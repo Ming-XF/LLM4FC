@@ -70,7 +70,7 @@ class TimeLLMConfig(BaseConfig):
                  n_heads=8,
                  d_ff=128,
                  num_prototypes=500,
-                 patch_stride=5,
+                 patch_stride=1,
                  dropout=0.1,
                  llm_layers=28):
         super().__init__(node_size=node_size, num_classes=num_classes)
@@ -138,8 +138,8 @@ class Model(nn.Module):
     4. Text prototypes from ChatGLM-6B word_embeddings via mapping_layer
     5. ReprogrammingLayer: cross-attention patches ↔ prototypes → (B, L, 4096)
     6. Prompt assembly: [dynamic_statistics_prompt | reprogrammed_patches]
-    7. Frozen ChatGLM-6B encoding
-    8. Mean-pool patch hidden states → Linear classifier → 4 classes
+    7. Frozen ChatGLM-6B encoding (bidirectional attention)
+    8. Per-position projection → sum → 4-class logits
     """
 
     def __init__(self, config: TimeLLMConfig):
@@ -174,6 +174,9 @@ class Model(nn.Module):
         # LLM gradient checkpointing off
         self.llm.transformer.gradient_checkpointing = False
 
+        # Cache position_encoding_2d flag (used for bidirectional-attn forward)
+        self.position_encoding_2d = self.llm.transformer.position_encoding_2d
+
         # ── 2. Text prototypes from LLM word embeddings ──
         self.word_embeddings = self.llm.transformer.word_embeddings.weight
         # ChatGLM-6B vocab_size = 150528
@@ -189,9 +192,9 @@ class Model(nn.Module):
             attention_dropout=config.dropout,
         )
 
-        # ── 5. Classification head ──
+        # ── 5. Classification head (per-position projection → sum) ──
         self.dropout = nn.Dropout(config.dropout)
-        self.cls_head = nn.Linear(self.d_llm, config.num_classes)
+        self.pos_projection = nn.Linear(self.d_llm, config.num_classes)
 
         # ── 6. Freeze LLM ──
         for param in self.llm.parameters():
@@ -279,20 +282,42 @@ class Model(nn.Module):
         )                                                 # (B, P+L, 4096)
 
         # ════════════════════════════════════════════════════════════
-        # Step 6: Frozen ChatGLM-6B encoding
+        # Step 6: Frozen ChatGLM-6B encoding (bidirectional attention)
         # ════════════════════════════════════════════════════════════
-        # forward_from_embeds returns [seq_len, batch, hidden_size]
-        HL = self.llm.forward_from_embeds(inputs_embeds)
-        HL = HL.transpose(0, 1)              # → (B, S+P+L, 4096)
+        S = inputs_embeds.shape[1]
+
+        # Bidirectional attention mask: all False = no masking (full visibility)
+        attention_mask = torch.zeros(B, 1, S, S, dtype=torch.bool,
+                                     device=device)
+
+        # Position IDs (matching ChatGLM-6B 2D position encoding convention)
+        position_ids = torch.arange(S, dtype=torch.long, device=device)
+        position_ids = position_ids.unsqueeze(0).repeat(B, 1)
+        if self.position_encoding_2d:
+            block_position_ids = torch.arange(S, dtype=torch.long,
+                                              device=device).unsqueeze(0).repeat(B, 1)
+            position_ids = torch.stack((position_ids, block_position_ids), dim=1)
+
+        transformer_outputs = self.llm.transformer(
+            input_ids=None,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            past_key_values=None,
+            inputs_embeds=inputs_embeds,
+            use_cache=False,
+            output_attentions=False,
+            output_hidden_states=False,
+            return_dict=False,
+        )
+        # transformer returns [seq_len, batch, hidden_size]
+        HL = transformer_outputs[0].transpose(0, 1)   # → (B, S, 4096)
 
         # ════════════════════════════════════════════════════════════
-        # Step 7: Pool patch hidden states → classify
+        # Step 7: Per-position projection → sum → classify
         # ════════════════════════════════════════════════════════════
-        # Take the last L positions (corresponding to DFC patches)
-        patch_hidden = HL[:, -L:, :]          # (B, L, 4096)
-        pooled = patch_hidden.mean(dim=1)     # (B, 4096)
-        pooled = self.dropout(pooled)
-        logits = self.cls_head(pooled)        # (B, 4)
+        # Each position independently votes on 4 classes; sum over all positions
+        pos_logits = self.pos_projection(self.dropout(HL))   # (B, S, 4)
+        logits = pos_logits.sum(dim=1)                       # (B, 4)
 
         # Handle labels: convert from one-hot if needed
         if labels.dim() > 1 and labels.shape[-1] > 1:
@@ -305,7 +330,7 @@ class Model(nn.Module):
             hidden_state={
                 'patches': patches,
                 'reprogrammed': reprogrammed,
-                'llm_pooled': pooled,
+                'llm_hidden': HL.mean(dim=1),
             }
         )
 

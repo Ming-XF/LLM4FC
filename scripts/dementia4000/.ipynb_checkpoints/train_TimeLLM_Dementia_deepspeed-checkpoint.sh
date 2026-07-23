@@ -35,7 +35,7 @@ deepspeed --num_gpus=4 main.py \
     --early_stop_metric "Accuracy" \
     --d_model 64 \
     --num_heads 8 \
-    --patch_stride 5 \
+    --patch_stride 2 \
     --num_prototypes 500 \
     --llm_layers 28 \
     --dropout 0.1 \
