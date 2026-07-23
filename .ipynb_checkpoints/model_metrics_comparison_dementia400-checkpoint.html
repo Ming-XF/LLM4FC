@@ -1,0 +1,66 @@
+
+    <html>
+    <head>
+        <title>Model Metrics Comparison</title>
+        <style>
+            table {
+                border-collapse: collapse;
+                width: 100%;
+                margin: 20px 0;
+                font-family: Arial, sans-serif;
+            }
+            th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: center;
+            }
+            th {
+                background-color: #f2f2f2;
+                position: sticky;
+                top: 0;
+            }
+            tr:nth-child(even) {
+                background-color: #f9f9f9;
+            }
+            tr:hover {
+                background-color: #f1f1f1;
+            }
+            .metric-header {
+                background-color: #e6f7ff;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Model Metrics Comparison (Average of Best Epochs from 3 Runs)</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2">Model</th>
+                    <th colspan="6" class="metric-header">Metrics (Average of Best Epochs)</th>
+                </tr>
+                <tr>
+                    <th>AUC</th>
+                    <th>Accuracy</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>F-score</th>
+                    <th>Loss</th>
+                </tr>
+            </thead>
+            <tbody>
+    
+                <tr>
+                    <td>BrainVAE_BatchSize16_Epoch200_Dementia400</td>
+                    <td>0.7229</td>
+                    <td>0.5033</td>
+                    <td>0.5273</td>
+                    <td>0.4886</td>
+                    <td>0.4803</td>
+                    <td>57.7358</td>
+                </tr>
+        
+            </tbody>
+        </table>
+    </body>
+    </html>
+    

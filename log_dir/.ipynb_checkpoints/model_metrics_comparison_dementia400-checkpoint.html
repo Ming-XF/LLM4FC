@@ -1,0 +1,216 @@
+
+    <html>
+    <head>
+        <title>Model Metrics Comparison</title>
+        <style>
+            table {
+                border-collapse: collapse;
+                width: 100%;
+                margin: 20px 0;
+                font-family: Arial, sans-serif;
+            }
+            th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: center;
+            }
+            th {
+                background-color: #f2f2f2;
+                position: sticky;
+                top: 0;
+            }
+            tr:nth-child(even) {
+                background-color: #f9f9f9;
+            }
+            tr:hover {
+                background-color: #f1f1f1;
+            }
+            .metric-header {
+                background-color: #e6f7ff;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Model Metrics Comparison</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2">Model</th>
+                    <th colspan="6" class="metric-header">Metrics (Best Epoch)</th>
+                </tr>
+                <tr>
+                    <th>AUC</th>
+                    <th>Accuracy</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>F-score</th>
+                    <th>Loss</th>
+                </tr>
+            </thead>
+            <tbody>
+    
+                <tr>
+                    <td>DeepConvNet_Dementia400</td>
+                    <td>0.3756</td>
+                    <td>0.1500</td>
+                    <td>0.0562</td>
+                    <td>0.1562</td>
+                    <td>0.0791</td>
+                    <td>1.6144</td>
+                </tr>
+        
+                <tr>
+                    <td>EEGNet_Dementia400</td>
+                    <td>0.4178</td>
+                    <td>0.1700</td>
+                    <td>0.2656</td>
+                    <td>0.1548</td>
+                    <td>0.1923</td>
+                    <td>1.5553</td>
+                </tr>
+        
+                <tr>
+                    <td>LMDA_Dementia400</td>
+                    <td>0.4585</td>
+                    <td>0.1900</td>
+                    <td>0.2680</td>
+                    <td>0.1726</td>
+                    <td>0.2081</td>
+                    <td>1.4853</td>
+                </tr>
+        
+                <tr>
+                    <td>ShallowConvNet_Dementia400</td>
+                    <td>0.5307</td>
+                    <td>0.2300</td>
+                    <td>0.3098</td>
+                    <td>0.2381</td>
+                    <td>0.1121</td>
+                    <td>1.3882</td>
+                </tr>
+        
+                <tr>
+                    <td>RACNN_Dementia400</td>
+                    <td>0.5553</td>
+                    <td>0.2900</td>
+                    <td>0.1364</td>
+                    <td>0.2634</td>
+                    <td>0.1537</td>
+                    <td>23.4634</td>
+                </tr>
+        
+                <tr>
+                    <td>DFaST_Dementia400</td>
+                    <td>0.5556</td>
+                    <td>0.3000</td>
+                    <td>0.2254</td>
+                    <td>0.2798</td>
+                    <td>0.2427</td>
+                    <td>1.3927</td>
+                </tr>
+        
+                <tr>
+                    <td>EEGChannelNet_Dementia400</td>
+                    <td>0.5572</td>
+                    <td>0.2400</td>
+                    <td>0.0600</td>
+                    <td>0.2500</td>
+                    <td>0.0968</td>
+                    <td>1.5548</td>
+                </tr>
+        
+                <tr>
+                    <td>TCANet_Dementia400</td>
+                    <td>0.5766</td>
+                    <td>0.2800</td>
+                    <td>0.0700</td>
+                    <td>0.2500</td>
+                    <td>0.1094</td>
+                    <td>5.8999</td>
+                </tr>
+        
+                <tr>
+                    <td>TCACNet_Dementia400</td>
+                    <td>0.5787</td>
+                    <td>0.2800</td>
+                    <td>0.0700</td>
+                    <td>0.2500</td>
+                    <td>0.1094</td>
+                    <td>184.9096</td>
+                </tr>
+        
+                <tr>
+                    <td>FBNetGen_Dementia400</td>
+                    <td>0.6078</td>
+                    <td>0.3600</td>
+                    <td>0.2200</td>
+                    <td>0.3348</td>
+                    <td>0.2367</td>
+                    <td>1.3393</td>
+                </tr>
+        
+                <tr>
+                    <td>MTSTA_Dementia400</td>
+                    <td>0.6422</td>
+                    <td>0.4600</td>
+                    <td>0.3269</td>
+                    <td>0.4464</td>
+                    <td>0.3377</td>
+                    <td>133.4264</td>
+                </tr>
+        
+                <tr>
+                    <td>STAGIN_Dementia400</td>
+                    <td>0.6522</td>
+                    <td>0.4800</td>
+                    <td>0.2894</td>
+                    <td>0.4613</td>
+                    <td>0.3386</td>
+                    <td>101.1962</td>
+                </tr>
+        
+                <tr>
+                    <td>SteadyNet_Dementia400</td>
+                    <td>0.6565</td>
+                    <td>0.3300</td>
+                    <td>0.1855</td>
+                    <td>0.3036</td>
+                    <td>0.2212</td>
+                    <td>1.2431</td>
+                </tr>
+        
+                <tr>
+                    <td>BNT_Dementia400</td>
+                    <td>0.7275</td>
+                    <td>0.4800</td>
+                    <td>0.2703</td>
+                    <td>0.4613</td>
+                    <td>0.3299</td>
+                    <td>14.2346</td>
+                </tr>
+        
+                <tr>
+                    <td>VAESTA_Dementia400</td>
+                    <td>0.7309</td>
+                    <td>0.3600</td>
+                    <td>0.2146</td>
+                    <td>0.3333</td>
+                    <td>0.2324</td>
+                    <td>160.2059</td>
+                </tr>
+        
+                <tr>
+                    <td>BrainNetCNN_Dementia400</td>
+                    <td>0.7564</td>
+                    <td>0.5300</td>
+                    <td>0.4924</td>
+                    <td>0.5119</td>
+                    <td>0.4820</td>
+                    <td>0.8682</td>
+                </tr>
+        
+            </tbody>
+        </table>
+    </body>
+    </html>
+    
