@@ -2,6 +2,11 @@
 #
 # TimeLLM DDP training on Dementia4000 (4 GPUs)
 #
+# Architecture (TimeLLM v2 — static FC):
+#   SFC → GCN node encoder (channel-name embeddings) → Reprogramming
+#   (cross-attention to text prototypes) → Frozen ChatGLM-6B
+#   → Flatten + classifier (AD/MCI/SCD/NC)
+#
 # Uses torchrun for multi-GPU DistributedDataParallel.
 # Each GPU runs one process; DistributedSampler partitions the data.
 #
@@ -34,9 +39,10 @@ torchrun --nproc_per_node=$NUM_GPUS --master_port=29500 main.py \
     --early_stop_metric "Accuracy" \
     --d_model 64 \
     --num_heads 8 \
-    --patch_stride 1 \
     --num_prototypes 500 \
-    --llm_layers 28 \
+    --num_patches 19 \
+    --d_ff 128 \
+    --gcn_hidden 128 \
     --dropout 0.1 \
     --do_parallel \
     --do_train \

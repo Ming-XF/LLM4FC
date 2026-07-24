@@ -2,17 +2,18 @@
 #
 # TimeLLM training on Dementia4000
 #
-# Architecture (based on Time-LLM ICLR 2024):
-#   DFC sliding windows (graph patches) → BrainNetCNN (graph encoder)
-#   → ReprogrammingLayer (cross-attention to text prototypes)
-#   → Frozen ChatGLM-6B → mean-pool → classifier (4 classes)
+# Architecture (TimeLLM v2 — static FC):
+#   SFC → GCN node encoder (channel-name embeddings) → Reprogramming
+#   (cross-attention to text prototypes) → Frozen ChatGLM-6B
+#   → Flatten + classifier (AD/MCI/SCD/NC)
 #
-# Trainable parameters (~76M):
-#   - BrainNetCNN (E2E+E2N+N2G): ~200K
-#   - Patch projection: 256→64: ~16K
-#   - mapping_layer: Linear(150528→500): ~75M
-#   - ReprogrammingLayer (Q/K/V/out projections): ~1M
-#   - Classification head: Linear(4096→4): ~16K
+# Trainable parameters (~77M):
+#   - channel_embed_projection (4096→128): ~0.5M
+#   - GCN + node_projection: ~24K
+#   - mapping_layer: Linear(vocab→500): ~75M
+#   - ReprogrammingLayer (Q/K/V/out): ~1M
+#   - node_pos_embed (19×4096): ~155K
+#   - output_projection (Flatten + Linear): ~10K
 #
 # GPU memory: ~24 GB (single GPU, bf16, batch_size=2)
 #   ChatGLM-6B (frozen): ~12 GB
@@ -41,9 +42,10 @@ python main.py \
     --early_stop_metric "Accuracy" \
     --d_model 64 \
     --num_heads 8 \
-    --patch_stride 1 \
     --num_prototypes 500 \
-    --llm_layers 28 \
+    --num_patches 19 \
+    --d_ff 128 \
+    --gcn_hidden 128 \
     --dropout 0.1 \
     --do_train \
     --do_evaluate \

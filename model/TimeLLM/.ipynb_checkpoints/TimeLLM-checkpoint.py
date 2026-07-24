@@ -237,10 +237,11 @@ class Model(nn.Module):
         ]
         word_embed_weight = self.llm.transformer.word_embeddings.weight.data
         channel_embeds = torch.stack([
-            word_embed_weight[torch.tensor(ids)].mean(dim=0)
+            word_embed_weight[torch.tensor(ids)].mean(dim=0).float()
             for ids in channel_name_ids
         ])  # (C, d_llm)
-        self.register_buffer("channel_name_embeddings", channel_embeds)
+        self.register_buffer("node_init",
+            self.channel_embed_projection(channel_embeds))  # (C, gcn_hidden)
 
         self.head_nf = config.d_ff * config.num_patches
         self.output_projection = nn.Sequential(
@@ -317,13 +318,8 @@ class Model(nn.Module):
         device = SFC.device
 
         adj_norm = normalize_adjacency(SFC, threshold=0.0)
-        adj_norm = adj_norm.to(dtype=self.node_projection[0].weight.dtype)
 
-        node_init = self.channel_embed_projection(
-            self.channel_name_embeddings.to(
-                dtype=self.channel_embed_projection[0].weight.dtype)
-        )  # (C, gcn_hidden)
-        node_init = node_init.unsqueeze(0).expand(B, -1, -1)
+        node_init = self.node_init.unsqueeze(0).expand(B, -1, -1)
         gcn_out = self.gcn(node_init, adj_norm)
         gcn_out = F.gelu(gcn_out)
 
@@ -335,11 +331,10 @@ class Model(nn.Module):
         source_embeddings = source_embeddings.to(
             dtype=self.word_embeddings.dtype)
 
-        reprogram_dtype = self.reprogramming_layer.query_projection.weight.dtype
         reprogrammed = self.reprogramming_layer(
-            node_embeddings.to(dtype=reprogram_dtype),
-            source_embeddings.to(dtype=reprogram_dtype),
-            source_embeddings.to(dtype=reprogram_dtype),
+            node_embeddings.to(dtype=torch.float32),
+            source_embeddings.to(dtype=torch.float32),
+            source_embeddings.to(dtype=torch.float32),
         )
 
         reprogrammed = reprogrammed + self.node_pos_embed
@@ -371,19 +366,12 @@ class Model(nn.Module):
         attention_mask = torch.zeros(B, 1, S, S, dtype=torch.bool,
                                      device=device)
 
-        global_pos = torch.arange(S, dtype=torch.long, device=device).unsqueeze(0).repeat(B, 1)
+        position_ids = torch.arange(S, dtype=torch.long, device=device)
+        position_ids = position_ids.unsqueeze(0).repeat(B, 1)
         if self.position_encoding_2d:
-            # Prompt prefix and graph node patches use independent local
-            # position coordinates so the model can distinguish them as
-            # distinct segments (modalities) rather than one undifferentiated
-            # sequence.
-            block_pos = torch.cat([
-                torch.arange(P_skip, dtype=torch.long, device=device),
-                torch.arange(C, dtype=torch.long, device=device),
-            ]).unsqueeze(0).repeat(B, 1)
-            position_ids = torch.stack((global_pos, block_pos), dim=1)
-        else:
-            position_ids = global_pos
+            block_position_ids = torch.arange(S, dtype=torch.long,
+                                              device=device).unsqueeze(0).repeat(B, 1)
+            position_ids = torch.stack((position_ids, block_position_ids), dim=1)
 
         transformer_outputs = self.llm.transformer(
             input_ids=None,
@@ -398,8 +386,7 @@ class Model(nn.Module):
         )
         HL = transformer_outputs[0].transpose(0, 1)
 
-        HL_patches = HL[:, P_skip:, :self.config.d_ff].to(
-            dtype=self.output_projection[1].weight.dtype)
+        HL_patches = HL[:, P_skip:, :self.config.d_ff].to(dtype=torch.float32)
         logits = self.output_projection(HL_patches)
 
         if labels.dim() > 1 and labels.shape[-1] > 1:

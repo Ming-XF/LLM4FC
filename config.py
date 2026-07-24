@@ -274,10 +274,12 @@ def init_model_config(args, data_config: DataConfig):
             num_classes=data_config.num_class,
             d_model=args.d_model,
             n_heads=args.num_heads,
+            d_ff=args.d_ff,
             num_prototypes=args.num_prototypes,
             gcn_hidden=args.gcn_hidden,
             dropout=args.dropout,
             llm_layers=args.llm_layers,
+            num_patches=args.num_patches,
         )
         model = Model(model_config)
     else:
