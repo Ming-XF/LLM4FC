@@ -1283,10 +1283,11 @@ class LDDE2thTrainer(LDDETrainer):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TimeLLMTrainer(Trainer):
-    """TimeLLM trainer for DFC-based dementia classification.
+    """TimeLLM v2 trainer for static-FC-based dementia classification.
 
-    Architecture: BNC graph patch encoder → Reprogramming (cross-attention
-    to text prototypes) → frozen ChatGLM-6B → mean-pool → classifier.
+    Architecture: SFC → adjacency norm → GCN node encoder → Reprogramming
+    (cross-attention to text prototypes) → frozen ChatGLM-6B (19 tokens)
+    → mean-pool → classifier.
 
     Supports:
       - Single GPU (AMP)
@@ -1295,7 +1296,8 @@ class TimeLLMTrainer(Trainer):
 
     Key differences from LDDE2thTrainer:
       - No LoRA (pure Time-LLM reprogramming paradigm)
-      - DFC-only input (no gender/age/education)
+      - Static FC input (correlation) only (no DFC, no time_series)
+      - No gender/age/education
       - Single-stage joint training
       - Simpler state_dict save/load (no LoRA adapter)
     """
@@ -1327,15 +1329,17 @@ class TimeLLMTrainer(Trainer):
     # ── Input preparation ──────────────────────────────────────────
 
     def prepare_inputs_kwargs(self, inputs):
-        """Extract fields for TimeLLM forward pass.
+        """Extract fields for TimeLLM v2 forward pass.
 
-        Labels are kept as-is (one-hot); class-index conversion happens
-        inside the model forward.
+        Uses static FC (correlation) as input; labels are converted to
+        class indices inside the model forward.
         """
+        labels = inputs['labels']
+        if labels.dim() > 1 and labels.shape[-1] > 1:
+            labels = labels.argmax(dim=-1)
         return {
-            "time_series": inputs['time_series'].float().to(self.device),
-            "DFC": inputs['DFC'].float().to(self.device),
-            "labels": inputs['labels'].to(self.device),
+            "SFC": inputs['correlation'].float().to(self.device),
+            "labels": labels.long().to(self.device),
         }
 
     # ── Training loop (AMP / DeepSpeed) ────────────────────────────
@@ -1530,7 +1534,7 @@ class TimeLLMTrainer(Trainer):
                     preds_local = batch_preds
                 else:
                     preds_local = torch.cat([preds_local, batch_preds], dim=0)
-                labels_local += input_kwargs['labels'].argmax(dim=-1).cpu().tolist()
+                labels_local += input_kwargs['labels'].cpu().tolist()
 
         # ── Distributed gather across ranks ──
         if is_dist:

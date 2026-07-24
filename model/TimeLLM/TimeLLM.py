@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModel
 from ..base import BaseConfig, ModelOutputs
-from ..LDDE2th.LDDE2thLayers import BrainNetCNN
 
 import logging
 
@@ -12,31 +11,9 @@ _log = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Dynamic Prompt Template
+# EEG 19-channel layout (kept as reference)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-PROMPT_TEMPLATE = (
-    "<|start_prompt|>Dataset: Dementia4000 resting-state EEG, 19 channels (10-20 system). "
-    "Task: Classify the patient into one of 4 categories (0=NC, 1=SMI, 2=MCI, 3=AD) "
-    "based on DFC patterns.\n"
-    "Input DFC statistics:\n"
-    "- {L} DFC windows after stride={stride} subsampling\n"
-    "- Global mean FC: {mean_fc:.3f}, std across edges: {std_fc:.3f}\n"
-    "- Positive connections (r>0): {pos_ratio:.1f}%, strong connections (|r|>0.5): {strong_ratio:.1f}%\n"
-    "- Weighted clustering coefficient: {cluster_coef:.3f}, "
-    "characteristic path length: {path_length:.2f}\n"
-    "- Mean temporal variability (DFC std across windows): {temporal_std:.3f}\n"
-    "- Most stable connection: {stable_pair} (CV={stable_cv:.3f})\n"
-    "- Most unstable connection: {unstable_pair} (CV={unstable_cv:.3f})\n"
-    "- Intra-frontal FC: {fc_frontal:.3f}, intra-temporal FC: {fc_temporal:.3f}\n"
-    "- Intra-central/SMN FC: {fc_central:.3f}, intra-parietal FC: {fc_parietal:.3f}\n"
-    "- Intra-occipital/VIS FC: {fc_occipital:.3f}\n"
-    "- Parieto-temporal FC (DMN posterior proxy): {fc_parieto_temporal:.3f}\n"
-    "- Inter-hemispheric homologous FC: {fc_homologous:.3f}\n"
-    "<|end_prompt|>"
-)
-
-# EEG 19-channel layout
 EEG_19_CHANNELS = [
     'Fp1', 'F3', 'C3', 'P3', 'O1',
     'Fp2', 'F4', 'C4', 'P4', 'O2',
@@ -46,18 +23,122 @@ EEG_19_CHANNELS = [
 ]
 
 EEG_CHANNEL_GROUPS = {
-    'frontal':  [0, 5, 1, 6, 10, 13, 16],   # Fp1,Fp2,F3,F4,F7,F8,Fz
-    'temporal': [11, 14, 12, 15],              # T3,T4,T5,T6
-    'central':  [2, 17, 7],                     # C3,Cz,C4
-    'parietal': [3, 18, 8],                     # P3,Pz,P4
-    'occipital': [4, 9],                        # O1,O2
+    'frontal':  [0, 5, 1, 6, 10, 13, 16],
+    'temporal': [11, 14, 12, 15],
+    'central':  [2, 17, 7],
+    'parietal': [3, 18, 8],
+    'occipital': [4, 9],
 }
 
-# Homologous pairs (left-right symmetric)
 HOMOLOGOUS_PAIRS = [
     (0, 5), (1, 6), (2, 7), (3, 8), (4, 9),
     (10, 13), (11, 14), (12, 15),
 ]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# System Prompt
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Prompt Part 1: Dataset description ──
+PROMPT_DATASET = (
+    "This dataset is used for Alzheimer's disease (AD) dementia diagnosis, "
+    "based on resting-state EEG data from over a thousand subjects. The raw "
+    "signals are segmented into 1-second windows, and Pearson correlation "
+    "coefficients are computed between each pair of channels to construct "
+    "brain functional connectivity graphs. A total of 19 channels (international "
+    "10-20 system) are covered, in the following order: Fp1, F3, C3, P3, O1, "
+    "Fp2, F4, C4, P4, O2, F7, T3, T5, F8, T4, T6, FZ, CZ, PZ."
+)
+
+# ── Prompt Part 2: Task instruction ──
+PROMPT_TASK = (
+    "Given 19-channel brain functional connectivity, classify the subject "
+    "as AD (Alzheimer's disease), MCI (mild cognitive impairment), "
+    "SCD (subjective cognitive decline), or NC (normal cognition)."
+)
+
+# ── Prompt Part 3: Statistical features template (filled per sample) ──
+PROMPT_STATS = (
+    "Maximum connection: {max_pair} (r={max_val:.3f}). "
+    "Minimum positive connection: {min_pos_pair} (r={min_pos_val:.3f}). "
+    "Strongest negative connection: {max_neg_pair} (r={max_neg_val:.3f}). "
+    "Mean intra-frontal FC: {fc_frontal:.3f}. "
+    "Mean inter-hemispheric homologous FC: {fc_homologous:.3f}. "
+    "Global mean FC: {mean_fc:.3f} (std: {std_fc:.3f})."
+)
+
+# ── Assembled fixed system prompt (Part 1 + Part 2 only) ──
+SYSTEM_PROMPT = "\n".join([PROMPT_DATASET, PROMPT_TASK])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GCN Layer + adjacency normalization
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class GCNLayer(nn.Module):
+    """Single graph convolution layer.
+
+    H^{l+1} = D^{-1/2} Â D^{-1/2} H^l W^l
+    """
+    def __init__(self, in_features, out_features, dropout=0.1):
+        super().__init__()
+        self.linear = nn.Linear(in_features, out_features, bias=False)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x, adj_norm):
+        """
+        Args:
+            x:        (B, N, in_features)  node features
+            adj_norm: (B, N, N)            normalized adjacency with self-loops
+
+        Returns:
+            (B, N, out_features)
+        """
+        x = self.dropout(x)
+        support = self.linear(x)
+        out = torch.bmm(adj_norm, support)
+        return out
+
+
+def normalize_adjacency(SFC, threshold=0.0):
+    """Convert static FC matrix to symmetric-normalized graph adjacency.
+
+    A = |SFC| (with threshold, zero diagonal, self-loop)
+    Ã_norm = D^{-1/2} A D^{-1/2}
+
+    Args:
+        SFC:      (B, N, N)  Pearson correlation matrix, values in [-1, 1]
+        threshold: float      edges with absolute r < threshold are zeroed
+
+    Returns:
+        adj_norm: (B, N, N)  normalized adjacency matrix
+    """
+    B, N, _ = SFC.shape
+    device = SFC.device
+
+    adj = SFC.abs().clone()
+
+    # Zero diagonal
+    idx = torch.arange(N, device=device)
+    adj[:, idx, idx] = 0
+
+    # Threshold weak edges
+    adj[adj < threshold] = 0
+
+    # Add self-loops: Â = A + I
+    adj = adj + torch.eye(N, device=device).unsqueeze(0)
+
+    # Degree matrix
+    deg = adj.sum(dim=-1)  # (B, N)
+    deg_inv_sqrt = deg.pow(-0.5)
+    deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.0
+
+    # D^{-1/2} Â D^{-1/2}
+    D_inv_sqrt = torch.diag_embed(deg_inv_sqrt)  # (B, N, N)
+    adj_norm = D_inv_sqrt @ adj @ D_inv_sqrt
+
+    return adj_norm
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -68,23 +149,21 @@ class TimeLLMConfig(BaseConfig):
     def __init__(self, node_size, num_classes,
                  d_model=64,
                  n_heads=8,
-                 d_ff=128,
                  num_prototypes=500,
-                 patch_stride=1,
+                 gcn_hidden=128,
                  dropout=0.1,
                  llm_layers=28):
         super().__init__(node_size=node_size, num_classes=num_classes)
-        self.d_model = d_model          # patch feature dim (Q input to Reprogramming)
-        self.n_heads = n_heads          # ReprogrammingLayer attention heads
-        self.d_ff = d_ff                # unused, kept for compat
-        self.num_prototypes = num_prototypes  # N of text prototypes
-        self.patch_stride = patch_stride      # DFC temporal subsampling stride
+        self.d_model = d_model                # node embedding dim → ReprogrammingLayer Q
+        self.n_heads = n_heads                # ReprogrammingLayer attention heads
+        self.num_prototypes = num_prototypes  # number of text prototypes
+        self.gcn_hidden = gcn_hidden          # GCN hidden dimension
         self.dropout = dropout
-        self.llm_layers = llm_layers    # ChatGLM layers to use (all 28)
+        self.llm_layers = llm_layers          # ChatGLM layers to use
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ReprogrammingLayer — cross-attention: time-series patches → text prototypes
+# ReprogrammingLayer — cross-attention: nodes → text prototypes
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class ReprogrammingLayer(nn.Module):
@@ -125,39 +204,43 @@ class ReprogrammingLayer(nn.Module):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TimeLLM Model — BNC patch encoder → Reprogramming → ChatGLM-6B → classify
+# TimeLLM v2 Model — GCN node encoder → Reprogramming → ChatGLM-6B → classify
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class Model(nn.Module):
-    """Time-LLM for DFC-based dementia classification.
+    """TimeLLM v2 for static-FC-based dementia classification.
 
-    Architecture (based on Time-LLM ICLR 2024):
-    1. DFC temporal subsampling (stride)
-    2. BrainNetCNN per-window graph encoding → (B, L, 256)
-    3. Linear projection → (B, L, d_model)
-    4. Text prototypes from ChatGLM-6B word_embeddings via mapping_layer
-    5. ReprogrammingLayer: cross-attention patches ↔ prototypes → (B, L, 4096)
-    6. Prompt assembly: [dynamic_statistics_prompt | reprogrammed_patches]
-    7. Frozen ChatGLM-6B encoding (bidirectional attention)
-    8. Per-position projection → sum → 4-class logits
+    Architecture:
+    1. Static FC (B, 19, 19) → normalize_adjacency → (B, 19, 19)
+    2. Learnable node_init (19, gcn_hidden) → GCN(adj_norm) → node_embeddings (B, 19, gcn_hidden)
+    3. Node projection → (B, 19, d_model)
+    4. Text prototypes from ChatGLM-6B word_embeddings via mapping_layer → (500, 4096)
+    5. ReprogrammingLayer: cross-attention (Q=nodes, K/V=prototypes) → (B, 19, 4096)
+    6. Add learnable node position embeddings
+    7. Assemble [<start_prompt> | frozen_prefix | per-sample_stats | <end_prompt> | node_tokens]
+    8. Frozen ChatGLM-6B bidirectional encoding
+    9. Mean pool over node tokens only → Linear(4096 → 4) → logits
     """
 
     def __init__(self, config: TimeLLMConfig):
         super().__init__()
         self.config = config
-        C = config.node_size          # 19
-        self.stride = config.patch_stride  # 5
+        C = config.node_size               # 19 EEG channels
         self.d_model = config.d_model      # 64
         self.num_prototypes = config.num_prototypes  # 500
-        self.n_heads = config.n_heads       # 8
-        self.d_llm = 4096                   # ChatGLM-6B hidden_size
-        self.llm_layers = config.llm_layers  # 28
+        self.n_heads = config.n_heads      # 8
+        self.d_llm = 4096                  # ChatGLM-6B hidden_size
+        self.llm_layers = config.llm_layers
 
-        # ── 1. BrainNetCNN — DFC graph patch encoder ──
-        self.bnc = BrainNetCNN(C)
-        # Project BNC output (256) → d_model for ReprogrammingLayer Q input
-        self.patch_projection = nn.Sequential(
-            nn.Linear(256, config.d_model),
+        # ── 1. GCN node encoder ──
+        # Learnable initial node features: one vector per EEG channel
+        self.node_init = nn.Parameter(torch.randn(C, config.gcn_hidden) * 0.02)
+        self.gcn = GCNLayer(config.gcn_hidden, config.gcn_hidden,
+                            dropout=config.dropout)
+
+        # Project GCN output to d_model for ReprogrammingLayer Q
+        self.node_projection = nn.Sequential(
+            nn.Linear(config.gcn_hidden, config.d_model),
             nn.LayerNorm(config.d_model),
             nn.GELU(),
             nn.Dropout(config.dropout),
@@ -171,20 +254,43 @@ class Model(nn.Module):
             "./model/chatglm-6b", trust_remote_code=True
         ).bfloat16()
 
-        # LLM gradient checkpointing off
         self.llm.transformer.gradient_checkpointing = False
-
-        # Cache position_encoding_2d flag (used for bidirectional-attn forward)
         self.position_encoding_2d = self.llm.transformer.position_encoding_2d
 
-        # ── 2. Text prototypes from LLM word embeddings ──
+        # ── Frozen system prompt prefix embeddings (Part 1 + Part 2) ──
+        prefix_ids = self.tokenizer.encode(SYSTEM_PROMPT)
+        with torch.no_grad():
+            prefix_embeds = self.llm.transformer.word_embeddings(
+                torch.tensor(prefix_ids)
+            )  # (P_prefix, 4096)
+        self.register_buffer("prompt_prefix_embeddings", prefix_embeds)
+        self.P_prefix: int = prefix_embeds.shape[0]  # number of fixed prefix tokens
+
+        # ── Frozen start / end prompt tags ──
+        start_tag_ids = self.tokenizer.encode("<start_prompt>\n")
+        with torch.no_grad():
+            start_tag_embeds = self.llm.transformer.word_embeddings(
+                torch.tensor(start_tag_ids)
+            )  # (P_start, 4096)
+        self.register_buffer("start_tag_embeddings", start_tag_embeds)
+        self.P_start: int = start_tag_embeds.shape[0]
+
+        end_tag_ids = self.tokenizer.encode("\n<end_prompt>")
+        with torch.no_grad():
+            end_tag_embeds = self.llm.transformer.word_embeddings(
+                torch.tensor(end_tag_ids)
+            )  # (P_end, 4096)
+        self.register_buffer("end_tag_embeddings", end_tag_embeds)
+        self.P_end: int = end_tag_embeds.shape[0]
+
+        # ── 3. Text prototypes from LLM word embeddings ──
         self.word_embeddings = self.llm.transformer.word_embeddings.weight
         # ChatGLM-6B vocab_size = 150528
-        self.vocab_size = self.word_embeddings.shape[0]  # 150528
+        self.vocab_size = self.word_embeddings.shape[0]
         self.mapping_layer = nn.Linear(self.vocab_size, self.num_prototypes)
-        # mapping_layer: Linear(150528, 500), weight = (500, 150528) ≈ 75M params
+        # mapping_layer: Linear(150528, 500), ~75M trainable params
 
-        # ── 4. ReprogrammingLayer — cross-attention ──
+        # ── 4. ReprogrammingLayer: cross-attention nodes ↔ prototypes ──
         self.reprogramming_layer = ReprogrammingLayer(
             d_model=config.d_model,
             n_heads=config.n_heads,
@@ -192,101 +298,184 @@ class Model(nn.Module):
             attention_dropout=config.dropout,
         )
 
-        # ── 5. Classification head (per-position projection → sum) ──
-        self.dropout = nn.Dropout(config.dropout)
-        self.pos_projection = nn.Linear(self.d_llm, config.num_classes)
+        # ── 5. Learnable node position embeddings ──
+        self.node_pos_embed = nn.Parameter(torch.zeros(1, C, self.d_llm))
+        nn.init.normal_(self.node_pos_embed, std=0.02)
 
-        # ── 6. Freeze LLM ──
+        # ── 6. Classification head ──
+        self.dropout = nn.Dropout(config.dropout)
+        self.cls_head = nn.Linear(self.d_llm, config.num_classes)
+
+        # ── 7. Freeze LLM ──
         for param in self.llm.parameters():
             param.requires_grad = False
 
-        # Set pad_token
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
+    # ── Per-sample stats prompt builder ────────────────────────────
+
+    def _build_stats_prompts(self, SFC):
+        """Build per-sample statistical feature prompt from static FC.
+
+        Args:
+            SFC: (B, 19, 19) static functional connectivity matrices
+
+        Returns:
+            list[str] of length B
+        """
+        B, N, _ = SFC.shape
+
+        prompts = []
+        for b in range(B):
+            fc = SFC[b].clone()
+            fc.fill_diagonal_(0.0)
+
+            # ── Global stats ──
+            triu_idx = torch.triu_indices(N, N, offset=1)
+            all_edges = fc[triu_idx[0], triu_idx[1]]
+            mean_fc = float(all_edges.mean())
+            std_fc = float(all_edges.std())
+
+            # ── Extremal connections ──
+            edge_values = []
+            for i, j in zip(triu_idx[0].tolist(), triu_idx[1].tolist()):
+                edge_values.append({
+                    'i': i, 'j': j,
+                    'val': fc[i, j].item(),
+                    'name': f"{EEG_19_CHANNELS[i]}-{EEG_19_CHANNELS[j]}",
+                })
+
+            # Max connection (highest r)
+            edge_values.sort(key=lambda e: e['val'], reverse=True)
+            max_edge = edge_values[0]
+
+            # Min positive connection
+            pos_edges = [e for e in edge_values if e['val'] > 0]
+            min_pos_edge = pos_edges[-1] if pos_edges else max_edge
+
+            # Strongest negative connection
+            neg_edges = [e for e in edge_values if e['val'] < 0]
+            max_neg_edge = neg_edges[0] if neg_edges else edge_values[-1]
+
+            # ── Intra-frontal FC ──
+            frontal_idx = EEG_CHANNEL_GROUPS['frontal']
+            frontal_vals = []
+            for a in range(len(frontal_idx)):
+                for k in range(a + 1, len(frontal_idx)):
+                    frontal_vals.append(
+                        fc[frontal_idx[a], frontal_idx[k]].item())
+            fc_frontal = float(torch.tensor(frontal_vals).mean()) if frontal_vals else 0.0
+
+            # ── Inter-hemispheric homologous FC ──
+            homo_vals = [fc[i, j].item() for i, j in HOMOLOGOUS_PAIRS]
+            fc_homologous = float(torch.tensor(homo_vals).mean())
+
+            prompt = PROMPT_STATS.format(
+                max_pair=max_edge['name'],
+                max_val=max_edge['val'],
+                min_pos_pair=min_pos_edge['name'],
+                min_pos_val=min_pos_edge['val'],
+                max_neg_pair=max_neg_edge['name'],
+                max_neg_val=max_neg_edge['val'],
+                fc_frontal=fc_frontal,
+                fc_homologous=fc_homologous,
+                mean_fc=mean_fc,
+                std_fc=std_fc,
+            )
+            prompts.append(prompt)
+
+        return prompts
+
     # ── Forward ────────────────────────────────────────────────────
-    def forward(self, time_series, DFC, labels,
-                gender=None, age=None, education=None):
+
+    def forward(self, SFC, labels, gender=None, age=None, education=None):
         """
         Args:
-            time_series: (B, 19, Ts)   EEG time series
-            DFC:         (B, L_full, 19, 19)  dynamic FC matrices
-            labels:      (B,)           class indices (int)
+            SFC:    (B, 19, 19)  static functional connectivity matrix
+            labels: (B,) or (B, 4)  class indices or one-hot
 
         Returns:
             ModelOutputs with logits, loss, hidden_state
         """
-        B, L_full, C, _ = DFC.shape
-        device = DFC.device
+        B, C, _ = SFC.shape
+        device = SFC.device
 
         # ════════════════════════════════════════════════════════════
-        # Step 0: DFC temporal subsampling
+        # Step 1: Normalize adjacency matrix
         # ════════════════════════════════════════════════════════════
-        DFC = DFC[:, ::self.stride, :, :]              # (B, L, 19, 19)
-        L = DFC.shape[1]
+        adj_norm = normalize_adjacency(SFC, threshold=0.0)   # (B, C, C)
 
         # ════════════════════════════════════════════════════════════
-        # Step 1: BrainNetCNN graph patch encoding
+        # Step 2: GCN → 19 node embeddings
         # ════════════════════════════════════════════════════════════
-        DFC_flat = DFC.reshape(B * L, 1, C, C)          # (B*L, 1, 19, 19)
-        DFC_flat = DFC_flat.to(dtype=next(self.bnc.parameters()).dtype)
-        F_per_window = self.bnc(DFC_flat)                # (B*L, 256)
-        F_per_window = F_per_window.reshape(B, L, 256)   # (B, L, 256)
+        node_init = self.node_init.unsqueeze(0).expand(B, -1, -1)  # (B, C, gcn_hidden)
+        gcn_out = self.gcn(node_init, adj_norm)                     # (B, C, gcn_hidden)
+        gcn_out = F.gelu(gcn_out)
 
-        # Project to d_model space
-        patches = self.patch_projection(F_per_window)     # (B, L, d_model)
-
-        # ════════════════════════════════════════════════════════════
-        # Step 2: Build dynamic prompt from DFC statistics
-        # ════════════════════════════════════════════════════════════
-        prompt_texts = self._build_dynamic_prompts(DFC, L)
-        prompt_tokens = self.tokenizer(
-            prompt_texts, return_tensors="pt",
-            padding=True, truncation=True, max_length=2048
-        ).input_ids.to(device)
-        prompt_embeddings = self.llm.transformer.word_embeddings(
-            prompt_tokens)                                 # (B, P, 4096)
-        P = prompt_embeddings.shape[1]
+        # Project to d_model for ReprogrammingLayer Q
+        node_embeddings = self.node_projection(gcn_out)             # (B, C, d_model)
 
         # ════════════════════════════════════════════════════════════
         # Step 3: Text prototypes from LLM word embeddings
         # ════════════════════════════════════════════════════════════
-        # word_embeddings: (vocab_size, 4096)
-        # → permute → (4096, vocab_size)
-        # → mapping_layer (Linear(vocab_size, num_prototypes)) → (4096, num_prototypes)
-        # → permute → (num_prototypes, 4096)
-        source_embeddings = self.mapping_layer(
-            self.word_embeddings.permute(1, 0)
-        ).permute(1, 0)                                  # (N_proto, 4096)
+        # word_embeddings is bfloat16 (frozen LLM), mapping_layer is float32.
+        # Cast to float32 for the linear, then back to bfloat16 for reprogramming.
+        we = self.word_embeddings.permute(1, 0).to(
+            dtype=self.mapping_layer.weight.dtype)
+        source_embeddings = self.mapping_layer(we).permute(1, 0)  # (N_proto, 4096)
+        source_embeddings = source_embeddings.to(
+            dtype=self.word_embeddings.dtype)
 
         # ════════════════════════════════════════════════════════════
-        # Step 4: Reprogramming (cross-attention)
-        #   Q: patch embeddings (B, L, d_model)
-        #   K,V: text prototypes (N_proto, 4096)
-        # → (B, L, 4096)
+        # Step 4: Reprogramming — cross-attention
+        #   Q: node embeddings (B, C, d_model)  [float32]
+        #   K,V: text prototypes (N_proto, 4096)  [coming from mapping_layer]
+        #   ReprogrammingLayer runs in float32; cast output to bfloat16 for LLM.
         # ════════════════════════════════════════════════════════════
+        # Cast prototypes to float32 for ReprogrammingLayer (its weights are fp32)
         reprogrammed = self.reprogramming_layer(
-            patches.to(dtype=source_embeddings.dtype),
-            source_embeddings,
-            source_embeddings,
-        )                                                 # (B, L, 4096)
+            node_embeddings.to(dtype=torch.float32),
+            source_embeddings.to(dtype=torch.float32),
+            source_embeddings.to(dtype=torch.float32),
+        )                                                    # (B, C, 4096)  float32
+
+        # Add learnable node position embeddings, then convert to bfloat16 for LLM
+        reprogrammed = reprogrammed + self.node_pos_embed     # (B, C, 4096)
+        reprogrammed = reprogrammed.to(dtype=torch.bfloat16)
 
         # ════════════════════════════════════════════════════════════
-        # Step 5: Assemble LLM input
-        #   [dynamic_prompt | reprogrammed_patches]
+        # Step 5: Build per-sample stats prompt & assemble
+        #   [<start_prompt> | prefix (Part1+2) | stats (Part3) | <end_prompt> | node_tokens]
         # ════════════════════════════════════════════════════════════
+        stats_texts = self._build_stats_prompts(SFC)
+        stats_ids = self.tokenizer(
+            stats_texts, return_tensors="pt",
+            padding=True, truncation=True, max_length=256
+        ).input_ids.to(device)
+        stats_embeddings = self.llm.transformer.word_embeddings(
+            stats_ids)                                       # (B, P_stats, 4096)
+
+        start_tag = self.start_tag_embeddings.unsqueeze(0) \
+                        .expand(B, -1, -1)                   # (B, P_start, 4096)
+        end_tag = self.end_tag_embeddings.unsqueeze(0) \
+                      .expand(B, -1, -1)                     # (B, P_end, 4096)
+        prompt_prefix = self.prompt_prefix_embeddings.unsqueeze(0) \
+                            .expand(B, -1, -1)                # (B, P_prefix, 4096)
+
         inputs_embeds = torch.cat(
-            [prompt_embeddings.to(dtype=reprogrammed.dtype),
-             reprogrammed],
+            [start_tag,
+             prompt_prefix,
+             stats_embeddings.to(dtype=prompt_prefix.dtype),
+             end_tag,
+             reprogrammed.to(dtype=prompt_prefix.dtype)],
             dim=1,
-        )                                                 # (B, P+L, 4096)
-
-        # ════════════════════════════════════════════════════════════
-        # Step 6: Frozen ChatGLM-6B encoding (bidirectional attention)
-        # ════════════════════════════════════════════════════════════
+        )                                                    # (B, total, 4096)
         S = inputs_embeds.shape[1]
+        P_skip = (self.P_start + self.P_prefix +
+                  stats_embeddings.shape[1] + self.P_end)     # prompt tokens to skip
 
-        # Bidirectional attention mask: all False = no masking (full visibility)
+        # Bidirectional attention: all False = full visibility
         attention_mask = torch.zeros(B, 1, S, S, dtype=torch.bool,
                                      device=device)
 
@@ -310,14 +499,15 @@ class Model(nn.Module):
             return_dict=False,
         )
         # transformer returns [seq_len, batch, hidden_size]
-        HL = transformer_outputs[0].transpose(0, 1)   # → (B, S, 4096)
+        HL = transformer_outputs[0].transpose(0, 1)           # → (B, P_skip+19, 4096)
 
         # ════════════════════════════════════════════════════════════
-        # Step 7: Per-position projection → sum → classify
+        # Step 6: Mean pool over node tokens only (skip all prompt) → classify
         # ════════════════════════════════════════════════════════════
-        # Each position independently votes on 4 classes; sum over all positions
-        pos_logits = self.pos_projection(self.dropout(HL))   # (B, S, 4)
-        logits = pos_logits.sum(dim=1)                       # (B, 4)
+        # HL is bfloat16; cast to float32 for dropout & cls_head (float32 layers)
+        llm_pooled = HL[:, P_skip:, :].mean(dim=1).to(dtype=torch.float32)
+        llm_pooled = self.dropout(llm_pooled)
+        logits = self.cls_head(llm_pooled)                    # (B, num_classes)
 
         # Handle labels: convert from one-hot if needed
         if labels.dim() > 1 and labels.shape[-1] > 1:
@@ -328,192 +518,8 @@ class Model(nn.Module):
             logits=logits,
             loss=loss,
             hidden_state={
-                'patches': patches,
+                'gcn_out': gcn_out,
                 'reprogrammed': reprogrammed,
-                'llm_hidden': HL.mean(dim=1),
+                'llm_pooled': llm_pooled,
             }
         )
-
-    # ── Dynamic Prompt Building ────────────────────────────────────
-    def _build_dynamic_prompts(self, DFC, L):
-        """Build per-sample dynamic prompt texts from DFC statistics.
-
-        Args:
-            DFC: (B, L, 19, 19) subsampled DFC matrices
-            L:   number of windows
-
-        Returns:
-            list[str] of length B
-        """
-        B = DFC.shape[0]
-        device = DFC.device
-        N = 19  # channels
-
-        # Time-averaged FC matrix
-        fc_mean = DFC.mean(dim=1)              # (B, 19, 19)
-        # Time std (temporal variability)
-        fc_std = DFC.std(dim=1)                # (B, 19, 19)
-
-        prompts = []
-        for b in range(B):
-            fc = fc_mean[b].clone()            # (19, 19)
-            fc_std_b = fc_std[b].clone()       # (19, 19)
-
-            # Zero diagonal
-            fc.fill_diagonal_(0.0)
-            fc_std_b.fill_diagonal_(0.0)
-
-            # ── Global stats ──
-            triu_idx = torch.triu_indices(N, N, offset=1)
-            all_edges = fc[triu_idx[0], triu_idx[1]]   # 171 edges
-            mean_fc = float(all_edges.mean())
-            std_fc = float(all_edges.std())
-            pos_ratio = float((all_edges > 0).float().mean()) * 100
-            strong_ratio = float((all_edges.abs() > 0.5).float().mean()) * 100
-
-            # ── Graph metrics ──
-            cluster_coef, path_length = self._graph_metrics(fc)
-
-            # ── Temporal variability ──
-            all_std = fc_std_b[triu_idx[0], triu_idx[1]]
-            temporal_std = float(all_std.mean())
-
-            # Most stable / unstable connections
-            edges_cv = []
-            for i in range(N):
-                for j in range(i + 1, N):
-                    mu = abs(fc[i, j].item())
-                    sigma = fc_std_b[i, j].item()
-                    if mu > 0.05 and sigma > 0:
-                        edges_cv.append({
-                            'i': i, 'j': j,
-                            'mu': mu, 'sigma': sigma,
-                            'cv': sigma / mu,
-                        })
-            if edges_cv:
-                edges_cv.sort(key=lambda e: e['cv'])
-                stable = edges_cv[0]
-                unstable = edges_cv[-1]
-                stable_pair = f"{EEG_19_CHANNELS[stable['i']]}-{EEG_19_CHANNELS[stable['j']]}"
-                unstable_pair = f"{EEG_19_CHANNELS[unstable['i']]}-{EEG_19_CHANNELS[unstable['j']]}"
-                stable_cv = stable['cv']
-                unstable_cv = unstable['cv']
-            else:
-                stable_pair, unstable_pair = "N/A", "N/A"
-                stable_cv, unstable_cv = 0.0, 0.0
-
-            # ── Network-level FC ──
-            def _intra_fc(indices):
-                vals = []
-                for a in range(len(indices)):
-                    for b in range(a + 1, len(indices)):
-                        vals.append(fc[indices[a], indices[b]].item())
-                return float(torch.tensor(vals).mean()) if vals else 0.0
-
-            fc_frontal = _intra_fc(EEG_CHANNEL_GROUPS['frontal'])
-            fc_temporal = _intra_fc(EEG_CHANNEL_GROUPS['temporal'])
-            fc_central = _intra_fc(EEG_CHANNEL_GROUPS['central'])
-            fc_parietal = _intra_fc(EEG_CHANNEL_GROUPS['parietal'])
-            fc_occipital = _intra_fc(EEG_CHANNEL_GROUPS['occipital'])
-
-            # Parieto-temporal cross-network (DMN posterior proxy)
-            pt_vals = []
-            for pi in EEG_CHANNEL_GROUPS['parietal']:
-                for ti in EEG_CHANNEL_GROUPS['temporal']:
-                    pt_vals.append(fc[pi, ti].item())
-            fc_parieto_temporal = float(torch.tensor(pt_vals).mean()) if pt_vals else 0.0
-
-            # Homologous inter-hemispheric FC
-            homo_vals = [fc[i, j].item() for i, j in HOMOLOGOUS_PAIRS]
-            fc_homologous = float(torch.tensor(homo_vals).mean())
-
-            prompt = PROMPT_TEMPLATE.format(
-                L=L,
-                stride=self.stride,
-                mean_fc=mean_fc,
-                std_fc=std_fc,
-                pos_ratio=pos_ratio,
-                strong_ratio=strong_ratio,
-                cluster_coef=cluster_coef,
-                path_length=path_length,
-                temporal_std=temporal_std,
-                stable_pair=stable_pair,
-                stable_cv=stable_cv,
-                unstable_pair=unstable_pair,
-                unstable_cv=unstable_cv,
-                fc_frontal=fc_frontal,
-                fc_temporal=fc_temporal,
-                fc_central=fc_central,
-                fc_parietal=fc_parietal,
-                fc_occipital=fc_occipital,
-                fc_parieto_temporal=fc_parieto_temporal,
-                fc_homologous=fc_homologous,
-            )
-            prompts.append(prompt)
-
-        return prompts
-
-    @staticmethod
-    def _graph_metrics(fc, density=0.25):
-        """Compute weighted clustering coefficient and characteristic path length.
-
-        Uses proportional threshold (top density |r| edges) rather than r>0 binary.
-
-        Args:
-            fc: (19, 19) FC matrix
-            density: fraction of edges to retain (default 0.25 = top 25%)
-
-        Returns:
-            (clustering_coef, characteristic_path_length)
-        """
-        N = fc.shape[0]
-        fc_abs = fc.abs().clone()
-        fc_abs.fill_diagonal_(0.0)
-
-        k = max(1, int(torch.ceil(torch.tensor(N * density)).item()))
-        adj = torch.zeros(N, N, dtype=fc.dtype, device=fc.device)
-
-        for i in range(N):
-            row = fc_abs[i]
-            _, top_idx = torch.topk(row, k)
-            for j in top_idx:
-                if row[j] > 0:
-                    adj[i, j] = row[j]
-        # Symmetrize
-        adj = (adj + adj.T) / 2
-
-        # ── Weighted clustering coefficient (Onnela 2005) ──
-        degrees = (adj > 0).sum(dim=1).float()
-        C_per_node = torch.zeros(N, dtype=fc.dtype, device=fc.device)
-        for i in range(N):
-            neighbors = torch.where(adj[i] > 0)[0]
-            if len(neighbors) < 2:
-                continue
-            tri_sum = 0.0
-            for a_idx, j in enumerate(neighbors):
-                for k in neighbors[a_idx + 1:]:
-                    if adj[j, k] > 0:
-                        tri_sum += (adj[i, j] * adj[j, k] * adj[k, i]) ** (1.0 / 3.0)
-            denom = degrees[i] * (degrees[i] - 1)
-            C_per_node[i] = tri_sum / denom if denom > 0 else 0.0
-
-        valid = degrees >= 2
-        C = float(C_per_node[valid].mean()) if valid.any() else 0.0
-
-        # ── Weighted characteristic path length ──
-        dist = torch.full((N, N), float('inf'), device=fc.device)
-        dist.fill_diagonal_(0)
-        for i in range(N):
-            for j in range(N):
-                if adj[i, j] > 0:
-                    dist[i, j] = 1.0 / adj[i, j]
-
-        # Floyd-Warshall
-        for kk in range(N):
-            dk = dist[:, kk:kk + 1] + dist[kk:kk + 1, :]
-            dist = torch.minimum(dist, dk)
-
-        finite = dist[torch.isfinite(dist)]
-        L_char = float(finite.mean()) if len(finite) > 0 else 0.0
-
-        return C, L_char

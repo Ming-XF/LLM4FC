@@ -275,7 +275,7 @@ def init_model_config(args, data_config: DataConfig):
             d_model=args.d_model,
             n_heads=args.num_heads,
             num_prototypes=args.num_prototypes,
-            patch_stride=args.patch_stride,
+            gcn_hidden=args.gcn_hidden,
             dropout=args.dropout,
             llm_layers=args.llm_layers,
         )
@@ -361,8 +361,11 @@ def init_config():
     model_group.add_argument("--initializer", default=None, type=str, help="")
     model_group.add_argument("--integration", default=None, type=str, help="")
     model_group.add_argument("--llm_layers", default=28, type=int, help="Number of ChatGLM layers to use")
-    model_group.add_argument("--patch_stride", default=5, type=int, help="DFC temporal subsampling stride")
+    model_group.add_argument("--patch_stride", default=5, type=int, help="DFC temporal subsampling stride (TimeLLM v1 only)")
     model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
+    model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim (TimeLLM v1 FlattenHead)")
+    model_group.add_argument("--num_patches", default=20, type=int, help="Number of DFC windows after stride (TimeLLM v1 FlattenHead)")
+    model_group.add_argument("--gcn_hidden", default=128, type=int, help="GCN hidden dimension (TimeLLM v2)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
