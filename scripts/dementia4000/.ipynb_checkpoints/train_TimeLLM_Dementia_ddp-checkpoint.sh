@@ -21,8 +21,8 @@ torchrun --nproc_per_node=$NUM_GPUS --master_port=29500 main.py \
     --num_epochs 100 \
     --save_steps 25 \
     --drop_last False \
-    --train_set 0.8 \
-    --val_set 0.1 \
+    --train_set 0.6 \
+    --val_set 0.2 \
     --schedule 'cos' \
     --optimizer 'Adam' \
     --learning_rate 1e-3 \
@@ -31,7 +31,7 @@ torchrun --nproc_per_node=$NUM_GPUS --master_port=29500 main.py \
     --warmup_steps 200 \
     --early_stop_patience 15 \
     --early_stop_min_delta 0.001 \
-    --early_stop_metric "Accuracy" \
+    --early_stop_metric "Loss" \
     --d_model 64 \
     --num_heads 8 \
     --patch_stride 5 \

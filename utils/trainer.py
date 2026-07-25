@@ -128,13 +128,15 @@ class Trainer(object):
         if self.args.visualize:
             self.visualize()
 
-        # ── Early stopping — disabled when patience == 0 ──
+        # ── Early stopping — monitors val Loss (mode='min') ──
         from utils.early_stopping import EarlyStopping
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
             min_delta=self.args.early_stop_min_delta,
-            mode='max' if self.args.early_stop_metric != 'Loss' else 'min',
+            mode='min',
         )
+
+        best_test_result = None
 
         for epoch in tqdm(range(1, self.args.num_epochs + 1), desc="epoch", ncols=0):
             start_time = timer()
@@ -144,20 +146,27 @@ class Trainer(object):
             self.data_config.alpha = self.data_config.beta = \
                 0.5 * (self.args.num_epochs - epoch) / self.args.num_epochs + 0.5
 
-            # ── Validation — select best model ──
+            # ── Validation ──
             val_result = self.evaluate(dataloader_key='val')
-            monitor_score = val_result.get(self.args.early_stop_metric, 0.0)
+            val_loss = val_result.get('Loss', float('inf'))
 
-            improved = early_stopper.step(monitor_score)
+            # ── Test (evaluate every epoch) ──
+            test_result = self.evaluate(dataloader_key='test')
+
+            # ── Early stop based on val Loss ──
+            improved = early_stopper.step(val_loss)
             if improved:
                 self.best_result = val_result
+                best_test_result = test_result
                 self.save_model()
-                logger.info("Best model saved (val_%s=%.4f)",
-                            self.args.early_stop_metric, early_stopper.best_score)
+                logger.info("Best model saved (val_loss=%.4f, test_acc=%.4f)",
+                            early_stopper.best_score,
+                            test_result.get('Accuracy', 0.0))
 
-            msg = (f" Train loss: {train_loss:.5f}, Val loss: {val_result['Loss']:.5f}, "
-                   f"Val {self.args.early_stop_metric}: {monitor_score:.4f}, "
-                   f"Best: {early_stopper.best_score:.4f}, "
+            msg = (f" Train loss: {train_loss:.5f}, Val loss: {val_loss:.5f}, "
+                   f"Test loss: {test_result['Loss']:.5f}, "
+                   f"Best val loss: {early_stopper.best_score:.5f}, "
+                   f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                    f"Time: {(end_time - start_time):.1f}s")
             print(msg)
             logger.info(msg)
@@ -166,13 +175,16 @@ class Trainer(object):
                 logger.info(f"Early stopping triggered at epoch {epoch}")
                 break
 
-        # ── Final Test evaluation ──
+        # ── Load best model & report test result from best epoch ──
         self.load_model()
-        self.test_result = self.evaluate(dataloader_key='test')
-        logger.info("=== Final test result ===")
-        for k, v in self.test_result.items():
-            if v is not None:
-                logger.info(f"  {k}: {v:.5f}")
+        self.test_result = best_test_result
+        logger.info("=== Best epoch test result ===")
+        if self.test_result is not None:
+            for k, v in self.test_result.items():
+                if v is not None:
+                    logger.info(f"  {k}: {v:.5f}")
+        else:
+            logger.info("  (no test result recorded)")
 
     def evaluate(self, dataloader_key='test', inference_mode=None):
         if self.data_config.num_class == 2:
@@ -181,7 +193,7 @@ class Trainer(object):
             result = self.multiple_evaluate(dataloader_key, inference_mode=inference_mode)
         return result
 
-    def binary_evaluate(self, dataloader_key='test'):
+    def binary_evaluate(self, dataloader_key='test', **kwargs):
         logger.info(f"***** Running evaluation on {dataloader_key} dataset *****")
         self.model.eval()
         evaluate_dataloader = self.data_loaders[dataloader_key]
@@ -229,21 +241,16 @@ class Trainer(object):
             result['Specificity'] = recall[0]
             result['Sensitivity'] = recall[1]
             result['Loss'] = losses / len(loss_list)
-        if self.args.within_subject:
-            print(f'\n{self.subject_id}-{dataloader_key}{self.task_id} : Accuracy:{result["Accuracy"]:.5f}, Precision:{result["Precision"]:.5f}, '
-                  f'AUC:{result["AUC"]:.5f}, Recall:{result["Recall"]:.5f}, F_score:{result["F_score"]:.5f}, '
-                  f'Specificity:{result["Specificity"]:.5f}, Sensitivity:{result["Sensitivity"]:.5f}', end=',')
-        else:
-            print(f'\n{dataloader_key}{self.task_id} : Accuracy:{result["Accuracy"]:.5f}, Precision:{result["Precision"]:.5f}, '
-                  f'AUC:{result["AUC"]:.5f}, Recall:{result["Recall"]:.5f}, F_score:{result["F_score"]:.5f}, '
-                  f'Specificity:{result["Specificity"]:.5f}, Sensitivity:{result["Sensitivity"]:.5f}', end=',')
+        print(f'\n{dataloader_key}{self.task_id} : Accuracy:{result["Accuracy"]:.5f}, Precision:{result["Precision"]:.5f}, '
+              f'AUC:{result["AUC"]:.5f}, Recall:{result["Recall"]:.5f}, F_score:{result["F_score"]:.5f}, '
+              f'Loss:{result["Loss"]:.5f}')
         for k, v in result.items():
             if v is not None:
                 logger.info(f"{k}: {v:.5f}")
         # wandb.log(result)
         return result
 
-    def multiple_evaluate(self, dataloader_key='test'):
+    def multiple_evaluate(self, dataloader_key='test', **kwargs):
         logger.info(f"***** Running evaluation on {dataloader_key}{self.task_id} dataset *****")
         self.model.eval()
         evaluate_dataloader = self.data_loaders[dataloader_key]
@@ -294,15 +301,10 @@ class Trainer(object):
         # else:
         #     print(f'Test{self.task_id} : Accuracy:{result["Accuracy"]:.5f}, AUC:{result["AUC"]:.5f}', end=',')
         
-        if self.args.within_subject:
-            print(f'\n{self.subject_id}-{dataloader_key}{self.task_id} : Accuracy:{result["Accuracy"]:.5f}, Precision:{result["Precision"]:.5f}, '
-                  f'AUC:{result["AUC"]:.5f}, Recall:{result["Recall"]:.5f}, F_score:{result["F_score"]:.5f}, '
-                  , end=',')
-        else:
-            print(f'\n{dataloader_key}{self.task_id} : Accuracy:{result["Accuracy"]:.5f}, Precision:{result["Precision"]:.5f}, '
-                  f'AUC:{result["AUC"]:.5f}, Recall:{result["Recall"]:.5f}, F_score:{result["F_score"]:.5f}, '
-                  , end=',')
-        
+        print(f'\n{dataloader_key}{self.task_id} : Accuracy:{result["Accuracy"]:.5f}, Precision:{result["Precision"]:.5f}, '
+              f'AUC:{result["AUC"]:.5f}, Recall:{result["Recall"]:.5f}, F_score:{result["F_score"]:.5f}, '
+              f'Loss:{result["Loss"]:.5f}')
+
         for k, v in result.items():
             if v is not None:
                 logger.info(f"{k}: {v:.5f}")

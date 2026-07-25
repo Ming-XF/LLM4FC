@@ -27,8 +27,8 @@ deepspeed --num_gpus=4 main.py \
     --num_epochs 10 \
     --save_steps 5 \
     --drop_last False \
-    --train_set 0.8 \
-    --val_set 0.1 \
+    --train_set 0.6 \
+    --val_set 0.2 \
     --schedule 'cos' \
     --optimizer 'Adam' \
     --learning_rate 1e-4 \
@@ -36,7 +36,7 @@ deepspeed --num_gpus=4 main.py \
     --weight_decay 0 \
     --early_stop_patience 20 \
     --early_stop_min_delta 0.001 \
-    --early_stop_metric "Accuracy" \
+    --early_stop_metric "Loss" \
     --d_model 64 \
     --num_heads 8 \
     --num_prototypes 500 \
@@ -60,8 +60,8 @@ deepspeed --num_gpus=4 main.py \
     --num_epochs 10 \
     --save_steps 5 \
     --drop_last False \
-    --train_set 0.8 \
-    --val_set 0.1 \
+    --train_set 0.6 \
+    --val_set 0.2 \
     --schedule 'cos' \
     --optimizer 'Adam' \
     --learning_rate 1e-4 \
@@ -70,7 +70,7 @@ deepspeed --num_gpus=4 main.py \
     # --warmup_steps 200 \
     --early_stop_patience 20 \
     --early_stop_min_delta 0.001 \
-    --early_stop_metric "Accuracy" \
+    --early_stop_metric "Loss" \
     --d_model 64 \
     --num_heads 8 \
     --num_prototypes 500 \

@@ -18,8 +18,8 @@ deepspeed --num_gpus=4 main.py \
     --batch_size 2 \
     --num_epochs 50 \
     --drop_last False \
-    --train_set 0.8 \
-    --val_set 0.1 \
+    --train_set 0.6 \
+    --val_set 0.2 \
     --schedule 'cos' \
     --optimizer 'Adam' \
     --learning_rate 1e-3 \
@@ -28,7 +28,7 @@ deepspeed --num_gpus=4 main.py \
     --warmup_steps 400 \
     --early_stop_patience 20 \
     --early_stop_min_delta 0.001 \
-    --early_stop_metric "Accuracy" \
+    --early_stop_metric "Loss" \
     --deepspeed \
     --deepspeed_config ds_config_zero2.json \
     --do_train \
@@ -44,8 +44,8 @@ deepspeed --num_gpus=4 main.py \
 #     --batch_size 1 \
 #     --num_epochs 3 \
 #     --drop_last False \
-#     --train_set 0.8 \
-#     --val_set 0.1 \
+#     --train_set 0.6 \
+#     --val_set 0.2 \
 #     --schedule 'cos' \
 #     --optimizer 'Adam' \
 #     --learning_rate 1e-3 \
@@ -54,7 +54,7 @@ deepspeed --num_gpus=4 main.py \
 #     --warmup_steps 400 \
 #     --early_stop_patience 20 \
 #     --early_stop_min_delta 0.001 \
-#     --early_stop_metric "Accuracy" \
+#     --early_stop_metric "Loss" \
 #     --deepspeed \
 #     --deepspeed_config ds_config_zero2.json \
 #     --do_train \

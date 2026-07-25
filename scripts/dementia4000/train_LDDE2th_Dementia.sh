@@ -17,8 +17,8 @@ python main.py \
     --num_epochs 200 \
     --save_steps 50 \
     --drop_last False \
-    --train_set 0.8 \
-    --val_set 0.1 \
+    --train_set 0.6 \
+    --val_set 0.2 \
     --schedule 'cos' \
     --optimizer 'Adam' \
     --learning_rate 1e-4 \
@@ -27,7 +27,7 @@ python main.py \
     --warmup_steps 400 \
     --early_stop_patience 20 \
     --early_stop_min_delta 0.001 \
-    --early_stop_metric "Accuracy" \
+    --early_stop_metric "Loss" \
     --do_train \
     --do_evaluate \
     --do_test

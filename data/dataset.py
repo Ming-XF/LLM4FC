@@ -65,7 +65,7 @@ class BaseDataset(Dataset):
         """创建数据划分。
 
         当 ``num_repeat >= 2`` 时沿用原有 GroupKFold 逻辑；
-        当 ``num_repeat == 1`` 时自动切换为 80/10/10 按被试分组划分。
+        当 ``num_repeat == 1`` 时自动切换为 60/20/20 按被试分组划分。
         """
         if self.k_fold is not None:
             # ── 原有 K-Fold 模式（num_repeat >= 2）──
@@ -94,8 +94,8 @@ class BaseDataset(Dataset):
                 self.val_index = np.array([], dtype=int)
         else:
             # ── train/val/test 模式 — 按被试分组划分，防止数据泄露 ──
-            train_ratio = self.data_config.train_set   # default 0.8
-            val_ratio = self.data_config.val_set        # default 0.1
+            train_ratio = self.data_config.train_set   # default 0.6
+            val_ratio = self.data_config.val_set        # default 0.2
             unique_subjs = np.unique(groups)
 
             # 每个被试的主标签（用于分层抽样）

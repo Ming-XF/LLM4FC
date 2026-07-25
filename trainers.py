@@ -192,8 +192,10 @@ class STAGINTrainer(Trainer):
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
             min_delta=self.args.early_stop_min_delta,
-            mode='max' if self.args.early_stop_metric != 'Loss' else 'min',
+            mode='min',
         )
+
+        best_test_result = None
 
         for epoch in tqdm(range(1, self.args.num_epochs + 1), desc="epoch"):
             start_time = timer()
@@ -204,19 +206,24 @@ class STAGINTrainer(Trainer):
                 0.8 * (self.args.num_epochs - epoch) / self.args.num_epochs + 0.2
 
             val_result = self.evaluate(dataloader_key='val')
-            monitor_score = val_result.get(self.args.early_stop_metric, 0.0)
+            val_loss = val_result.get('Loss', float('inf'))
 
-            improved = early_stopper.step(monitor_score)
+            test_result = self.evaluate(dataloader_key='test')
+
+            improved = early_stopper.step(val_loss)
             if improved:
                 self.best_result = val_result
+                best_test_result = test_result
                 self.save_model()
-                logger.info("Best model saved (val_%s=%.4f)",
-                            self.args.early_stop_metric, early_stopper.best_score)
+                logger.info("Best model saved (val_loss=%.4f, test_acc=%.4f)",
+                            early_stopper.best_score,
+                            test_result.get('Accuracy', 0.0))
 
             msg = (f"Epoch: {epoch}, Train loss: {train_loss:.5f}, "
-                   f"Val loss: {val_result['Loss']:.5f}, "
-                   f"Val {self.args.early_stop_metric}: {monitor_score:.4f}, "
-                   f"Best: {early_stopper.best_score:.4f}, "
+                   f"Val loss: {val_loss:.5f}, "
+                   f"Test loss: {test_result['Loss']:.5f}, "
+                   f"Best val loss: {early_stopper.best_score:.5f}, "
+                   f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                    f"Time: {(end_time - start_time):.1f}s")
             print(msg)
             logger.info(msg)
@@ -226,11 +233,14 @@ class STAGINTrainer(Trainer):
                 break
 
         self.load_model()
-        self.test_result = self.evaluate(dataloader_key='test')
-        logger.info("=== Final test result ===")
-        for k, v in self.test_result.items():
-            if v is not None:
-                logger.info(f"  {k}: {v:.5f}")
+        self.test_result = best_test_result
+        logger.info("=== Best epoch test result ===")
+        if self.test_result is not None:
+            for k, v in self.test_result.items():
+                if v is not None:
+                    logger.info(f"  {k}: {v:.5f}")
+        else:
+            logger.info("  (no test result recorded)")
 
 
 class EEGNetTrainer(Trainer):
@@ -629,8 +639,10 @@ class GCDGCNTrainer(Trainer):
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
             min_delta=self.args.early_stop_min_delta,
-            mode='max' if self.args.early_stop_metric != 'Loss' else 'min',
+            mode='min',
         )
+
+        best_test_result = None
 
         for epoch in tqdm(range(1, self.args.num_epochs + 1), desc="epoch"):
             start_time = timer()
@@ -641,17 +653,24 @@ class GCDGCNTrainer(Trainer):
                 0.8 * (self.args.num_epochs - epoch) / self.args.num_epochs + 0.2
 
             val_result = self.evaluate(dataloader_key='val')
-            monitor_score = val_result.get(self.args.early_stop_metric, 0.0)
+            val_loss = val_result.get('Loss', float('inf'))
 
-            improved = early_stopper.step(monitor_score)
+            test_result = self.evaluate(dataloader_key='test')
+
+            improved = early_stopper.step(val_loss)
             if improved:
                 self.best_result = val_result
+                best_test_result = test_result
                 self.save_model()
-                logger.info("Best model saved (val_%s=%.4f)",
-                            self.args.early_stop_metric, early_stopper.best_score)
+                logger.info("Best model saved (val_loss=%.4f, test_acc=%.4f)",
+                            early_stopper.best_score,
+                            test_result.get('Accuracy', 0.0))
 
             msg = (f"Epoch: {epoch}, Train loss: {train_loss:.5f}, "
-                   f"Val loss: {val_result['Loss']:.5f}, "
+                   f"Val loss: {val_loss:.5f}, "
+                   f"Test loss: {test_result['Loss']:.5f}, "
+                   f"Best val loss: {early_stopper.best_score:.5f}, "
+                   f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                    f"Epoch time = {(end_time - start_time):.3f}s")
             print(msg)
             logger.info(msg)
@@ -661,11 +680,14 @@ class GCDGCNTrainer(Trainer):
                 break
 
         self.load_model()
-        self.test_result = self.evaluate(dataloader_key='test')
-        logger.info("=== Final test result ===")
-        for k, v in self.test_result.items():
-            if v is not None:
-                logger.info(f"  {k}: {v:.5f}")
+        self.test_result = best_test_result
+        logger.info("=== Best epoch test result ===")
+        if self.test_result is not None:
+            for k, v in self.test_result.items():
+                if v is not None:
+                    logger.info(f"  {k}: {v:.5f}")
+        else:
+            logger.info("  (no test result recorded)")
 
 class CEEDNetTrainer(DFaSTTrainer):
     def __init__(self, args, local_rank=0, task_id=0, subject_id=0):
@@ -741,8 +763,10 @@ class LDDETrainer(Trainer):
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
             min_delta=self.args.early_stop_min_delta,
-            mode='max' if self.args.early_stop_metric != 'Loss' else 'min',
+            mode='min',
         )
+
+        best_test_result = None
 
         for epoch in tqdm(range(1, self.args.num_epochs + 1), desc="epoch"):
             start_time = timer()
@@ -753,19 +777,27 @@ class LDDETrainer(Trainer):
                 0.8 * (self.args.num_epochs - epoch) / self.args.num_epochs + 0.2
 
             val_result = self.evaluate(dataloader_key='val')
-            monitor_score = val_result.get(self.args.early_stop_metric, 0.0)
+            val_loss = (val_result.get('Classification Loss', 0.0)
+                        + val_result.get('Regression Loss', 0.0))
 
-            improved = early_stopper.step(monitor_score)
+            test_result = self.evaluate(dataloader_key='test')
+            test_loss = (test_result.get('Classification Loss', 0.0)
+                         + test_result.get('Regression Loss', 0.0))
+
+            improved = early_stopper.step(val_loss)
             if improved:
                 self.best_result = val_result
+                best_test_result = test_result
                 self.save_model()
-                logger.info("Best model saved (val_%s=%.4f)",
-                            self.args.early_stop_metric, early_stopper.best_score)
+                logger.info("Best model saved (val_loss=%.4f, test_acc=%.4f)",
+                            early_stopper.best_score,
+                            test_result.get('Accuracy', 0.0))
 
             msg = (f"Epoch: {epoch}, Train Cla: {train_loss1:.5f}, "
                    f"Train Reg: {train_loss2:.5f}, "
-                   f"Val {self.args.early_stop_metric}: {monitor_score:.4f}, "
-                   f"Best: {early_stopper.best_score:.4f}, "
+                   f"Val loss: {val_loss:.5f}, Test loss: {test_loss:.5f}, "
+                   f"Best val loss: {early_stopper.best_score:.5f}, "
+                   f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                    f"Time: {(end_time - start_time):.1f}s")
             print(msg)
             logger.info(msg)
@@ -775,11 +807,14 @@ class LDDETrainer(Trainer):
                 break
 
         self.load_model()
-        self.test_result = self.evaluate(dataloader_key='test')
-        logger.info("=== Final test result ===")
-        for k, v in self.test_result.items():
-            if v is not None:
-                logger.info(f"  {k}: {v:.5f}")
+        self.test_result = best_test_result
+        logger.info("=== Best epoch test result ===")
+        if self.test_result is not None:
+            for k, v in self.test_result.items():
+                if v is not None:
+                    logger.info(f"  {k}: {v:.5f}")
+        else:
+            logger.info("  (no test result recorded)")
             
     def multiple_evaluate(self, dataloader_key='test', inference_mode=None):
         logger.info(f"***** Running evaluation on {dataloader_key}{self.task_id} dataset *****")
@@ -1054,10 +1089,10 @@ class LDDE2thTrainer(LDDETrainer):
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
             min_delta=self.args.early_stop_min_delta,
-            mode='max' if self.args.early_stop_metric != 'Loss' else 'min',
+            mode='min',
         )
 
-        best_accuracy = 0.0
+        best_test_result = None
         stop_requested = False
 
         for epoch in tqdm(range(1, self.args.num_epochs + 1), desc="epoch"):
@@ -1075,20 +1110,23 @@ class LDDE2thTrainer(LDDETrainer):
                 0.8 * (self.args.num_epochs - epoch) / self.args.num_epochs + 0.2
 
             val_result = self.evaluate(dataloader_key='val')
+            # Test evaluate every epoch (must be called on all ranks for distributed gather)
+            test_result = self.evaluate(dataloader_key='test')
 
             is_rank_0 = (not torch.distributed.is_initialized()
                          or torch.distributed.get_rank() == 0)
             if is_rank_0:
-                monitor_score = val_result.get(self.args.early_stop_metric, 0.0)
+                val_loss = val_result.get('Loss', float('inf'))
                 current_acc = val_result.get('Accuracy', 0.0)
 
-                improved = early_stopper.step(monitor_score)
+                improved = early_stopper.step(val_loss)
                 if improved:
-                    best_accuracy = early_stopper.best_score
                     self.best_result = val_result
+                    best_test_result = test_result
                     self.save_model()
-                    logger.info("Best model saved (val_%s=%.4f)",
-                                self.args.early_stop_metric, best_accuracy)
+                    logger.info("Best model saved (val_loss=%.4f, test_acc=%.4f)",
+                                early_stopper.best_score,
+                                test_result.get('Accuracy', 0.0))
 
                 if self.args.save_steps > 0 and epoch % self.args.save_steps == 0:
                     ckpt_dir = os.path.join(
@@ -1098,7 +1136,9 @@ class LDDE2thTrainer(LDDETrainer):
                     logger.info("Checkpoint saved at epoch %d", epoch)
 
                 msg = (f"Epoch: {epoch}, Loss: {train_loss:.5f}, "
-                       f"Val Acc: {current_acc:.4f}, Best: {early_stopper.best_score:.4f}, "
+                       f"Val loss: {val_loss:.5f}, Test loss: {test_result.get('Loss', float('inf')):.5f}, "
+                       f"Val Acc: {current_acc:.4f}, Best val loss: {early_stopper.best_score:.4f}, "
+                       f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                        f"Time: {(end_time - start_time):.1f}s")
                 print(msg)
                 logger.info(msg)
@@ -1121,21 +1161,17 @@ class LDDE2thTrainer(LDDETrainer):
 
         if is_rank_0:
             self.load_model()
-            logger.info("=== Final test ===")
-
-        if self.args.deepspeed and torch.distributed.is_initialized():
-            torch.distributed.barrier()
-
-        self.test_result = self.evaluate(dataloader_key='test')
-
-        if is_rank_0:
-            logger.info("=== Final test result ===")
-            for k, v in self.test_result.items():
-                if v is not None:
-                    if isinstance(v, (int, float, np.floating, np.integer)):
-                        logger.info(f"  {k}: {v:.5f}")
-                    else:
-                        logger.info(f"  {k}: {v}")
+            self.test_result = best_test_result
+            logger.info("=== Best epoch test result ===")
+            if self.test_result is not None:
+                for k, v in self.test_result.items():
+                    if v is not None:
+                        if isinstance(v, (int, float, np.floating, np.integer)):
+                            logger.info(f"  {k}: {v:.5f}")
+                        else:
+                            logger.info(f"  {k}: {v}")
+            else:
+                logger.info("  (no test result recorded)")
 
             final_dir = os.path.join(
                 self.args.model_dir, self.args.model,
@@ -1405,9 +1441,10 @@ class TimeLLMTrainer(Trainer):
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
             min_delta=self.args.early_stop_min_delta,
-            mode='max' if self.args.early_stop_metric != 'Loss' else 'min',
+            mode='min',
         )
 
+        best_test_result = None
         stop_requested = False
 
         for epoch in tqdm(range(1, self.args.num_epochs + 1), desc="epoch"):
@@ -1426,19 +1463,23 @@ class TimeLLMTrainer(Trainer):
                 0.8 * (self.args.num_epochs - epoch) / self.args.num_epochs + 0.2
 
             val_result = self.evaluate(dataloader_key='val')
+            # Test evaluate every epoch (must be called on all ranks for distributed gather)
+            test_result = self.evaluate(dataloader_key='test')
 
             is_rank_0 = (not torch.distributed.is_initialized()
                          or torch.distributed.get_rank() == 0)
             if is_rank_0:
-                monitor_score = val_result.get(self.args.early_stop_metric, 0.0)
+                val_loss = val_result.get('Loss', float('inf'))
                 current_acc = val_result.get('Accuracy', 0.0)
 
-                improved = early_stopper.step(monitor_score)
+                improved = early_stopper.step(val_loss)
                 if improved:
                     self.best_result = val_result
+                    best_test_result = test_result
                     self.save_model()
-                    logger.info("Best model saved (val_%s=%.4f)",
-                                self.args.early_stop_metric, early_stopper.best_score)
+                    logger.info("Best model saved (val_loss=%.4f, test_acc=%.4f)",
+                                early_stopper.best_score,
+                                test_result.get('Accuracy', 0.0))
 
                 if self.args.save_steps > 0 and epoch % self.args.save_steps == 0:
                     ckpt_dir = os.path.join(
@@ -1448,8 +1489,9 @@ class TimeLLMTrainer(Trainer):
                     logger.info("Checkpoint saved at epoch %d", epoch)
 
                 msg = (f"Epoch: {epoch}, Loss: {train_loss:.5f}, "
-                       f"Val Acc: {current_acc:.4f}, "
-                       f"Best: {early_stopper.best_score:.4f}, "
+                       f"Val loss: {val_loss:.5f}, Test loss: {test_result.get('Loss', float('inf')):.5f}, "
+                       f"Val Acc: {current_acc:.4f}, Best val loss: {early_stopper.best_score:.4f}, "
+                       f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                        f"Time: {(end_time - start_time):.1f}s")
                 print(msg)
                 logger.info(msg)
@@ -1473,21 +1515,17 @@ class TimeLLMTrainer(Trainer):
 
         if is_rank_0:
             self.load_model()
-            logger.info("=== Final test ===")
-
-        if self.args.deepspeed and torch.distributed.is_initialized():
-            torch.distributed.barrier()
-
-        self.test_result = self.evaluate(dataloader_key='test')
-
-        if is_rank_0:
-            logger.info("=== Final test result ===")
-            for k, v in self.test_result.items():
-                if v is not None:
-                    if isinstance(v, (int, float, np.floating, np.integer)):
-                        logger.info(f"  {k}: {v:.5f}")
-                    else:
-                        logger.info(f"  {k}: {v}")
+            self.test_result = best_test_result
+            logger.info("=== Best epoch test result ===")
+            if self.test_result is not None:
+                for k, v in self.test_result.items():
+                    if v is not None:
+                        if isinstance(v, (int, float, np.floating, np.integer)):
+                            logger.info(f"  {k}: {v:.5f}")
+                        else:
+                            logger.info(f"  {k}: {v}")
+            else:
+                logger.info("  (no test result recorded)")
 
             final_dir = os.path.join(
                 self.args.model_dir, self.args.model,

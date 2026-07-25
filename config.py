@@ -319,8 +319,8 @@ def init_config():
     data_group.add_argument("--data_dir", default="", type=str, help="")
     data_group.add_argument("--data2_dir", default="", type=str, help="")
     data_group.add_argument("--data_processors", default=0, type=int, help="")
-    data_group.add_argument("--train_set", default=0.8, type=float, help="")
-    data_group.add_argument("--val_set", default=0.1, type=float, help="")
+    data_group.add_argument("--train_set", default=0.6, type=float, help="")
+    data_group.add_argument("--val_set", default=0.2, type=float, help="")
     data_group.add_argument("--percentage", default=1., type=float, help="")
     data_group.add_argument("--batch_size", default=64, type=int, help="")
     data_group.add_argument("--num_workers", default=5, type=int, help="")
@@ -385,7 +385,7 @@ def init_config():
                              help="Early stopping patience (epochs, 0 = disabled)")
     train_group.add_argument("--early_stop_min_delta", default=0.001, type=float,
                              help="Minimum improvement to reset patience")
-    train_group.add_argument("--early_stop_metric", default="Accuracy", type=str,
+    train_group.add_argument("--early_stop_metric", default="Loss", type=str,
                              help="Metric to monitor for early stopping (Accuracy / AUC / Loss)")
 
     # ── Train/Val/Test split mode (used when --num_repeat == 1) ──
