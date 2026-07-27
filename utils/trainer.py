@@ -89,6 +89,8 @@ class Trainer(object):
     def _forward(self, input_kwargs):
         """Return model outputs, using autocast for mixed precision."""
         if self.args.deepspeed:
+            input_kwargs = {k: v.to(dtype=torch.bfloat16) if isinstance(v, torch.Tensor) and v.is_floating_point() else v
+                            for k, v in input_kwargs.items()}
             with torch.cuda.amp.autocast(dtype=torch.bfloat16):
                 return self.model(**input_kwargs)
         else:
