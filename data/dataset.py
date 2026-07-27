@@ -10,7 +10,7 @@ from .data_config import DataConfig
 
 
 class BaseDataset(Dataset):
-    def __init__(self, data_config: DataConfig, k=0, train=True, subject_id=0, one_hot=True):
+    def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True):
         super(BaseDataset, self).__init__()
         self.data_config = data_config
         self._mode = 'train' if train else 'test'
@@ -19,8 +19,6 @@ class BaseDataset(Dataset):
         else:
             self.k_fold = None                  # train/val/test 模式
         self.k = k
-        self.subject_id = subject_id
-        self.selected = []
         self.all_data = {}
         self.train_index = None
         self.val_index = None                    # 新增 — 仅 train/val/test 模式有效

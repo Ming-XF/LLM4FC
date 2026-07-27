@@ -12,8 +12,8 @@ from utils import *
 import pdb
 
 class BNTTrainer(Trainer):
-    def __init__(self, args, local_rank=0, task_id=0, subject_id=0):
-        super(BNTTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id, subject_id=subject_id)
+    def __init__(self, args, local_rank=0, task_id=0):
+        super(BNTTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id)
 
     def prepare_inputs_kwargs(self, inputs):
         time_series = inputs['time_series']
@@ -31,8 +31,8 @@ class BNTTrainer(Trainer):
 
 
 class FBNetGenTrainer(Trainer):
-    def __init__(self, args, local_rank=0, task_id=0, subject_id=0):
-        super(FBNetGenTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id, subject_id=subject_id)
+    def __init__(self, args, local_rank=0, task_id=0):
+        super(FBNetGenTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id)
 
     def prepare_inputs_kwargs(self, inputs):
         time_series = inputs['time_series']
@@ -53,13 +53,13 @@ class FBNetGenTrainer(Trainer):
 
 
 class BrainNetCNNTrainer(BNTTrainer):
-    def __init__(self, args, local_rank=0, task_id=0, subject_id=0):
-        super(BrainNetCNNTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id, subject_id=subject_id)
+    def __init__(self, args, local_rank=0, task_id=0):
+        super(BrainNetCNNTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id)
 
 
 class STAGINTrainer(Trainer):
-    def __init__(self, args, local_rank=0, task_id=0, subject_id=0):
-        super(STAGINTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id, subject_id=subject_id)
+    def __init__(self, args, local_rank=0, task_id=0):
+        super(STAGINTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id)
 
     def prepare_inputs_kwargs(self, inputs, **kwargs):
         dyn_a, sampling_points = process_dynamic_fc(inputs['time_series'].transpose(1, 2),
@@ -101,8 +101,8 @@ class STAGINTrainer(Trainer):
 
 
 class TCACNetTrainer(Trainer):
-    def __init__(self, args, local_rank=0, task_id=0, subject_id=0):
-        super(TCACNetTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id, subject_id=subject_id)
+    def __init__(self, args, local_rank=0, task_id=0):
+        super(TCACNetTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id)
 
     def prepare_inputs_kwargs(self, inputs):
         time_series = inputs['time_series']
@@ -182,8 +182,8 @@ class TCACNetTrainer(Trainer):
 
 
 class ALTERTrainer(Trainer):
-    def __init__(self, args, local_rank=0, task_id=0, subject_id=0):
-        super(ALTERTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id, subject_id=subject_id)
+    def __init__(self, args, local_rank=0, task_id=0):
+        super(ALTERTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id)
 
     def prepare_inputs_kwargs(self, inputs):
         time_series = inputs['time_series']
@@ -202,8 +202,8 @@ class ALTERTrainer(Trainer):
                     "labels": labels.float().to(self.device)}
 
 class GCDGCNTrainer(Trainer):
-    def __init__(self, args, local_rank=0, task_id=0, subject_id=0):
-        super(GCDGCNTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id, subject_id=subject_id)
+    def __init__(self, args, local_rank=0, task_id=0):
+        super(GCDGCNTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id)
 
     def prepare_inputs_kwargs(self, inputs, epoch=None):
         time_series = inputs['time_series']
@@ -245,9 +245,8 @@ class TimeLLMTrainer(Trainer):
     Supports: Single GPU (AMP), Multi-GPU DDP, DeepSpeed ZeRO-2
     """
 
-    def __init__(self, args, local_rank=0, task_id=0, subject_id=0):
-        super().__init__(args, local_rank=local_rank,
-                         task_id=task_id, subject_id=subject_id)
+    def __init__(self, args, local_rank=0, task_id=0):
+        super().__init__(args, local_rank=local_rank, task_id=task_id)
 
     def prepare_inputs_kwargs(self, inputs):
         """Extract fields for TimeLLM v2 forward pass.

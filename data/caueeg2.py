@@ -17,8 +17,8 @@ from multiprocessing import Pool, cpu_count
 
 
 class CAUEEG2Dataset(BaseDataset):
-    def __init__(self, data_config: DataConfig, k=0, train=True, subject_id=0, one_hot=True):
-        super(CAUEEG2Dataset, self).__init__(data_config, k, train, subject_id=subject_id, one_hot=one_hot)
+    def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True):
+        super(CAUEEG2Dataset, self).__init__(data_config, k, train, one_hot=one_hot)
 
     def load_data(self, one_hot=True):
         raw = np.load(self.data_config.data_dir, allow_pickle=True)
@@ -37,8 +37,6 @@ class CAUEEG2Dataset(BaseDataset):
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        if self.subject_id:
-            self.select_subject()
         self._create_splits(labels, self.all_data['subject_id'])
         self.all_data['labels'] = F.one_hot(torch.from_numpy(self.all_data['labels']).to(torch.int64)).numpy()
         shuffle(self.train_index)
@@ -61,12 +59,6 @@ class CAUEEG2Dataset(BaseDataset):
                 'labels': labels,
                 'sample_idx': idx[item]}
 
-    def select_subject(self):
-        self.selected = [self.subject_id]
-        index = np.sum(self.all_data["subject_id"] == i for i in self.selected) == 1
-        self.all_data['time_series'] = self.all_data['time_series'][index]
-        self.all_data['labels'] = self.all_data['labels'][index]
-        self.all_data['subject_id'] = self.all_data['subject_id'][index]
 
 
 def _process_one_sample(args):

@@ -6,4 +6,5 @@ from .caueeg2 import CAUEEG2Dataset
 from .caueeg4 import CAUEEG4Dataset
 from .c42b import C42BDataset
 from .zuco import ZuCoDataset
+from .beirut import BeirutDataset
 from .preprocess import continues_mixup_data

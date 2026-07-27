@@ -12,8 +12,8 @@ from .preprocess import *
 
 
 class C42BDataset(BaseDataset):
-    def __init__(self, data_config: DataConfig, k=0, train=True, subject_id=0, one_hot=True):
-        super(C42BDataset, self).__init__(data_config, k, train, subject_id=subject_id, one_hot=one_hot)
+    def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True):
+        super(C42BDataset, self).__init__(data_config, k, train, one_hot=one_hot)
 
     def load_data(self, one_hot=True):
         data = np.load(self.data_config.data_dir, allow_pickle=True).item()
@@ -32,32 +32,34 @@ class C42BDataset(BaseDataset):
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
         self.all_data['tags'] = tags
-        if self.subject_id:
-            self.select_subject()
         # groups = np.array([f"{int(s)}_{int(l)}" for s, l in zip(self.all_data['subject_id'], labels)])
         # self.train_index, self.test_index = list(self.k_fold.split(self.all_data['time_series'], groups))[self.k]
         index = np.arange(self.all_data['tags'].shape[0])
         self.train_index = index[self.all_data['tags'] == 1]
         self.test_index = index[self.all_data['tags'] == 0]
 
-        # train/val/test mode: further split train portion by subject
-        if self.k_fold is None:
-            from sklearn.model_selection import train_test_split
-            train_subj_ids = self.all_data['subject_id'][self.train_index]
-            train_labels_raw = labels[self.train_index]
-            unique_subjs = np.unique(train_subj_ids)
+        # ── Split train portion into train/val by subject (always, regardless of KFold) ──
+        from sklearn.model_selection import train_test_split
+        train_subj_ids = self.all_data['subject_id'][self.train_index]
+        train_labels_raw = labels[self.train_index]
+        unique_subjs = np.unique(train_subj_ids)
+
+        if len(unique_subjs) >= 3:
             subj_labels = np.array([
                 np.bincount(train_labels_raw[train_subj_ids == s].astype(int)).argmax()
                 for s in unique_subjs
             ])
             val_ratio = self.data_config.val_set / self.data_config.train_set
             train_subjs, val_subjs = train_test_split(
-                unique_subjs, test_size=val_ratio,
+                unique_subjs, test_size=min(val_ratio, 0.3),
                 stratify=subj_labels, random_state=42 + self.k)
-            train_mask = np.isin(train_subj_ids, train_subjs)
-            val_mask = np.isin(train_subj_ids, val_subjs)
-            self.val_index = self.train_index[val_mask]
-            self.train_index = self.train_index[train_mask]
+        else:
+            train_subjs, val_subjs = unique_subjs, np.array([], dtype=int)
+
+        train_mask = np.isin(train_subj_ids, train_subjs)
+        val_mask = np.isin(train_subj_ids, val_subjs)
+        self.val_index = self.train_index[val_mask]
+        self.train_index = self.train_index[train_mask]
         self.all_data['labels'] = F.one_hot(torch.from_numpy(self.all_data['labels'] - 1).to(torch.int64)).numpy()
         shuffle(self.train_index)
 
@@ -79,13 +81,6 @@ class C42BDataset(BaseDataset):
                 'labels': labels,
                 'sample_idx': idx[item]}
 
-    def select_subject(self):
-        self.selected = [self.subject_id]
-        index = np.sum(self.all_data["subject_id"] // 10 == i for i in self.selected) == 1
-        self.all_data['time_series'] = self.all_data['time_series'][index]
-        self.all_data['labels'] = self.all_data['labels'][index]
-        self.all_data['subject_id'] = self.all_data['subject_id'][index]
-        self.all_data['tags'] = self.all_data['tags'][index]
 
 
 def c42b_preprocess(path="../data/C42B/"):
@@ -134,7 +129,7 @@ def c42b_preprocess(path="../data/C42B/"):
     time_series = data_norm(time_series)
     time_series = preprocess_ea(time_series)
     tags = np.append(tags, np.zeros(labels.shape[0] - tags.shape[0]), axis=0)
-    np.save(os.path.join(path, f"C42B128.npy"), {"timeseries": time_series,
+    np.save(os.path.join(path, f"c42b.npy"), {"timeseries": time_series,
                                                  "corr": pearson,
                                                  "labels": labels,
                                                  "subject_id": subject_ids,

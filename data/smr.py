@@ -14,8 +14,8 @@ import pdb
 
 
 class SMRDataset(BaseDataset):
-    def __init__(self, data_config: DataConfig, k=0, train=True, subject_id=0, one_hot=True):
-        super(SMRDataset, self).__init__(data_config, k, train, subject_id=subject_id, one_hot=one_hot)
+    def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True):
+        super(SMRDataset, self).__init__(data_config, k, train, one_hot=one_hot)
 
     def load_data(self, one_hot=True):
         data = np.load(self.data_config.data_dir, allow_pickle=True).item()
@@ -36,8 +36,6 @@ class SMRDataset(BaseDataset):
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
         self.all_data['tags'] = tags
-        if self.subject_id:
-            self.select_subject()
         self._create_splits(labels, self.all_data['subject_id'])
         self.all_data['labels'] = F.one_hot(torch.from_numpy(self.all_data['labels'] - 1).to(torch.int64)).numpy()
         shuffle(self.train_index)
@@ -60,13 +58,6 @@ class SMRDataset(BaseDataset):
                 'labels': labels,
                 'sample_idx': idx[item]}
 
-    def select_subject(self):
-        self.selected = [self.subject_id]
-        index = np.sum(self.all_data["subject_id"] == i for i in self.selected) == 1
-        self.all_data['time_series'] = self.all_data['time_series'][index]
-        self.all_data['labels'] = self.all_data['labels'][index]
-        self.all_data['subject_id'] = self.all_data['subject_id'][index]
-        self.all_data['tags'] = self.all_data['tags'][index]
 
 
 def smr_preprocess(path="../data/SMR/"):

@@ -126,8 +126,6 @@ def init_config():
     global_group.add_argument("--log_dir", default="./log_dir", type=str, help="")
     global_group.add_argument("--model", default="TimeLLM", type=str, help="")
     global_group.add_argument("--num_repeat", default=1, type=int, help="")
-    global_group.add_argument("--within_subject", action="store_true", help="")
-    global_group.add_argument("--subject_num", default=10, type=int, help="")
     global_group.add_argument("--visualize", action="store_true", help="")
     global_group.add_argument("--append", default="", type=str, help="")
 
@@ -144,7 +142,6 @@ def init_config():
     data_group.add_argument("--num_epochs", default=200, type=int, help="")
     data_group.add_argument("--drop_last", default=True, type=bool, help="")
     data_group.add_argument("--dynamic", action="store_true", help="")
-    data_group.add_argument("--subject_id", default=0, type=int, help="")
     data_group.add_argument("--frequency", default=500, type=int, help="")
     data_group.add_argument("--D", default=2, type=int, help="")
     data_group.add_argument("--F1", default=8, type=int, help="")

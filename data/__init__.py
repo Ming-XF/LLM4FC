@@ -7,6 +7,5 @@ from .caueeg4 import CAUEEG4Dataset
 from .c42b import C42BDataset
 from .zuco import ZuCoDataset
 from .beirut import BeirutDataset
-from .dementia2000 import Dementia2000Dataset
-from .dementia4000 import Dementia4000Dataset
+from .ds import DSDataset
 from .preprocess import continues_mixup_data

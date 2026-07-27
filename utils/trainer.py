@@ -25,11 +25,10 @@ logger.setLevel(logging.DEBUG)
 
 
 class Trainer(object):
-    def __init__(self, args, local_rank=0, task_id=0, subject_id=0):
+    def __init__(self, args, local_rank=0, task_id=0):
         self.task_id = task_id
         self.args = args
         self.local_rank = local_rank
-        self.subject_id = subject_id
         self.data_config = DataConfig(args)
         self.data_loaders = self.load_datasets()
 
@@ -70,7 +69,7 @@ class Trainer(object):
 
     def load_datasets(self):
         datasets = eval(
-            f"{self.args.dataset}Dataset")(self.data_config, k=self.task_id, subject_id=self.subject_id)
+            f"{self.args.dataset}Dataset")(self.data_config, k=self.task_id)
 
         if self.args.deepspeed:
             data_loaders = init_deepspeed_dataloader(self.data_config, datasets)

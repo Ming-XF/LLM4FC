@@ -16,8 +16,8 @@ names = ["ZAB", "ZDM", "ZDN", "ZGW", "ZJM", "ZJN", "ZJS", "ZKB", "ZKH", "ZKW", "
 
 
 class ZuCoDataset(BaseDataset):
-    def __init__(self, data_config: DataConfig, k=0, train=True, subject_id=0, one_hot=True):
-        super(ZuCoDataset, self).__init__(data_config, k, train, subject_id=subject_id, one_hot=one_hot)
+    def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True):
+        super(ZuCoDataset, self).__init__(data_config, k, train, one_hot=one_hot)
 
     def load_data(self, one_hot=True):
         self.all_data = np.load(self.data_config.data_dir, allow_pickle=True).item()
@@ -39,8 +39,6 @@ class ZuCoDataset(BaseDataset):
 
         self.data_config.class_weight = [1] * self.data_config.num_class
 
-        if self.subject_id:
-            self.select_subject()
         self._create_splits(self.all_data['labels'], self.all_data['subject_id'])
         if one_hot:
             self.all_data['labels'] = F.one_hot(torch.from_numpy(self.all_data['labels']).to(torch.int64)).numpy()
@@ -104,16 +102,6 @@ class ZuCoDataset(BaseDataset):
         self.all_data = all_data
         self.data_config.time_series_size = max_s_lens
 
-    def select_subject(self):
-        self.selected = [self.subject_id]
-        index = np.sum(self.all_data["subject_id"] == i for i in self.selected) == 1
-        self.all_data['words_time_series'] = self.all_data['words_time_series'][index]
-        # self.all_data['sentences_time_series'] = self.all_data['sentences_time_series'][index]
-        self.all_data['sentences_time_series'] = [self.all_data['sentences_time_series'][i]
-                                                  for i, j in enumerate(index) if j]
-        self.all_data['labels'] = self.all_data['labels'][index]
-        self.all_data['subject_id'] = self.all_data['subject_id'][index]
-        self.all_data['sentences'] = self.all_data['sentences'][index]
 
 
 def zuco_preprocess_TSR(path=r"D:\data\ZuCo"):
