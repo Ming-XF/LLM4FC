@@ -11,6 +11,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 
 from .data_config import DataConfig
 from .dataset import BaseDataset
+from .preprocess import *
 
 
 class MNREDDataset(BaseDataset):
@@ -20,9 +21,9 @@ class MNREDDataset(BaseDataset):
     def load_data(self, one_hot=True):
         data = np.load(self.data_config.data_dir, allow_pickle=True).item()
         time_series = data["timeseries"]
-        correlation = data["corr"]
         labels = data["labels"]
         subject_id = data["subject_id"]
+        self.hz = data.get("hz", 250)
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
@@ -30,7 +31,6 @@ class MNREDDataset(BaseDataset):
 
         self.data_config.class_weight = [1, 2]
         self.all_data['time_series'] = time_series
-        self.all_data['correlation'] = correlation
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
@@ -47,19 +47,20 @@ class MNREDDataset(BaseDataset):
         sampling_init = (randrange(time_series.size(-1) - self.data_config.time_series_size)) \
             if self.data_config.dynamic else 0
         time_series = time_series[:, sampling_init:sampling_init + self.data_config.time_series_size]
-        correlation = self.connectivity(time_series, activate=False)
-        # time_series = self.norm(time_series)
-        # correlation = torch.from_numpy(self.all_data['correlation'][idx[item]]).float()
+        SFC = self.connectivity(time_series, activate=False)
+        DFC = dynamic_connectivity(time_series.numpy(), 3 * self.hz, 1 * self.hz)
+        DFC = torch.from_numpy(DFC).float()
 
         return {'time_series': time_series,
-                'correlation': correlation,
-                'labels': labels}
+                'DFC': DFC,
+                'correlation': SFC,
+                'labels': labels,
+                'sample_idx': idx[item]}
 
     def select_subject(self):
         self.selected = [self.subject_id]
         index = np.sum(self.all_data["subject_id"] == i for i in self.selected) == 1
         self.all_data['time_series'] = self.all_data['time_series'][index]
-        self.all_data['correlation'] = self.all_data['correlation'][index]
         self.all_data['labels'] = self.all_data['labels'][index]
         self.all_data['subject_id'] = self.all_data['subject_id'][index]
 

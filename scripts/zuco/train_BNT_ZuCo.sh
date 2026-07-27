@@ -1,24 +1,29 @@
 #!/bin/bash
-export PYTHONUNBUFFERED=1
-export CUDA_VISIBLE_DEVICES=0
+#
+# BNT DeepSpeed ZeRO-2 training on ZuCo (zuco)
+# GPUs: 4  |  batch_size: 4 per GPU  |  total effective: 16
+#
 
-cd ../..
-python main.py \
---num_repeat 5 \
---wandb_entity cwg \
---project ZuCo-TSR \
-\
---model "BNT" \
-\
---dataset 'ZuCo' \
---data_dir "/data/datasets/ZuCo/ZuCo-TSR.npy" \
---batch_size 1 \
---num_epochs 100 \
---drop_last True \
---model_dir "output_dir" \
---schedule 'cos' \
---learning_rate 1e-4 \
-\
---do_train \
---do_evaluate \
---do_test
+deepspeed --num_gpus=4 main.py \
+    --model "BNT" \
+    --num_repeat 1 \
+    --dataset 'ZuCo' \
+    --data_dir "/data/datasets/ZuCo/ZuCo-TSR.npy" \
+    --batch_size 4 \
+    --num_epochs 200 \
+    --drop_last False \
+    --train_set 0.6 \
+    --val_set 0.2 \
+    --schedule 'cos' \
+    --optimizer 'Adam' \
+    --learning_rate 1e-4 \
+    --weight_decay 1e-4 \
+    --eps 1e-8 \
+    --early_stop_patience 20 \
+    --early_stop_min_delta 0.001 \
+    --early_stop_metric "Loss" \
+    --deepspeed \
+    --deepspeed_config ds_config_zero2.json \
+    --do_train \
+    --do_evaluate \
+    --do_test

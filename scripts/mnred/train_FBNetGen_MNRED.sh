@@ -1,23 +1,29 @@
 #!/bin/bash
-export PYTHONUNBUFFERED=1
+#
+# FBNetGen DeepSpeed ZeRO-2 training on MNRED (mnred)
+# GPUs: 4  |  batch_size: 4 per GPU  |  total effective: 16
+#
 
-cd ../..
-python main.py \
-\
---model "FBNetGen" \
---num_repeat 5 \
-\
---dataset 'MNRED' \
---data_dir "../data/MNRED/MNRED.npy" \
---batch_size 16 \
---num_epochs 100 \
---drop_last True \
---model_dir "output_dir" \
-\
---mix_up \
---do_train \
---learning_rate 1e-4 \
---target_learning_rate 1e-5 \
---schedule 'cos' \
---do_evaluate \
---do_test
+deepspeed --num_gpus=4 main.py \
+    --model "FBNetGen" \
+    --num_repeat 1 \
+    --dataset 'MNRED' \
+    --data_dir "../data/MNRED/mnred.npy" \
+    --batch_size 4 \
+    --num_epochs 200 \
+    --drop_last False \
+    --train_set 0.6 \
+    --val_set 0.2 \
+    --schedule 'cos' \
+    --optimizer 'Adam' \
+    --learning_rate 1e-4 \
+    --weight_decay 1e-4 \
+    --eps 1e-8 \
+    --early_stop_patience 20 \
+    --early_stop_min_delta 0.001 \
+    --early_stop_metric "Loss" \
+    --deepspeed \
+    --deepspeed_config ds_config_zero2.json \
+    --do_train \
+    --do_evaluate \
+    --do_test

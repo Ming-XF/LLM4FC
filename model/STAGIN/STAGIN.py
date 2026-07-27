@@ -123,7 +123,8 @@ class STAGIN(nn.Module):
             ortho_latent = rearrange(h_bridge, 't b n c -> (t b) n c')      # (TxB)xNxD
             matrix_inner = torch.bmm(ortho_latent, ortho_latent.permute(0, 2, 1))
             reg_ortho += (matrix_inner / matrix_inner.max(-1)[0].unsqueeze(-1) - torch.eye(num_nodes,
-                                                                                           device=matrix_inner.device)).triu().norm(
+                                                                                             device=matrix_inner.device,
+                                                                                             dtype=matrix_inner.dtype)).triu().norm(
                 dim=(1, 2)).mean()
 
             latent = self.cls_token(h_attend)       # BxD

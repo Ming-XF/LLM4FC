@@ -58,11 +58,11 @@ class GCDGCN(nn.Module):
     def normalize_adj(self, adj):
         """归一化邻接矩阵（计算归一化拉普拉斯）"""
         # 添加自环
-        adj_with_self = adj + torch.eye(self.config.node_size, device=adj.device).unsqueeze(0)
-        
+        adj_with_self = adj + torch.eye(self.config.node_size, device=adj.device, dtype=adj.dtype).unsqueeze(0)
+
         degree = torch.sum(adj, dim=-1)
         degree_inv_sqrt = torch.pow(degree + 1e-8, -0.5).diag_embed()
-        laplacian = torch.eye(self.config.node_size, device=adj.device) - \
+        laplacian = torch.eye(self.config.node_size, device=adj.device, dtype=adj.dtype) - \
                    torch.matmul(degree_inv_sqrt, torch.matmul(adj, degree_inv_sqrt))
         return laplacian
 
@@ -86,7 +86,7 @@ class GCDGCN(nn.Module):
         device = node_feature.device
         
         
-        x = torch.eye(C).unsqueeze(0).repeat(B, 1, 1).to(device)  # (batch, 16, 16)
+        x = torch.eye(C, device=device).unsqueeze(0).repeat(B, 1, 1).to(dtype=node_feature.dtype)  # (batch, 16, 16)
         adj = node_feature
 
 
@@ -136,17 +136,18 @@ class GCDGCN(nn.Module):
         
         # 1. 重建邻接矩阵
         idx = torch.triu_indices(self.config.node_size, self.config.node_size, 1)
-        adj = torch.zeros(batch_size, self.config.node_size, self.config.node_size, device=embeddings.device)
+        adj = torch.zeros(batch_size, self.config.node_size, self.config.node_size,
+                          device=embeddings.device, dtype=embeddings.dtype)
         adj[:, idx[0], idx[1]] = embeddings
         adj[:, idx[1], idx[0]] = embeddings
         
         # 2. 计算归一化拉普拉斯矩阵的特征值（全局特征）
         degree = torch.sum(adj, dim=-1)
         degree_inv_sqrt = torch.pow(degree, -0.5).diag_embed()
-        laplacian = torch.eye(self.config.node_size, device=adj.device).unsqueeze(0) - \
+        laplacian = torch.eye(self.config.node_size, device=adj.device, dtype=adj.dtype).unsqueeze(0) - \
                    torch.matmul(degree_inv_sqrt, torch.matmul(adj, degree_inv_sqrt))
         
-        eigenvalues = torch.linalg.eigvalsh(laplacian)
+        eigenvalues = torch.linalg.eigvalsh(laplacian.float())
         eigenvalues, _ = torch.sort(eigenvalues, dim=1)
         eigenv = eigenvalues[:, 1:]  # 忽略λ₁=0
         
@@ -232,7 +233,7 @@ class GCDEmbedding(nn.Module):
         embedding_vec = self.mlp(x)
         
         # 重建去噪后的邻接矩阵
-        adj_denoised = torch.zeros_like(adj)
+        adj_denoised = torch.zeros_like(adj, dtype=embedding_vec.dtype)
         adj_denoised[:, idx[0], idx[1]] = embedding_vec
         adj_denoised[:, idx[1], idx[0]] = embedding_vec
         

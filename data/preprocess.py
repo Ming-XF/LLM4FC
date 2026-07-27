@@ -6,9 +6,6 @@ from scipy.fftpack import fft
 from scipy.linalg import sqrtm
 from scipy.signal import firwin, lfilter, filtfilt
 
-import torch
-import numpy as np
-
 import pdb
 
 class DementiaDataNormalizer:
@@ -148,3 +145,60 @@ def preprocess_ea(data):
     for i in range(len(data)):
         data[i] = np.dot(np.linalg.inv(sqrtm(R_bar_mean)), data[i])
     return data
+
+
+def dynamic_connectivity(time_series, window_size, step_size, activate=False, use_oas=False):
+    """计算动态脑功能连接 (sliding-window FC)。
+
+    Parameters
+    ----------
+    time_series : array-like, shape (N, L)
+        EEG 数据，N 为通道数，L 为采样点数。
+    window_size : int
+        滑动窗口大小（采样点数）。
+    step_size : int
+        滑动步长（采样点数）。
+    activate : bool
+        是否应用 Fisher z 变换（arctanh）。
+    use_oas : bool
+        是否使用 OAS 收缩协方差估计器（默认使用标准 Pearson 相关）。
+
+    Returns
+    -------
+    dynamic_conn : numpy.ndarray, shape (num_windows, N, N)
+        动态功能连接矩阵。对角线始终置零。
+    """
+    N, L = time_series.shape
+    num_windows = (L - window_size) // step_size + 1
+
+    if use_oas:
+        from sklearn.covariance import OAS
+        oas = OAS(assume_centered=False)
+
+    dynamic_conn = []
+
+    for i in range(num_windows):
+        start_idx = i * step_size
+        end_idx = start_idx + window_size
+        window_data = time_series[:, start_idx:end_idx]  # (N, window_size)
+
+        if use_oas:
+            cov = oas.fit(window_data.T).covariance_
+            d = np.sqrt(np.diag(cov))
+            conn_matrix = cov / np.outer(d, d)
+        else:
+            with np.errstate(divide='ignore', invalid='ignore'):
+                conn_matrix = np.corrcoef(window_data)
+
+        conn_matrix = np.nan_to_num(conn_matrix, nan=0.0, posinf=0.0, neginf=0.0)
+
+        if activate:
+            # Fisher z 变换：clip 输入避免 arctanh(±1) = ±inf
+            conn_matrix = np.arctanh(np.clip(conn_matrix, -0.9999, 0.9999))
+
+        # 对角线始终置零，避免自相关影响下游模型
+        np.fill_diagonal(conn_matrix, 0)
+
+        dynamic_conn.append(conn_matrix)
+
+    return np.stack(dynamic_conn, axis=0)

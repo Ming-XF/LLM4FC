@@ -84,7 +84,7 @@ def normalize_adjacency(SFC, threshold=0.0):
 
     adj[adj < threshold] = 0
 
-    adj = adj + torch.eye(N, device=device).unsqueeze(0)
+    adj = adj + torch.eye(N, device=device, dtype=adj.dtype).unsqueeze(0)
 
     deg = adj.sum(dim=-1)
     deg_inv_sqrt = deg.pow(-0.5)

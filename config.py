@@ -47,11 +47,6 @@ def init_model_config(args, data_config: DataConfig):
         model_config = BrainNetCNNConfig(node_size=data_config.node_size,
                                          num_classes=data_config.num_class)
         model = BrainNetCNN(model_config)
-    elif args.model == 'DFCBNC':
-        from model.DFCBNC import DFCBNC, DFCBNCConfig
-        model_config = DFCBNCConfig(node_size=data_config.node_size,
-                                     num_classes=data_config.num_class)
-        model = DFCBNC(model_config)
     elif args.model == 'STAGIN':
         model_config = STAGINConfig(node_size=data_config.node_size,
                                     num_classes=data_config.num_class,
@@ -62,146 +57,6 @@ def init_model_config(args, data_config: DataConfig):
                                     dynamic_length=args.dynamic_length,
                                     sampling_init=args.sampling_init)
         model = STAGIN(model_config)
-    elif args.model == "Transformer":
-        model_config = TransformerConfig(node_size=data_config.node_size,
-                                         num_classes=data_config.num_class,
-                                         node_feature_size=data_config.node_feature_size,
-                                         readout='concat',
-                                         num_layers=args.num_layers)
-        model = Transformer(model_config)
-    elif args.model == "EEGNet":
-        model_config = EEGNetConfig(node_size=data_config.node_size,
-                                    time_series_size=data_config.time_series_size,
-                                    node_feature_size=data_config.node_feature_size,
-                                    num_classes=data_config.num_class,
-                                    frequency=args.frequency,
-                                    D=args.D,
-                                    num_kernels=args.num_kernels,
-                                    p1=args.p1,
-                                    p2=args.p2,
-                                    dropout=args.dropout)
-        model_config.class_weight = data_config.class_weight
-        model = EEGNet(model_config)
-    elif args.model == "DFaST":
-        model_config = DFaSTConfig(node_size=data_config.node_size,
-                                   time_series_size=data_config.time_series_size,
-                                   node_feature_size=data_config.node_feature_size,
-                                   num_classes=data_config.num_class,
-                                   sparsity=args.sparsity,
-                                   frequency=args.frequency,
-                                   D=args.D,
-                                   p1=args.p1,
-                                   p2=args.p2,
-                                   k=args.k,
-                                   num_kernels=args.num_kernels,
-                                   d_model=args.d_model,
-                                   window_size=args.window_size,
-                                   window_stride=args.window_stride,
-                                   dynamic_length=args.dynamic_length,
-                                   num_heads=args.num_heads,
-                                   dim_feedforward=args.dim_feedforward,
-                                   num_spatial_layers=args.num_layers,
-                                   num_node_temporal_layers=args.num_node_temporal_layers,
-                                   num_graph_temporal_layers=args.num_graph_temporal_layers,
-                                   attention_depth=args.attention_depth,
-                                   activation=args.activation,
-                                   dropout=args.dropout,
-                                   # distill=(False, ) + (args.num_layers - 1) *
-                                   #         ((True,) if args.distill else (False,)),
-                                   distill=args.num_layers * ((True,) if args.distill else (False,)),
-                                   initializer=args.initializer,
-                                   label_smoothing=args.epsilon_ls
-                                   )
-        model_config.class_weight = data_config.class_weight
-        model = DFaSTForClassification(model_config)
-    elif args.model == "DFaSTOnlySpatial":
-        model_config = DFaSTConfig(node_size=data_config.node_size,
-                                   time_series_size=data_config.time_series_size,
-                                   node_feature_size=data_config.node_feature_size,
-                                   num_classes=data_config.num_class,
-                                   sparsity=args.sparsity,
-                                   frequency=args.frequency,
-                                   D=args.D,
-                                   p1=args.p1,
-                                   p2=args.p2,
-                                   k=args.k,
-                                   num_kernels=args.num_kernels,
-                                   d_model=args.d_model,
-                                   window_size=args.window_size,
-                                   window_stride=args.window_stride,
-                                   dynamic_length=args.dynamic_length,
-                                   num_heads=args.num_heads,
-                                   dim_feedforward=args.dim_feedforward,
-                                   num_spatial_layers=args.num_layers,
-                                   num_node_temporal_layers=args.num_node_temporal_layers,
-                                   num_graph_temporal_layers=args.num_graph_temporal_layers,
-                                   attention_depth=args.attention_depth,
-                                   activation=args.activation,
-                                   dropout=args.dropout,
-                                   # distill=(False, ) + (args.num_layers - 1) *
-                                   #         ((True,) if args.distill else (False,)),
-                                   distill=args.num_layers * ((True,) if args.distill else (False,)),
-                                   initializer=args.initializer,
-                                   label_smoothing=args.epsilon_ls
-                                   )
-        model_config.class_weight = data_config.class_weight
-        model = DFaSTOnlySpatialForClassification(model_config)
-    elif args.model == "LMDA":
-        model_config = LMDAConfig(node_size=data_config.node_size,
-                                  time_series_size=data_config.time_series_size,
-                                  node_feature_size=data_config.node_feature_size,
-                                  num_classes=data_config.num_class,
-                                  depth=9,
-                                  channel_depth1=args.num_kernels,
-                                  channel_depth2=9,
-                                  ave_depth=1,
-                                  avepool=5
-                                  )
-        model_config.class_weight = data_config.class_weight
-        model = LMDA(model_config)
-    elif args.model == "ShallowConvNet":
-        model_config = ShallowConvNetConfig(node_size=data_config.node_size,
-                                            time_series_size=data_config.time_series_size,
-                                            node_feature_size=data_config.node_feature_size,
-                                            num_classes=data_config.num_class,
-                                            num_kernels=args.num_kernels
-                                            )
-        model_config.class_weight = data_config.class_weight
-        model = ShallowConvNet(model_config)
-    elif args.model == "DeepConvNet":
-        model_config = DeepConvNetConfig(node_size=data_config.node_size,
-                                         time_series_size=data_config.time_series_size,
-                                         node_feature_size=data_config.node_feature_size,
-                                         num_classes=data_config.num_class,
-                                         num_kernels=25
-                                         )
-        model_config.class_weight = data_config.class_weight
-        model = DeepConvNet(model_config)
-    elif args.model == "RACNN":
-        model_config = RACNNConfig(node_size=data_config.node_size,
-                                   time_series_size=data_config.time_series_size,
-                                   node_feature_size=data_config.node_feature_size,
-                                   num_classes=data_config.num_class,
-                                   k=args.k
-                                   )
-        model_config.class_weight = data_config.class_weight
-        model = RACNN(model_config)
-    elif args.model == "EEGChannelNet":
-        model_config = EEGChannelNetConfig(node_size=data_config.node_size,
-                                           time_series_size=data_config.time_series_size,
-                                           node_feature_size=data_config.node_feature_size,
-                                           num_classes=data_config.num_class
-                                           )
-        model_config.class_weight = data_config.class_weight
-        model = EEGChannelNet(model_config)
-    elif args.model == "TCANet":
-        model_config = TCANetConfig(node_size=data_config.node_size,
-                                    time_series_size=data_config.time_series_size,
-                                    node_feature_size=data_config.node_feature_size,
-                                    num_classes=data_config.num_class
-                                    )
-        model_config.class_weight = data_config.class_weight
-        model = TCANet(model_config)
     elif args.model == "TCACNet":
         model_config = TCACNetConfig(node_size=data_config.node_size,
                                      time_series_size=data_config.time_series_size,
@@ -210,25 +65,6 @@ def init_model_config(args, data_config: DataConfig):
                                      )
         model_config.class_weight = data_config.class_weight
         model = TCACNet(model_config)
-    elif args.model == "SBLEST":
-        model_config = SBLESTConfig(node_size=data_config.node_size,
-                                    time_series_size=data_config.time_series_size,
-                                    node_feature_size=data_config.node_feature_size,
-                                    num_classes=data_config.num_class
-                                    )
-        model_config.class_weight = data_config.class_weight
-        model = SBLEST(model_config)
-        
-    elif args.model == "SteadyNet":
-        model_config = SteadyNetConfig(node_size=data_config.node_size,
-                                  time_series_size=data_config.time_series_size,
-                                  node_feature_size=data_config.node_feature_size,
-                                  num_classes=data_config.num_class,
-                                  channel_depth1=args.num_kernels,
-                                  channel_depth2=20
-                                  )
-        model_config.class_weight = data_config.class_weight
-        model = SteadyNet(model_config)
     elif args.model == "ALTER":
         model_config = ALTERConfig(node_size=data_config.node_size,
                                  # sizes=(data_config.node_size, data_config.node_size // 2),
@@ -245,29 +81,10 @@ def init_model_config(args, data_config: DataConfig):
                                  dim_feedforward=1024,
                                  )
         model = ALTER(model_config)
-    elif args.model == 'AlzNetV3':
-        model_config = AlzNetV3Config(node_size=data_config.node_size,
-                                         num_classes=data_config.num_class)
-        model = AlzNetV3(model_config)
     elif args.model == 'GCDGCN':
         model_config = GCDGCNConfig(node_size=data_config.node_size,
                                          num_classes=data_config.num_class)
         model = GCDGCN(model_config)
-    elif args.model == "CEEDNet":
-        model_config = CEEDNetConfig(node_size=data_config.node_size,
-                                     time_series_size=data_config.time_series_size,
-                                     node_feature_size=data_config.node_feature_size,
-                                     num_classes=data_config.num_class)
-        model_config.class_weight = data_config.class_weight
-        model = CEEDNet(model_config)
-    elif args.model == 'LDDE':
-        model_config = LDDEConfig(node_size=data_config.node_size,
-                                         num_classes=data_config.num_class)
-        model = LDDE(model_config)
-    elif args.model == 'LDDE2th':
-        model_config = LDDE2thConfig(node_size=data_config.node_size,
-                                         num_classes=data_config.num_class)
-        model = LDDE2th(model_config)
     elif args.model == 'TimeLLM':
         model_config = TimeLLMConfig(
             node_size=data_config.node_size,
@@ -307,7 +124,7 @@ def init_config():
     global_group.add_argument("--project", default="", type=str, help="")
     global_group.add_argument("--wandb_entity", default='cwg', type=str, help="")
     global_group.add_argument("--log_dir", default="./log_dir", type=str, help="")
-    global_group.add_argument("--model", default="DFaST", type=str, help="")
+    global_group.add_argument("--model", default="TimeLLM", type=str, help="")
     global_group.add_argument("--num_repeat", default=1, type=int, help="")
     global_group.add_argument("--within_subject", action="store_true", help="")
     global_group.add_argument("--subject_num", default=10, type=int, help="")
@@ -373,7 +190,7 @@ def init_config():
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
     train_group.add_argument("--do_train", action="store_true", help="")
     train_group.add_argument("--do_parallel", action="store_true", help="")
-    train_group.add_argument("--deepspeed", action="store_true", help="Enable DeepSpeed ZeRO-3 (LDDE2th only)")
+    train_group.add_argument("--deepspeed", action="store_true", help="Enable DeepSpeed ZeRO-2/3")
     train_group.add_argument("--deepspeed_config", default="ds_config_zero3.json", type=str, help="DeepSpeed config JSON path")
     train_group.add_argument("--local_rank", default=0, type=int, help="Local rank (set by DeepSpeed launcher)")
     train_group.add_argument("--device", default="cuda", type=str, help="")
@@ -411,11 +228,6 @@ def init_config():
     evaluate_group = parser.add_argument_group(title="evaluate", description="")
     evaluate_group.add_argument("--do_evaluate", action="store_true", help="")
     evaluate_group.add_argument("--do_test", action="store_true", help="")
-    evaluate_group.add_argument("--inference_mode", default="full", type=str,
-                                choices=["full", "fast"],
-                                help="LDDE/LDDE2th eval inference mode: 'full' "
-                                     "(generate diagnostic text + classify) "
-                                     "or 'fast' (classify only)")
 
 
     return parser.parse_args()

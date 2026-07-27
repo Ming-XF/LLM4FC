@@ -15,9 +15,6 @@ import re
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
-from .dementia_mms import dynamic_connectivity
-
-
 class Dementia4000Dataset(BaseDataset):
     def __init__(self, data_config: DataConfig, k=0, train=True, subject_id=0, one_hot=True):
         super(Dementia4000Dataset, self).__init__(data_config, k, train, subject_id=subject_id, one_hot=one_hot)

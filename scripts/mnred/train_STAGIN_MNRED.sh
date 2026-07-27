@@ -1,34 +1,34 @@
 #!/bin/bash
-export PYTHONUNBUFFERED=1
-export CUDA_VISIBLE_DEVICES=2
-export WANDB_API_KEY=cd4441a5fcdd740b84b45deb6890ecb376bddecb
-export WANDB_MODE=offline
+#
+# STAGIN DeepSpeed ZeRO-2 training on MNRED (mnred)
+# GPUs: 4  |  batch_size: 4 per GPU  |  total effective: 16
+#
 
-cd ../..
-python main.py \
-\
---model "STAGIN" \
---num_repeat 5 \
-\
---dataset 'MNRED' \
---data_dir "../data/MNRED/MNRED.npy" \
---percentage 1. \
---batch_size 16 \
---num_epochs 100 \
---drop_last True \
-\
---d_model 64 \
---window_size 50 \
---window_stride 3 \
---dynamic_length 440 \
---num_heads 1 \
---num_layers 2 \
-\
---do_train \
-\
---learning_rate 0.0005 \
---max_learning_rate 0.001 \
---schedule 'one_cycle' \
-\
---do_evaluate \
---do_test
+deepspeed --num_gpus=4 main.py \
+    --model "STAGIN" \
+    --num_repeat 1 \
+    --dataset 'MNRED' \
+    --data_dir "../data/MNRED/mnred.npy" \
+    --batch_size 4 \
+    --num_epochs 200 \
+    --drop_last False \
+    --train_set 0.6 \
+    --val_set 0.2 \
+    --schedule 'cos' \
+    --optimizer 'Adam' \
+    --learning_rate 1e-4 \
+    --weight_decay 1e-4 \
+    --eps 1e-8 \
+    --early_stop_patience 20 \
+    --early_stop_min_delta 0.001 \
+    --early_stop_metric "Loss" \
+    --d_model 64 \
+    --window_size 50 \
+    --window_stride 3 \
+    --dynamic_length 600 \
+    --num_layers 2 \
+    --deepspeed \
+    --deepspeed_config ds_config_zero2.json \
+    --do_train \
+    --do_evaluate \
+    --do_test

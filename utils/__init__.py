@@ -5,5 +5,4 @@ from .accuracy import accuracy
 from .recorder import Recorder
 from .dynmic import process_dynamic_fc, corrcoef, process_dynamic_muti_type_fc
 from .trainer import *
-from .connect import extract_simple_eeg_features
 

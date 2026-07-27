@@ -10,6 +10,7 @@ from einops import rearrange
 
 from .data_config import DataConfig
 from .dataset import BaseDataset
+from .preprocess import *
 
 names = ["ZAB", "ZDM", "ZDN", "ZGW", "ZJM", "ZJN", "ZJS", "ZKB", "ZKH", "ZKW", "ZMG", "ZPH"]
 
@@ -22,6 +23,7 @@ class ZuCoDataset(BaseDataset):
         self.all_data = np.load(self.data_config.data_dir, allow_pickle=True).item()
 
         self.data_config.node_size = self.data_config.node_feature_size = self.all_data["time_series"][0].shape[0]
+        self.hz = self.all_data.get("hz", 128)
         self.padding_and_truncating()
 
         if "TSR" in self.data_config.data_dir:
@@ -48,7 +50,7 @@ class ZuCoDataset(BaseDataset):
         sentences_time_series = torch.from_numpy(self.all_data['sentences_time_series'][idx[item]]).float()
         words_time_series = torch.from_numpy(self.all_data['words_time_series'][idx[item]]).float()
         labels = torch.from_numpy(self.all_data['labels'][idx[item]]).to(torch.int64)
-        correlation = self.connectivity(sentences_time_series, activate=False)
+        SFC = self.connectivity(sentences_time_series, activate=False)
         words_time_series = rearrange(words_time_series, "c f n w -> n (c f w)")
 
         # words_time_series = self.norm(words_time_series)
@@ -56,9 +58,14 @@ class ZuCoDataset(BaseDataset):
         # correlation = self.correlation(time_series)
         # correlation = torch.from_numpy(self.all_data['correlation'][idx[item]]).float()
 
+        DFC = dynamic_connectivity(sentences_time_series.numpy(), 3 * self.hz, 1 * self.hz)
+        DFC = torch.from_numpy(DFC).float()
+
         return {'time_series': sentences_time_series,
-                'correlation': correlation,
-                'labels': labels}
+                'DFC': DFC,
+                'correlation': SFC,
+                'labels': labels,
+                'sample_idx': idx[item]}
 
     def padding_and_truncating(self):
         all_data = {}

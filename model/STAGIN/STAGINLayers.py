@@ -24,7 +24,11 @@ class LayerGIN(nn.Module):
                                  nn.Linear(hidden_dim, output_dim), nn.BatchNorm1d(output_dim), nn.ReLU())
 
     def forward(self, v, a):
-        v_aggregate = torch.sparse.mm(a, v)
+        # torch.sparse.mm does not support bf16 on CUDA — disable autocast
+        with torch.cuda.amp.autocast(enabled=False):
+            a_fp32 = a.float()
+            v_fp32 = v.float()
+            v_aggregate = torch.sparse.mm(a_fp32, v_fp32)
         v_aggregate += self.epsilon * v  # assumes that the adjacency matrix includes self-loop
         v_combine = self.mlp(v_aggregate)
         return v_combine

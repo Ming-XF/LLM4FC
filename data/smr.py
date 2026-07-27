@@ -20,11 +20,10 @@ class SMRDataset(BaseDataset):
     def load_data(self, one_hot=True):
         data = np.load(self.data_config.data_dir, allow_pickle=True).item()
         time_series = data["timeseries"]
-        # time_series = data["timeseries"][:, :, :550]
-        correlation = data["corr"]
         labels = data["labels"]
         subject_id = data["subject_id"]
         tags = data['tags']
+        self.hz = data.get("hz", 128)
 
         # pdb.set_trace()
 
@@ -34,7 +33,6 @@ class SMRDataset(BaseDataset):
 
         self.data_config.class_weight = [1, 1, 1, 1]
         self.all_data['time_series'] = time_series
-        self.all_data['correlation'] = correlation
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
         self.all_data['tags'] = tags
@@ -52,17 +50,20 @@ class SMRDataset(BaseDataset):
         sampling_init = (randrange(time_series.size(-1) - self.data_config.time_series_size)) \
             if self.data_config.dynamic else 0
         time_series = time_series[:, sampling_init:sampling_init + self.data_config.time_series_size]
-        correlation = self.connectivity(time_series, activate=False)
+        SFC = self.connectivity(time_series, activate=False)
+        DFC = dynamic_connectivity(time_series.numpy(), 3 * self.hz, 1 * self.hz)
+        DFC = torch.from_numpy(DFC).float()
 
         return {'time_series': time_series,
-                'correlation': correlation,
-                'labels': labels}
+                'DFC': DFC,
+                'correlation': SFC,
+                'labels': labels,
+                'sample_idx': idx[item]}
 
     def select_subject(self):
         self.selected = [self.subject_id]
         index = np.sum(self.all_data["subject_id"] == i for i in self.selected) == 1
         self.all_data['time_series'] = self.all_data['time_series'][index]
-        self.all_data['correlation'] = self.all_data['correlation'][index]
         self.all_data['labels'] = self.all_data['labels'][index]
         self.all_data['subject_id'] = self.all_data['subject_id'][index]
         self.all_data['tags'] = self.all_data['tags'][index]
