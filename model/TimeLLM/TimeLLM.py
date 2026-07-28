@@ -55,9 +55,10 @@ class TimeLLMConfig(BaseConfig):
                  num_prototypes=500,
                  gcn_hidden=128,
                  dropout=0.1,
-                 llm_layers=28,
                  num_patches=19,
-                 dataset_name='CAUEEG2'):
+                 dataset_name='CAUEEG2',
+                 llm_type='chatglm',
+                 llm_path='./model/chatglm-6b'):
         super().__init__(node_size=node_size, num_classes=num_classes)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -65,9 +66,10 @@ class TimeLLMConfig(BaseConfig):
         self.num_prototypes = num_prototypes
         self.gcn_hidden = gcn_hidden
         self.dropout = dropout
-        self.llm_layers = llm_layers
         self.num_patches = num_patches
         self.dataset_name = dataset_name
+        self.llm_type = llm_type
+        self.llm_path = llm_path
 
 
 class ReprogrammingLayer(nn.Module):
@@ -117,7 +119,8 @@ class Model(nn.Module):
         self.num_prototypes = config.num_prototypes
         self.n_heads = config.n_heads
         self.d_llm = 4096
-        self.llm_layers = config.llm_layers
+        self.llm_type = config.llm_type
+        self.llm_path = config.llm_path
 
         self.gcn = GCNLayer(config.gcn_hidden, config.gcn_hidden,
                             dropout=config.dropout)
@@ -135,20 +138,38 @@ class Model(nn.Module):
             nn.GELU(),
         )
 
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "./model/chatglm-6b", trust_remote_code=True
-        )
-        self.llm = AutoModel.from_pretrained(
-            "./model/chatglm-6b", trust_remote_code=True
-        ).bfloat16()
-
-        self.llm.transformer.gradient_checkpointing = False
-        self.position_encoding_2d = self.llm.transformer.position_encoding_2d
+        # ── LLM 加载（分支：chatglm / llama）──────────────────
+        if self.llm_type == 'chatglm':
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.llm_path, trust_remote_code=True
+            )
+            self.llm = AutoModel.from_pretrained(
+                self.llm_path, trust_remote_code=True
+            ).bfloat16()
+            self.llm.transformer.gradient_checkpointing = False
+            self.position_encoding_2d = self.llm.transformer.position_encoding_2d
+            self._word_embeddings = self.llm.transformer.word_embeddings
+            self._transformer = self.llm.transformer
+        elif self.llm_type == 'llama':
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.llm_path
+            )
+            self.llm = AutoModel.from_pretrained(
+                self.llm_path, torch_dtype=torch.bfloat16
+            )
+            self.llm.config.use_cache = False
+            self.position_encoding_2d = False
+            # AutoModel 返回 LlamaModel（无 .model 子模块），
+            # embed_tokens / layers / norm 直接挂在顶层
+            self._word_embeddings = self.llm.embed_tokens
+            self._transformer = self.llm
+        else:
+            raise ValueError(f"Unsupported llm_type: {self.llm_type}")
 
         self._pc = get_prompt_config(config.dataset_name)
         prefix_ids = self.tokenizer.encode(self._pc.system_prompt)
         with torch.no_grad():
-            prefix_embeds = self.llm.transformer.word_embeddings(
+            prefix_embeds = self._word_embeddings(
                 torch.tensor(prefix_ids)
             )
         self.register_buffer("prompt_prefix_embeddings", prefix_embeds)
@@ -156,7 +177,7 @@ class Model(nn.Module):
 
         start_tag_ids = self.tokenizer.encode("<start_prompt>\n")
         with torch.no_grad():
-            start_tag_embeds = self.llm.transformer.word_embeddings(
+            start_tag_embeds = self._word_embeddings(
                 torch.tensor(start_tag_ids)
             )
         self.register_buffer("start_tag_embeddings", start_tag_embeds)
@@ -164,13 +185,13 @@ class Model(nn.Module):
 
         end_tag_ids = self.tokenizer.encode("\n<end_prompt>")
         with torch.no_grad():
-            end_tag_embeds = self.llm.transformer.word_embeddings(
+            end_tag_embeds = self._word_embeddings(
                 torch.tensor(end_tag_ids)
             )
         self.register_buffer("end_tag_embeddings", end_tag_embeds)
         self.P_end: int = end_tag_embeds.shape[0]
 
-        self.word_embeddings = self.llm.transformer.word_embeddings.weight
+        self.word_embeddings = self._word_embeddings.weight
         self.vocab_size = self.word_embeddings.shape[0]
         self.mapping_layer = nn.Linear(self.vocab_size, self.num_prototypes)
 
@@ -184,12 +205,12 @@ class Model(nn.Module):
         self.node_pos_embed = nn.Parameter(torch.zeros(1, C, self.d_llm))
         nn.init.normal_(self.node_pos_embed, std=0.02)
 
-        # --- 用 ChatGLM 词嵌入初始化通道节点表示 ---
+        # --- 用 LLM 词嵌入初始化通道节点表示 ---
         channel_name_ids = [
             self.tokenizer.encode(name, add_special_tokens=False)
             for name in self._pc.channel_names
         ]
-        word_embed_weight = self.llm.transformer.word_embeddings.weight.data
+        word_embed_weight = self._word_embeddings.weight.data
         channel_embeds = torch.stack([
             word_embed_weight[torch.tensor(ids)].mean(dim=0)
             for ids in channel_name_ids
@@ -305,7 +326,7 @@ class Model(nn.Module):
             stats_texts, return_tensors="pt",
             padding=True, truncation=True, max_length=256
         ).input_ids.to(device)
-        stats_embeddings = self.llm.transformer.word_embeddings(stats_ids)
+        stats_embeddings = self._word_embeddings(stats_ids)
 
         start_tag = self.start_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
         end_tag = self.end_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
@@ -323,35 +344,60 @@ class Model(nn.Module):
         P_skip = (self.P_start + self.P_prefix +
                   stats_embeddings.shape[1] + self.P_end)
 
-        attention_mask = torch.zeros(B, 1, S, S, dtype=torch.bool,
-                                     device=device)
+        # ── 构造 position_ids 与 attention_mask（分支）────
+        if self.llm_type == 'chatglm':
+            # 因果注意力：token i 只能 attend token 0..i
+            # ChatGLM 中 True=遮蔽, False=可见
+            causal_mask = torch.triu(
+                torch.ones(S, S, dtype=torch.bool, device=device), diagonal=1
+            )
+            attention_mask = causal_mask.unsqueeze(0).unsqueeze(0).expand(B, 1, -1, -1)
 
-        global_pos = torch.arange(S, dtype=torch.long, device=device).unsqueeze(0).repeat(B, 1)
-        if self.position_encoding_2d:
-            # Prompt prefix and graph node patches use independent local
-            # position coordinates so the model can distinguish them as
-            # distinct segments (modalities) rather than one undifferentiated
-            # sequence.
-            block_pos = torch.cat([
-                torch.arange(P_skip, dtype=torch.long, device=device),
-                torch.arange(C, dtype=torch.long, device=device),
-            ]).unsqueeze(0).repeat(B, 1)
-            position_ids = torch.stack((global_pos, block_pos), dim=1)
+            global_pos = torch.arange(S, dtype=torch.long, device=device).unsqueeze(0).repeat(B, 1)
+            if self.position_encoding_2d:
+                block_pos = torch.cat([
+                    torch.arange(P_skip, dtype=torch.long, device=device),
+                    torch.arange(C, dtype=torch.long, device=device),
+                ]).unsqueeze(0).repeat(B, 1)
+                position_ids = torch.stack((global_pos, block_pos), dim=1)
+            else:
+                position_ids = global_pos
+
+            transformer_outputs = self._transformer(
+                input_ids=None,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                past_key_values=None,
+                inputs_embeds=inputs_embeds,
+                use_cache=False,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False,
+            )
+            # ChatGLM: (S, B, H) → (B, S, H)
+            HL = transformer_outputs[0].transpose(0, 1)
+
+        elif self.llm_type == 'llama':
+            # RoPE 1D position_ids: (B, S)
+            position_ids = torch.arange(S, dtype=torch.long,
+                                        device=device).unsqueeze(0).expand(B, -1)
+
+            # 不传 attention_mask，LLaMA 内部自动构造因果 mask
+            transformer_outputs = self._transformer(
+                input_ids=None,
+                position_ids=position_ids,
+                past_key_values=None,
+                inputs_embeds=inputs_embeds,
+                use_cache=False,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False,
+            )
+            # LLaMA: 输出已是 (B, S, H)，无需转置
+            HL = transformer_outputs[0]
+
         else:
-            position_ids = global_pos
-
-        transformer_outputs = self.llm.transformer(
-            input_ids=None,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            past_key_values=None,
-            inputs_embeds=inputs_embeds,
-            use_cache=False,
-            output_attentions=False,
-            output_hidden_states=False,
-            return_dict=False,
-        )
-        HL = transformer_outputs[0].transpose(0, 1)
+            raise ValueError(f"Unsupported llm_type: {self.llm_type}")
 
         HL_patches = HL[:, P_skip:, :self.config.d_ff].to(
             dtype=self.output_projection[1].weight.dtype)

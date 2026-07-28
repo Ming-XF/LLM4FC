@@ -28,6 +28,8 @@ deepspeed --num_gpus=4 main.py \
     --save_steps 25 \
     --deepspeed \
     --deepspeed_config scripts/deepspeed/TimeLLM.json \
+    --llm_type chatglm \
+    --llm_path ./model/chatglm-6b \
     --do_train \
     --do_evaluate \
     --do_test

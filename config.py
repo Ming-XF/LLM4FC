@@ -95,9 +95,10 @@ def init_model_config(args, data_config: DataConfig):
             num_prototypes=args.num_prototypes,
             gcn_hidden=args.gcn_hidden,
             dropout=args.dropout,
-            llm_layers=args.llm_layers,
             num_patches=args.num_patches,
             dataset_name=args.dataset,
+            llm_type=args.llm_type,
+            llm_path=args.llm_path,
         )
         model = Model(model_config)
     else:
@@ -177,7 +178,11 @@ def init_config():
     model_group.add_argument("--distill", action="store_true", help="")
     model_group.add_argument("--initializer", default=None, type=str, help="")
     model_group.add_argument("--integration", default=None, type=str, help="")
-    model_group.add_argument("--llm_layers", default=28, type=int, help="Number of ChatGLM layers to use")
+    model_group.add_argument("--llm_type", default="chatglm", type=str,
+                             choices=["chatglm", "llama"],
+                             help="LLM backbone: chatglm (default) or llama")
+    model_group.add_argument("--llm_path", default="./model/chatglm-6b", type=str,
+                             help="Path to pretrained LLM directory")
     model_group.add_argument("--patch_stride", default=5, type=int, help="DFC temporal subsampling stride (TimeLLM v1 only)")
     model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim (TimeLLM v1 FlattenHead)")
