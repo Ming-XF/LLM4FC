@@ -4,60 +4,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModel
 from ..base import BaseConfig, ModelOutputs
+from .prompts import get_prompt_config
 
 import logging
 
 _log = logging.getLogger(__name__)
-
-
-EEG_19_CHANNELS = [
-    'Fp1', 'F3', 'C3', 'P3', 'O1',
-    'Fp2', 'F4', 'C4', 'P4', 'O2',
-    'F7',  'T3', 'T5',
-    'F8',  'T4', 'T6',
-    'Fz',  'Cz', 'Pz',
-]
-
-EEG_CHANNEL_GROUPS = {
-    'frontal':  [0, 5, 1, 6, 10, 13, 16],
-    'temporal': [11, 14, 12, 15],
-    'central':  [2, 17, 7],
-    'parietal': [3, 18, 8],
-    'occipital': [4, 9],
-}
-
-HOMOLOGOUS_PAIRS = [
-    (0, 5), (1, 6), (2, 7), (3, 8), (4, 9),
-    (10, 13), (11, 14), (12, 15),
-]
-
-
-PROMPT_DATASET = (
-    "This dataset is used for Alzheimer's disease (AD) dementia diagnosis, "
-    "based on resting-state EEG data from over a thousand subjects. The raw "
-    "signals are segmented into 1-second windows, and Pearson correlation "
-    "coefficients are computed between each pair of channels to construct "
-    "brain functional connectivity graphs. A total of 19 channels (international "
-    "10-20 system) are covered, in the following order: Fp1, F3, C3, P3, O1, "
-    "Fp2, F4, C4, P4, O2, F7, T3, T5, F8, T4, T6, FZ, CZ, PZ."
-)
-
-PROMPT_TASK = (
-    "Given 19-channel brain functional connectivity, classify the subject "
-    "as AD (Alzheimer's disease), MCI (mild cognitive impairment), "
-    "SCD (subjective cognitive decline), or NC (normal cognition)."
-)
-
-PROMPT_STATS = (
-    "Maximum connection: {max_pair} (r={max_val:.3f}). "
-    "Minimum positive connection: {min_pos_pair} (r={min_pos_val:.3f}). "
-    "Strongest negative connection: {max_neg_pair} (r={max_neg_val:.3f}). "
-    "Mean intra-frontal FC: {fc_frontal:.3f}. "
-    "Mean inter-hemispheric homologous FC: {fc_homologous:.3f}. "
-    "Global mean FC: {mean_fc:.3f} (std: {std_fc:.3f})."
-)
-
-SYSTEM_PROMPT = "\n".join([PROMPT_DATASET, PROMPT_TASK])
 
 
 class GCNLayer(nn.Module):
@@ -105,7 +56,8 @@ class TimeLLMConfig(BaseConfig):
                  gcn_hidden=128,
                  dropout=0.1,
                  llm_layers=28,
-                 num_patches=19):
+                 num_patches=19,
+                 dataset_name='CAUEEG2'):
         super().__init__(node_size=node_size, num_classes=num_classes)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -115,6 +67,7 @@ class TimeLLMConfig(BaseConfig):
         self.dropout = dropout
         self.llm_layers = llm_layers
         self.num_patches = num_patches
+        self.dataset_name = dataset_name
 
 
 class ReprogrammingLayer(nn.Module):
@@ -192,7 +145,8 @@ class Model(nn.Module):
         self.llm.transformer.gradient_checkpointing = False
         self.position_encoding_2d = self.llm.transformer.position_encoding_2d
 
-        prefix_ids = self.tokenizer.encode(SYSTEM_PROMPT)
+        self._pc = get_prompt_config(config.dataset_name)
+        prefix_ids = self.tokenizer.encode(self._pc.system_prompt)
         with torch.no_grad():
             prefix_embeds = self.llm.transformer.word_embeddings(
                 torch.tensor(prefix_ids)
@@ -233,7 +187,7 @@ class Model(nn.Module):
         # --- 用 ChatGLM 词嵌入初始化通道节点表示 ---
         channel_name_ids = [
             self.tokenizer.encode(name, add_special_tokens=False)
-            for name in EEG_19_CHANNELS
+            for name in self._pc.channel_names
         ]
         word_embed_weight = self.llm.transformer.word_embeddings.weight.data
         channel_embeds = torch.stack([
@@ -256,6 +210,7 @@ class Model(nn.Module):
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def _build_stats_prompts(self, SFC):
+        pc = self._pc
         B, N, _ = SFC.shape
 
         prompts = []
@@ -273,7 +228,7 @@ class Model(nn.Module):
                 edge_values.append({
                     'i': i, 'j': j,
                     'val': fc[i, j].item(),
-                    'name': f"{EEG_19_CHANNELS[i]}-{EEG_19_CHANNELS[j]}",
+                    'name': f"{pc.channel_names[i]}-{pc.channel_names[j]}",
                 })
 
             edge_values.sort(key=lambda e: e['val'], reverse=True)
@@ -285,7 +240,7 @@ class Model(nn.Module):
             neg_edges = [e for e in edge_values if e['val'] < 0]
             max_neg_edge = neg_edges[-1] if neg_edges else edge_values[-1]
 
-            frontal_idx = EEG_CHANNEL_GROUPS['frontal']
+            frontal_idx = pc.channel_groups['frontal']
             frontal_vals = []
             for a in range(len(frontal_idx)):
                 for k in range(a + 1, len(frontal_idx)):
@@ -293,10 +248,10 @@ class Model(nn.Module):
                         fc[frontal_idx[a], frontal_idx[k]].item())
             fc_frontal = float(torch.tensor(frontal_vals).mean()) if frontal_vals else 0.0
 
-            homo_vals = [fc[i, j].item() for i, j in HOMOLOGOUS_PAIRS]
+            homo_vals = [fc[i, j].item() for i, j in pc.homologous_pairs]
             fc_homologous = float(torch.tensor(homo_vals).mean())
 
-            prompt = PROMPT_STATS.format(
+            prompt = pc.prompt_stats_template.format(
                 max_pair=max_edge['name'],
                 max_val=max_edge['val'],
                 min_pos_pair=min_pos_edge['name'],

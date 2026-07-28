@@ -97,6 +97,7 @@ def init_model_config(args, data_config: DataConfig):
             dropout=args.dropout,
             llm_layers=args.llm_layers,
             num_patches=args.num_patches,
+            dataset_name=args.dataset,
         )
         model = Model(model_config)
     else:
