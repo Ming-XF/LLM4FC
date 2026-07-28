@@ -217,6 +217,9 @@ class GCDGCNTrainer(Trainer):
                 "labels": labels.float().to(self.device),
                 "stage": stage}
 
+    def _early_stop_enabled(self, epoch):
+        return epoch is not None and epoch > 100
+
     def train_epoch(self, epoch=None):
         train_dataloader = self.data_loaders['train']
         self.model.train()

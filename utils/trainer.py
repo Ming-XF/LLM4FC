@@ -94,6 +94,10 @@ class Trainer(object):
             with torch.cuda.amp.autocast():
                 return self.model(**input_kwargs)
 
+    def _early_stop_enabled(self, epoch):
+        """Hook for subclasses to skip early stopping in certain phases (e.g. pretrain)."""
+        return True
+
     def _backward_and_step(self, loss):
         """Backward + step, dispatching to DeepSpeed or AMP scaler."""
         if self.args.deepspeed:
@@ -146,10 +150,12 @@ class Trainer(object):
             self.visualize()
 
         from utils.early_stopping import EarlyStopping
+        metric_name = self.args.early_stop_metric
+        mode = 'min' if metric_name == 'Loss' else 'max'
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
             min_delta=self.args.early_stop_min_delta,
-            mode='min',
+            mode=mode,
         )
 
         best_test_result = None
@@ -176,15 +182,22 @@ class Trainer(object):
             if is_rank_0:
                 val_loss = val_result.get('Loss', float('inf'))
                 current_acc = val_result.get('Accuracy', 0.0)
+                val_metric = val_result.get(metric_name, float('inf') if mode == 'min' else 0.0)
 
-                improved = early_stopper.step(val_loss)
-                if improved:
-                    self.best_result = val_result
-                    best_test_result = test_result
-                    self.save_model()
-                    logger.info("Best model saved (val_loss=%.4f, test_acc=%.4f)",
-                                early_stopper.best_score,
-                                test_result.get('Accuracy', 0.0))
+                if self._early_stop_enabled(epoch):
+                    improved = early_stopper.step(val_metric)
+                    if improved:
+                        self.best_result = val_result
+                        best_test_result = test_result
+                        self.save_model()
+                        logger.info("Best model saved (val_%s=%.4f, test_acc=%.4f)",
+                                    metric_name, early_stopper.best_score,
+                                    test_result.get('Accuracy', 0.0))
+
+                    if early_stopper.early_stop:
+                        stop_requested = True
+                else:
+                    improved = False
 
                 if self.args.save_steps > 0 and epoch % self.args.save_steps == 0:
                     ckpt_dir = os.path.join(
@@ -195,14 +208,11 @@ class Trainer(object):
 
                 msg = (f"Epoch: {epoch}, Loss: {train_loss:.5f}, "
                        f"Val loss: {val_loss:.5f}, Test loss: {test_result.get('Loss', float('inf')):.5f}, "
-                       f"Val Acc: {current_acc:.4f}, Best val loss: {early_stopper.best_score:.4f}, "
+                       f"Val Acc: {current_acc:.4f}, Best val {metric_name}: {early_stopper.best_score:.4f}, "
                        f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                        f"Time: {(end_time - start_time):.1f}s")
                 print(msg)
                 logger.info(msg)
-
-                if early_stopper.early_stop:
-                    stop_requested = True
 
             if self.args.deepspeed and torch.distributed.is_initialized():
                 stop_tensor = torch.tensor([1 if stop_requested else 0],
