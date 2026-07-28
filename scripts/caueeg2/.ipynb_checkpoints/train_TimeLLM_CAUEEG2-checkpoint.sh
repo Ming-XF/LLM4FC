@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # TimeLLM DeepSpeed ZeRO-2 training on CAUEEG2 (caueeg2)
-# GPUs: 4  |  batch_size: 2 per GPU  |  total effective: 8
+# GPUs: 4  |  batch_size: 3 per GPU  |  total effective: 12
 #
 
 deepspeed --num_gpus=4 main.py \
@@ -9,7 +9,7 @@ deepspeed --num_gpus=4 main.py \
     --num_repeat 1 \
     --dataset 'CAUEEG2' \
     --data_dir "../data/CAUEEG/caueeg2.npz" \
-    --batch_size 2 \
+    --batch_size 3 \
     --num_epochs 200 \
     --drop_last False \
     --train_set 0.6 \
