@@ -54,6 +54,7 @@ class TimeLLMConfig(BaseConfig):
                  d_ff=128,
                  num_prototypes=500,
                  gcn_hidden=128,
+                 num_gcn_layers=1,
                  dropout=0.1,
                  num_windows=10,
                  dataset_name='CAUEEG2',
@@ -65,6 +66,7 @@ class TimeLLMConfig(BaseConfig):
         self.d_ff = d_ff
         self.num_prototypes = num_prototypes
         self.gcn_hidden = gcn_hidden
+        self.num_gcn_layers = num_gcn_layers
         self.dropout = dropout
         self.num_windows = num_windows
         self.dataset_name = dataset_name
@@ -122,8 +124,10 @@ class Model(nn.Module):
         self.llm_type = config.llm_type
         self.llm_path = config.llm_path
 
-        self.gcn = GCNLayer(config.gcn_hidden, config.gcn_hidden,
-                            dropout=config.dropout)
+        self.gcn_layers = nn.ModuleList([
+            GCNLayer(config.gcn_hidden, config.gcn_hidden, dropout=config.dropout)
+            for _ in range(config.num_gcn_layers)
+        ])
 
         self.node_projection = nn.Sequential(
             nn.Linear(config.gcn_hidden, config.d_model),
@@ -300,8 +304,10 @@ class Model(nn.Module):
                 dtype=self.channel_embed_projection[0].weight.dtype)
         )  # (C, gcn_hidden)
         node_init = node_init.unsqueeze(0).expand(B * T, -1, -1)
-        gcn_out = self.gcn(node_init, adj_norm)
-        gcn_out = F.gelu(gcn_out)
+        gcn_out = node_init
+        for layer in self.gcn_layers:
+            gcn_out = layer(gcn_out, adj_norm)
+            gcn_out = F.gelu(gcn_out)
 
         # ── 改动2: 重组为时空统一序列 ──
         # (B*T, C, gcn_hidden) → (B, T, C, gcn_hidden) → (B, T*C, gcn_hidden)

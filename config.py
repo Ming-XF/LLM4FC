@@ -94,6 +94,7 @@ def init_model_config(args, data_config: DataConfig):
             d_ff=args.d_ff,
             num_prototypes=args.num_prototypes,
             gcn_hidden=args.gcn_hidden,
+            num_gcn_layers=args.num_gcn_layers,
             dropout=args.dropout,
             num_windows=args.num_windows,
             dataset_name=args.dataset,
@@ -187,6 +188,7 @@ def init_config():
     model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
     model_group.add_argument("--gcn_hidden", default=128, type=int, help="GCN hidden dimension (TimeLLM v2)")
+    model_group.add_argument("--num_gcn_layers", default=1, type=int, help="Number of GCN layers (TimeLLM)")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
 
     train_group = parser.add_argument_group(title="train", description="")
