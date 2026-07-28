@@ -55,7 +55,7 @@ class TimeLLMConfig(BaseConfig):
                  num_prototypes=500,
                  gcn_hidden=128,
                  dropout=0.1,
-                 num_patches=19,
+                 num_windows=10,
                  dataset_name='CAUEEG2',
                  llm_type='chatglm',
                  llm_path='./model/chatglm-6b'):
@@ -66,7 +66,7 @@ class TimeLLMConfig(BaseConfig):
         self.num_prototypes = num_prototypes
         self.gcn_hidden = gcn_hidden
         self.dropout = dropout
-        self.num_patches = num_patches
+        self.num_windows = num_windows
         self.dataset_name = dataset_name
         self.llm_type = llm_type
         self.llm_path = llm_path
@@ -202,9 +202,6 @@ class Model(nn.Module):
             attention_dropout=config.dropout,
         )
 
-        self.node_pos_embed = nn.Parameter(torch.zeros(1, C, self.d_llm))
-        nn.init.normal_(self.node_pos_embed, std=0.02)
-
         # --- 用 LLM 词嵌入初始化通道节点表示 ---
         channel_name_ids = [
             self.tokenizer.encode(name, add_special_tokens=False)
@@ -217,7 +214,7 @@ class Model(nn.Module):
         ])  # (C, d_llm)
         self.register_buffer("channel_name_embeddings", channel_embeds)
 
-        self.head_nf = config.d_ff * config.num_patches
+        self.head_nf = config.d_ff * config.node_size * config.num_windows
         self.output_projection = nn.Sequential(
             nn.Flatten(start_dim=1),
             nn.Linear(self.head_nf, config.num_classes),
@@ -288,20 +285,28 @@ class Model(nn.Module):
 
         return prompts
 
-    def forward(self, SFC, labels, gender=None, age=None, education=None):
-        B, C, _ = SFC.shape
-        device = SFC.device
+    def forward(self, DFC, SFC, labels, gender=None, age=None, education=None):
+        B, T, C, _ = DFC.shape
+        device = DFC.device
 
-        adj_norm = normalize_adjacency(SFC, threshold=0.0)
+        # ── 改动1: 共享 GCN 逐窗口编码 ──
+        # (B, T, C, C) → (B*T, C, C)，每个窗口独立过同一个 GCN
+        DFC_flat = DFC.reshape(B * T, C, C)
+        adj_norm = normalize_adjacency(DFC_flat, threshold=0.0)
         adj_norm = adj_norm.to(dtype=self.node_projection[0].weight.dtype)
 
         node_init = self.channel_embed_projection(
             self.channel_name_embeddings.to(
                 dtype=self.channel_embed_projection[0].weight.dtype)
         )  # (C, gcn_hidden)
-        node_init = node_init.unsqueeze(0).expand(B, -1, -1)
+        node_init = node_init.unsqueeze(0).expand(B * T, -1, -1)
         gcn_out = self.gcn(node_init, adj_norm)
         gcn_out = F.gelu(gcn_out)
+
+        # ── 改动2: 重组为时空统一序列 ──
+        # (B*T, C, gcn_hidden) → (B, T, C, gcn_hidden) → (B, T*C, gcn_hidden)
+        gcn_out = gcn_out.reshape(B, T, C, -1)
+        gcn_out = gcn_out.reshape(B, T * C, -1)
 
         node_embeddings = self.node_projection(gcn_out)
 
@@ -318,7 +323,6 @@ class Model(nn.Module):
             source_embeddings.to(dtype=reprogram_dtype),
         )
 
-        reprogrammed = reprogrammed + self.node_pos_embed
         reprogrammed = reprogrammed.to(dtype=torch.bfloat16)
 
         stats_texts = self._build_stats_prompts(SFC)
@@ -357,7 +361,7 @@ class Model(nn.Module):
             if self.position_encoding_2d:
                 block_pos = torch.cat([
                     torch.arange(P_skip, dtype=torch.long, device=device),
-                    torch.arange(C, dtype=torch.long, device=device),
+                    torch.arange(T * C, dtype=torch.long, device=device),
                 ]).unsqueeze(0).repeat(B, 1)
                 position_ids = torch.stack((global_pos, block_pos), dim=1)
             else:

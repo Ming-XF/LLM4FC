@@ -239,11 +239,11 @@ class GCDGCNTrainer(Trainer):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TimeLLMTrainer(Trainer):
-    """TimeLLM v2 trainer for static-FC-based dementia classification.
+    """TimeLLM v2 trainer for dynamic-FC-based dementia classification.
 
-    Architecture: SFC → adjacency norm → GCN node encoder → Reprogramming
-    (cross-attention to text prototypes) → frozen ChatGLM-6B (19 tokens)
-    → mean-pool → classifier.
+    Architecture: DFC → shared GCN per-window → (B, T*C, 128)
+    → Reprogramming (cross-attention to text prototypes) → frozen LLM
+    → Flatten → classifier.
 
     Supports: Single GPU (AMP), Multi-GPU DDP, DeepSpeed ZeRO-2
     """
@@ -254,13 +254,14 @@ class TimeLLMTrainer(Trainer):
     def prepare_inputs_kwargs(self, inputs):
         """Extract fields for TimeLLM v2 forward pass.
 
-        Uses static FC (correlation) as input; labels are converted to
-        class indices inside the model forward.
+        Uses dynamic FC (DFC) as main graph input;
+        static FC (correlation) for stats prompt.
         """
         labels = inputs['labels']
         if labels.dim() > 1 and labels.shape[-1] > 1:
             labels = labels.argmax(dim=-1)
         return {
+            "DFC": inputs['DFC'].float().to(self.device),
             "SFC": inputs['correlation'].float().to(self.device),
             "labels": labels.long().to(self.device),
         }

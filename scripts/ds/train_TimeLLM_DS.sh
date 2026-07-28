@@ -21,7 +21,6 @@ deepspeed --num_gpus=4 main.py \
     --d_model 64 \
     --num_heads 8 \
     --num_prototypes 500 \
-    --num_patches 19 \
     --d_ff 128 \
     --gcn_hidden 128 \
     --dropout 0.1 \
