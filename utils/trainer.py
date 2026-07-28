@@ -158,7 +158,6 @@ class Trainer(object):
             mode=mode,
         )
 
-        best_test_result = None
         stop_requested = False
 
         for epoch in tqdm(range(1, self.args.num_epochs + 1), desc="epoch", ncols=0):
@@ -177,7 +176,6 @@ class Trainer(object):
                 0.8 * (self.args.num_epochs - epoch) / self.args.num_epochs + 0.2
 
             val_result = self.evaluate(dataloader_key='val')
-            test_result = self.evaluate(dataloader_key='test')
 
             if is_rank_0:
                 val_loss = val_result.get('Loss', float('inf'))
@@ -187,11 +185,9 @@ class Trainer(object):
                     improved = early_stopper.step(val_metric)
                     if improved:
                         self.best_result = val_result
-                        best_test_result = test_result
                         self.save_model()
-                        logger.info("Best model saved (val_%s=%.4f, test_acc=%.4f)",
-                                    metric_name, early_stopper.best_score,
-                                    test_result.get('Accuracy', 0.0))
+                        logger.info("Best model saved (val_%s=%.4f)",
+                                    metric_name, early_stopper.best_score)
 
                     if early_stopper.early_stop:
                         stop_requested = True
@@ -206,7 +202,7 @@ class Trainer(object):
                     logger.info("Checkpoint saved at epoch %d", epoch)
 
                 msg = (f"Epoch: {epoch}, Loss: {train_loss:.5f}, "
-                       f"Val loss: {val_loss:.5f}, Test loss: {test_result.get('Loss', float('inf')):.5f}, "
+                       f"Val loss: {val_loss:.5f}, "
                        f"Val {metric_name}: {val_metric:.4f}, Best val {metric_name}: {early_stopper.best_score:.4f}, "
                        f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                        f"Time: {(end_time - start_time):.1f}s")
@@ -223,9 +219,10 @@ class Trainer(object):
             elif stop_requested:
                 break
 
+        self.load_model()
+        self.test_result = self.evaluate(dataloader_key='test')
+
         if is_rank_0:
-            self.load_model()
-            self.test_result = best_test_result
             logger.info("=== Best epoch test result ===")
             if self.test_result is not None:
                 for k, v in self.test_result.items():
