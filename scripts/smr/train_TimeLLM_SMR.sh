@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # TimeLLM DeepSpeed ZeRO-2 training on SMR (smr)
-# GPUs: 4  |  batch_size: 4 per GPU  |  total effective: 16
+# GPUs: 4  |  batch_size: 3 per GPU  |  total effective: 12
 #
 
 deepspeed --num_gpus=4 main.py \
@@ -9,7 +9,7 @@ deepspeed --num_gpus=4 main.py \
     --num_repeat 1 \
     --dataset 'SMR' \
     --data_dir "../data/SMR/SMR128.npy" \
-    --batch_size 4 \
+    --batch_size 3 \
     --num_epochs 200 \
     --drop_last False \
     --train_set 0.6 \
@@ -17,7 +17,7 @@ deepspeed --num_gpus=4 main.py \
     --schedule 'cos' \
     --early_stop_patience 10 \
     --early_stop_min_delta 0.001 \
-    --early_stop_metric "Accuracy" \
+    --early_stop_metric "F_score" \
     --d_model 64 \
     --num_heads 8 \
     --num_prototypes 500 \
