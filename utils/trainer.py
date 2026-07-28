@@ -359,24 +359,22 @@ class Trainer(object):
             preds_bin = (np.array(preds) > 0.5).astype(int)
             labels_arr = np.array(labels)
             result['Accuracy'] = (preds_bin == labels_arr).sum() / len(labels)
-            metric = precision_recall_fscore_support(
-                labels_arr, preds_bin, average="binary")
-            result['Precision'] = metric[0]
-            result['Recall'] = metric[1]
-            result['F_score'] = metric[2]
+            result['Precision'] = precision_recall_fscore_support(
+                labels_arr, preds_bin, average="binary")[0]
 
             report = classification_report(
                 labels_arr, preds_bin, output_dict=True, zero_division=0)
             recall = [0, 0]
             for k, v in report.items():
-                if '.' in k:
+                if k.isdigit():
                     recall[int(float(k))] = v['recall']
             result['Specificity'] = recall[0]
             result['Sensitivity'] = recall[1]
 
-            print(f'\n{dataloader_key}{self.task_id} : Accuracy:{result["Accuracy"]:.5f}, Precision:{result["Precision"]:.5f}, '
-                  f'AUC:{result["AUC"]:.5f}, Recall:{result["Recall"]:.5f}, F_score:{result["F_score"]:.5f}, '
-                  f'Loss:{result["Loss"]:.5f}')
+            print(f'\n{dataloader_key}{self.task_id} : Loss:{result["Loss"]:.5f}, '
+                  f'Accuracy:{result["Accuracy"]:.5f}, AUC:{result["AUC"]:.5f}, '
+                  f'Precision:{result["Precision"]:.5f}, Sensitivity:{result["Sensitivity"]:.5f}, '
+                  f'Specificity:{result["Specificity"]:.5f}')
             for k, v in result.items():
                 if v is not None:
                     logger.info(f"{k}: {v:.5f}")
