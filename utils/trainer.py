@@ -181,7 +181,6 @@ class Trainer(object):
 
             if is_rank_0:
                 val_loss = val_result.get('Loss', float('inf'))
-                current_acc = val_result.get('Accuracy', 0.0)
                 val_metric = val_result.get(metric_name, float('inf') if mode == 'min' else 0.0)
 
                 if self._early_stop_enabled(epoch):
@@ -208,7 +207,7 @@ class Trainer(object):
 
                 msg = (f"Epoch: {epoch}, Loss: {train_loss:.5f}, "
                        f"Val loss: {val_loss:.5f}, Test loss: {test_result.get('Loss', float('inf')):.5f}, "
-                       f"Val Acc: {current_acc:.4f}, Best val {metric_name}: {early_stopper.best_score:.4f}, "
+                       f"Val {metric_name}: {val_metric:.4f}, Best val {metric_name}: {early_stopper.best_score:.4f}, "
                        f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                        f"Time: {(end_time - start_time):.1f}s")
                 print(msg)
@@ -371,7 +370,8 @@ class Trainer(object):
             result['Specificity'] = recall[0]
             result['Sensitivity'] = recall[1]
 
-            print(f'\n{dataloader_key}{self.task_id} : Loss:{result["Loss"]:.5f}, '
+            print()
+            print(f'{dataloader_key}{self.task_id} : Loss:{result["Loss"]:.5f}, '
                   f'Accuracy:{result["Accuracy"]:.5f}, AUC:{result["AUC"]:.5f}, '
                   f'Precision:{result["Precision"]:.5f}, Sensitivity:{result["Sensitivity"]:.5f}, '
                   f'Specificity:{result["Specificity"]:.5f}')
@@ -416,7 +416,11 @@ class Trainer(object):
                     preds_local = batch_preds
                 else:
                     preds_local = torch.cat([preds_local, batch_preds], dim=0)
-                labels_local += input_kwargs['labels'].cpu().tolist()
+                lbl = input_kwargs['labels']
+                if lbl.dim() == 2 and lbl.shape[-1] > 1:
+                    labels_local += lbl.argmax(dim=-1).cpu().tolist()
+                else:
+                    labels_local += lbl.cpu().tolist()
 
         # ── Distributed gather across ranks ──
         if is_dist:
@@ -497,10 +501,11 @@ class Trainer(object):
             result['Recall'] = metric[1]
             result['F_score'] = metric[2]
 
-            print(f'\n{dataloader_key}{self.task_id} : Acc:{result["Accuracy"]:.5f}, '
+            print()
+            print(f'{dataloader_key}{self.task_id} : Acc:{result["Accuracy"]:.5f}, '
                   f'AUC:{result["AUC"]:.5f}, F1:{result["F_score"]:.5f}, '
-                  f'Loss:{result["Loss"]:.5f}',
-                  end=', ')
+                  f'Precision:{result["Precision"]:.5f}, Recall:{result["Recall"]:.5f}, '
+                  f'Loss:{result["Loss"]:.5f}')
 
             for k, v in result.items():
                 if v is not None:
