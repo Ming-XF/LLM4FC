@@ -36,9 +36,9 @@ _PROMPT_DATASET_CAUEEG = (
     "windows (3-second window, ~6.3-second stride), and Pearson correlation "
     "is computed between each of the 19 EEG channels within each window to "
     "produce dynamic functional connectivity (DFC) matrices. The following "
-    "data are presented as a sequence of 190 tokens: for each of the 10 time "
-    "windows (T0 to T9), 19 channel-node representations are provided in "
-    "order. The 19 channels (international 10-20 system) are: Fp1, F3, C3, P3, "
+    "data are presented as a sequence of 190 tokens: for each of the 19 channels, "
+    "10 time-window representations (T0 to T9) are provided in order (channel-first "
+    "ordering). The 19 channels (international 10-20 system) are: Fp1, F3, C3, P3, "
     "O1, Fp2, F4, C4, P4, O2, F7, T3, T5, F8, T4, T6, FZ, CZ, PZ."
 )
 

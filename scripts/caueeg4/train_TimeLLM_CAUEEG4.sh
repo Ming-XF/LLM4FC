@@ -23,7 +23,7 @@ deepspeed --num_gpus=4 main.py \
     --num_prototypes 500 \
     --d_ff 128 \
     --gcn_hidden 128 \
-    --num_gcn_layers 2 \
+    --num_gcn_layers 1 \
     --dropout 0.1 \
     --save_steps 25 \
     --deepspeed \

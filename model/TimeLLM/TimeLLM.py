@@ -309,10 +309,13 @@ class Model(nn.Module):
             gcn_out = layer(gcn_out, adj_norm)
             gcn_out = F.gelu(gcn_out)
 
-        # ── 改动2: 重组为时空统一序列 ──
-        # (B*T, C, gcn_hidden) → (B, T, C, gcn_hidden) → (B, T*C, gcn_hidden)
+        # ── 改动2: 重组为通道优先序列 ──
+        # (B*T, C, gcn_hidden) → (B, T, C, gcn_hidden) → (B, C, T, gcn_hidden)
+        # → (B, C*T, gcn_hidden)
+        # token order: C0T0, C0T1, ..., C0T9, C1T0, ..., C18T9
         gcn_out = gcn_out.reshape(B, T, C, -1)
-        gcn_out = gcn_out.reshape(B, T * C, -1)
+        gcn_out = gcn_out.transpose(1, 2).contiguous()
+        gcn_out = gcn_out.reshape(B, C * T, -1)
 
         node_embeddings = self.node_projection(gcn_out)
 
