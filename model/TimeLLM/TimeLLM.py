@@ -24,7 +24,7 @@ class GCNLayer(nn.Module):
         return out
 
 
-def normalize_adjacency(SFC, threshold=0.0, keep_ratio=0.5):
+def normalize_adjacency(SFC, threshold=0.0, keep_ratio=1.0):
     """对称归一化邻接矩阵（含自环），支持 Top-K 稀疏化。
 
     Parameters
