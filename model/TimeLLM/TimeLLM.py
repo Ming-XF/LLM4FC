@@ -24,97 +24,7 @@ class GCNLayer(nn.Module):
         return out
 
 
-class GATv2Layer(nn.Module):
-    """GATv2 图注意力层（Brody et al., ICLR 2022）。
-
-    e_ij = a^T · LeakyReLU( W·h_i ‖ W·h_j )
-
-    共享 W 投影源和目标节点，用 concat（非 add）计算注意力分数，
-    邻接矩阵仅作为 mask 定义邻域范围。
-
-    Parameters
-    ----------
-    in_features : int
-    out_features : int   concat 所有 head 后的总输出维度
-    n_heads : int        注意力头数（out_features 必须能被 n_heads 整除）
-    dropout : float      作用于特征和注意力权重的 dropout
-    negative_slope : float  LeakyReLU 的负斜率
-    """
-
-    def __init__(self, in_features, out_features, n_heads=4,
-                 dropout=0.1, negative_slope=0.2):
-        super().__init__()
-        assert out_features % n_heads == 0, \
-            f"out_features ({out_features}) 必须能被 n_heads ({n_heads}) 整除"
-        self.in_features = in_features
-        self.out_features = out_features
-        self.n_heads = n_heads
-        self.head_dim = out_features // n_heads
-        self.negative_slope = negative_slope
-
-        # 共享线性变换 W（源和目标节点使用同一投影）
-        self.lin = nn.Linear(in_features, out_features, bias=False)
-
-        # value 投影可独立，也可共享 W；此处独立以获得更大容量
-        self.lin_val = nn.Linear(in_features, out_features, bias=False)
-
-        # 注意力向量 a: shape (n_heads, 1, 2*head_dim)
-        # 因为拼接的是 [W·h_i ‖ W·h_j]，所以维度为 2×head_dim
-        self.attn_vec = nn.Parameter(torch.empty(n_heads, 1, 2 * self.head_dim))
-        nn.init.xavier_uniform_(self.attn_vec)
-
-        self.feat_dropout = nn.Dropout(dropout)
-        self.attn_dropout = nn.Dropout(dropout)
-
-        # head 间信息混合
-        self.out_proj = nn.Linear(out_features, out_features)
-
-    def forward(self, x, adj_norm):
-        """
-        x       : (B, N, d_in)
-        adj_norm: (B, N, N)  带符号的归一化邻接矩阵
-        returns : (B, N, out_features)
-        """
-        B, N, _ = x.shape
-        H = self.n_heads
-        dh = self.head_dim
-
-        x = self.feat_dropout(x)
-
-        # ── 共享线性投影 ──────────────────────────────────
-        h = self.lin(x).view(B, N, H, dh)           # (B, N, H, dh)
-        val = self.lin_val(x).view(B, N, H, dh)     # (B, N, H, dh)
-
-        # ── 注意力分数: e_ij = a · LeakyReLU( [h_i ‖ h_j] ) ──
-        # 拼接源和目标节点特征在最后一维
-        h_i = h.unsqueeze(2).expand(-1, -1, N, -1, -1)   # (B, N, N, H, dh)
-        h_j = h.unsqueeze(1).expand(-1, N, -1, -1, -1)   # (B, N, N, H, dh)
-        concat = torch.cat([h_i, h_j], dim=-1)             # (B, N, N, H, 2*dh)
-
-        e = F.leaky_relu(concat, negative_slope=self.negative_slope)
-        e = (e * self.attn_vec.view(1, 1, 1, H, -1)).sum(dim=-1)  # (B, N, N, H)
-        e = e.permute(0, 3, 1, 2)                     # (B, H, N, N)
-
-        # ── 用邻接矩阵构造 mask ──────────────────────────
-        # 0 边不参与 softmax（自环始终保留）
-        mask = (adj_norm.unsqueeze(1) != 0)           # (B, 1, N, N)
-
-        e_masked = e.masked_fill(~mask, float('-inf'))
-        alpha = F.softmax(e_masked, dim=-1)            # (B, H, N, N)
-        alpha = self.attn_dropout(alpha)
-
-        # ── 加权聚合 value ──────────────────────────────
-        val = val.permute(0, 2, 1, 3)                  # (B, H, N, dh)
-        out = torch.einsum('bhij,bhjd->bhid', alpha, val)  # (B, H, N, dh)
-        out = out.permute(0, 2, 1, 3).contiguous()     # (B, N, H, dh)
-        out = out.view(B, N, H * dh)                    # (B, N, out_features)
-
-        out = self.out_proj(out)
-
-        return out
-
-
-def normalize_adjacency(SFC, threshold=0.0, keep_ratio=1.0):
+def normalize_adjacency(SFC, threshold=0.0, keep_ratio=0.6):
     """对称归一化邻接矩阵（含自环），支持 Top-K 稀疏化。
 
     Parameters
@@ -190,9 +100,6 @@ class TimeLLMConfig(BaseConfig):
         self.dataset_name = dataset_name
         self.llm_type = llm_type
         self.llm_path = llm_path
-        self.use_gatv2 = True
-        self.gat_n_heads = 4
-        self.gat_negative_slope = 0.2
 
 
 class ReprogrammingLayer(nn.Module):
@@ -245,19 +152,10 @@ class Model(nn.Module):
         self.llm_type = config.llm_type
         self.llm_path = config.llm_path
 
-        if config.use_gatv2:
-            self.graph_layers = nn.ModuleList([
-                GATv2Layer(config.gcn_hidden, config.gcn_hidden,
-                           n_heads=config.gat_n_heads,
-                           dropout=config.dropout,
-                           negative_slope=config.gat_negative_slope)
-                for _ in range(config.num_gcn_layers)
-            ])
-        else:
-            self.graph_layers = nn.ModuleList([
-                GCNLayer(config.gcn_hidden, config.gcn_hidden, dropout=config.dropout)
-                for _ in range(config.num_gcn_layers)
-            ])
+        self.gcn_layers = nn.ModuleList([
+            GCNLayer(config.gcn_hidden, config.gcn_hidden, dropout=config.dropout)
+            for _ in range(config.num_gcn_layers)
+        ])
 
         self.node_projection = nn.Sequential(
             nn.Linear(config.gcn_hidden, config.d_model),
@@ -419,7 +317,7 @@ class Model(nn.Module):
         node_init = self.channel_embed_projection(eye)  # (C, gcn_hidden)
         node_init = node_init.unsqueeze(0).expand(B * T, -1, -1)
         gcn_out = node_init
-        for layer in self.graph_layers:
+        for layer in self.gcn_layers:
             gcn_out = layer(gcn_out, adj_norm)
             gcn_out = F.gelu(gcn_out)
 
