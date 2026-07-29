@@ -4,7 +4,7 @@
 # GPUs: 4  |  batch_size: 3 per GPU  |  total effective: 12
 #
 
-deepspeed --num_gpus=4 main.py \
+deepspeed --num_gpus=6 main.py \
     --model "TimeLLM" \
     --num_repeat 1 \
     --dataset 'CAUEEG2' \
@@ -20,10 +20,10 @@ deepspeed --num_gpus=4 main.py \
     --early_stop_metric "AUC" \
     --d_model 64 \
     --num_heads 8 \
-    --num_prototypes 500 \
-    --num_patches 19 \
+    --num_prototypes 1000 \
     --d_ff 128 \
     --gcn_hidden 128 \
+    --num_gcn_layers 1 \
     --dropout 0.1 \
     --save_steps 25 \
     --deepspeed \

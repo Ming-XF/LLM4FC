@@ -20,7 +20,7 @@ deepspeed --num_gpus=6 main.py \
     --early_stop_metric "AUC" \
     --d_model 64 \
     --num_heads 8 \
-    --num_prototypes 500 \
+    --num_prototypes 1000 \
     --d_ff 128 \
     --gcn_hidden 128 \
     --num_gcn_layers 1 \
