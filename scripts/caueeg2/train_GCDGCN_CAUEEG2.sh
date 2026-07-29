@@ -8,6 +8,7 @@ deepspeed --num_gpus=6 main.py \
     --model "GCDGCN" \
     --num_repeat 1 \
     --dataset 'CAUEEG2' \
+    --percentage 1 \
     --data_dir "../data/CAUEEG/caueeg2.npz" \
     --batch_size 3 \
     --num_epochs 200 \

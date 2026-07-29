@@ -8,6 +8,7 @@ deepspeed --num_gpus=6 main.py \
     --model "GCDGCN" \
     --num_repeat 1 \
     --dataset 'C42B' \
+    --percentage 1 \
     --data_dir "../data/C42B/C42B128.npy" \
     --batch_size 3 \
     --num_epochs 200 \

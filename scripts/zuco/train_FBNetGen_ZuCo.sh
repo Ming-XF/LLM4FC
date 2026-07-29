@@ -8,6 +8,7 @@ deepspeed --num_gpus=6 main.py \
     --model "FBNetGen" \
     --num_repeat 1 \
     --dataset 'ZuCo' \
+    --percentage 1 \
     --data_dir "/data/datasets/ZuCo/ZuCo-TSR.npy" \
     --batch_size 3 \
     --num_epochs 200 \

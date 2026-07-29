@@ -125,6 +125,14 @@ class BaseDataset(Dataset):
             self.val_index = np.where(np.isin(groups, val_subjs))[0]
             self.test_index = np.where(np.isin(groups, test_subjs))[0]
 
+        # ── few-shot：按比例随机子采样训练集 ──
+        percentage = self.data_config.percentage
+        if percentage < 1.0 and percentage > 0.0 and len(self.train_index) > 0:
+            rng = np.random.RandomState(42 + self.k)
+            n_keep = max(1, int(len(self.train_index) * percentage))
+            keep_idx = rng.choice(len(self.train_index), size=n_keep, replace=False)
+            self.train_index = self.train_index[keep_idx]
+
     @abstractmethod
     def load_data(self, one_hot=True):
         pass

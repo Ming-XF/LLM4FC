@@ -8,6 +8,7 @@ deepspeed --num_gpus=6 main.py \
     --model "ALTER" \
     --num_repeat 1 \
     --dataset 'DS' \
+    --percentage 1 \
     --data_dir "../data/DS/ds.npz" \
     --batch_size 3 \
     --num_epochs 200 \
