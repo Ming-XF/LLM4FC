@@ -8,7 +8,7 @@ deepspeed --num_gpus=6 main.py \
     --model "TCACNet" \
     --num_repeat 1 \
     --dataset 'SMR' \
-    --percentage 1 \
+    --few_shot 0 \
     --data_dir "../data/SMR/SMR128.npy" \
     --batch_size 3 \
     --num_epochs 200 \

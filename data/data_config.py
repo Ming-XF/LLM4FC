@@ -5,7 +5,7 @@ class DataConfig:
         self.data_dir = args.data_dir
         self.data2_dir = args.data2_dir
         self.train_set = args.train_set
-        self.percentage = args.percentage
+        self.few_shot = args.few_shot
         self.val_set = args.val_set
         self.batch_size = args.batch_size
         self.num_workers = args.num_workers

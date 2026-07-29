@@ -139,7 +139,7 @@ def init_config():
     data_group.add_argument("--data_processors", default=0, type=int, help="")
     data_group.add_argument("--train_set", default=0.6, type=float, help="")
     data_group.add_argument("--val_set", default=0.2, type=float, help="")
-    data_group.add_argument("--percentage", default=1., type=float, help="")
+    data_group.add_argument("--few_shot", default=0, type=int, help="few-shot: number of subjects per class (0 = use all)")
     data_group.add_argument("--batch_size", default=64, type=int, help="")
     data_group.add_argument("--num_workers", default=5, type=int, help="")
     data_group.add_argument("--num_epochs", default=200, type=int, help="")

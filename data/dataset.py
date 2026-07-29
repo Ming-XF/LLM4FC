@@ -125,13 +125,32 @@ class BaseDataset(Dataset):
             self.val_index = np.where(np.isin(groups, val_subjs))[0]
             self.test_index = np.where(np.isin(groups, test_subjs))[0]
 
-        # ── few-shot：按比例随机子采样训练集 ──
-        percentage = self.data_config.percentage
-        if percentage < 1.0 and percentage > 0.0 and len(self.train_index) > 0:
+        # ── few-shot：每类采样指定个受试者，保留其全部样本 ──
+        n_subj_per_class = self.data_config.few_shot
+        if n_subj_per_class > 0 and len(self.train_index) > 0:
+            train_groups = groups[self.train_index]
+            train_lbls = labels[self.train_index]
+
+            # 每个受试者的主标签
+            unique_subjs = np.unique(train_groups)
+            subj_lbls = np.array([
+                np.bincount(train_lbls[train_groups == s].astype(int)).argmax()
+                for s in unique_subjs
+            ])
+
+            # 正/负类受试者分别随机采样
+            pos_subjs = unique_subjs[subj_lbls == 1]
+            neg_subjs = unique_subjs[subj_lbls == 0]
+
             rng = np.random.RandomState(42 + self.k)
-            n_keep = max(1, int(len(self.train_index) * percentage))
-            keep_idx = rng.choice(len(self.train_index), size=n_keep, replace=False)
-            self.train_index = self.train_index[keep_idx]
+            n = min(n_subj_per_class, len(pos_subjs), len(neg_subjs))
+
+            keep_pos = rng.choice(pos_subjs, size=n, replace=False)
+            keep_neg = rng.choice(neg_subjs, size=n, replace=False)
+            keep_subjs = np.concatenate([keep_pos, keep_neg])
+
+            keep_mask = np.isin(train_groups, keep_subjs)
+            self.train_index = self.train_index[keep_mask]
 
     @abstractmethod
     def load_data(self, one_hot=True):

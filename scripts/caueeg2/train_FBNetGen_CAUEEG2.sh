@@ -8,7 +8,7 @@ deepspeed --num_gpus=6 main.py \
     --model "FBNetGen" \
     --num_repeat 1 \
     --dataset 'CAUEEG2' \
-    --percentage 1 \
+    --few_shot 0 \
     --data_dir "../data/CAUEEG/caueeg2.npz" \
     --batch_size 3 \
     --num_epochs 200 \

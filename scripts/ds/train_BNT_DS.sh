@@ -8,7 +8,7 @@ deepspeed --num_gpus=6 main.py \
     --model "BNT" \
     --num_repeat 1 \
     --dataset 'DS' \
-    --percentage 1 \
+    --few_shot 0 \
     --data_dir "../data/DS/ds.npz" \
     --batch_size 3 \
     --num_epochs 200 \
