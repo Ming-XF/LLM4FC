@@ -24,7 +24,16 @@ class GCNLayer(nn.Module):
         return out
 
 
-def normalize_adjacency(SFC, threshold=0.0):
+def normalize_adjacency(SFC, threshold=0.0, keep_ratio=0.5):
+    """对称归一化邻接矩阵（含自环），支持 Top-K 稀疏化。
+
+    Parameters
+    ----------
+    SFC : (B, N, N) 原始邻接矩阵（DFC 或静态 FC）。
+    threshold : float  绝对值低于此值的边直接置零（0 = 不过滤）。
+    keep_ratio : float  按绝对值排序后保留的边比例（1.0 = 全保留），
+                        仅作用于非对角线元素。
+    """
     B, N, _ = SFC.shape
     device = SFC.device
 
@@ -32,6 +41,16 @@ def normalize_adjacency(SFC, threshold=0.0):
 
     idx = torch.arange(N, device=device)
     adj[:, idx, idx] = 0
+
+    # ── Top-K 稀疏化：每张图独立选择绝对值最大的 keep_ratio 条边 ──
+    if keep_ratio < 1.0:
+        triu_idx = torch.triu_indices(N, N, offset=1)
+        for b in range(B):
+            vals = adj[b, triu_idx[0], triu_idx[1]].abs()
+            k = int(round(vals.shape[0] * keep_ratio))
+            if k < vals.shape[0]:
+                th = vals.topk(k).values[-1]
+                adj[b] = adj[b] * (adj[b].abs() >= th)
 
     adj[adj < threshold] = 0
 
