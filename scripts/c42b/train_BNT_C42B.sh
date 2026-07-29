@@ -4,7 +4,7 @@
 # GPUs: 4  |  batch_size: 3 per GPU  |  total effective: 12
 #
 
-deepspeed --num_gpus=4 main.py \
+deepspeed --num_gpus=6 main.py \
     --model "BNT" \
     --num_repeat 1 \
     --dataset 'C42B' \
