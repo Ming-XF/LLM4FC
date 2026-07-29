@@ -136,11 +136,7 @@ class Model(nn.Module):
             nn.Dropout(config.dropout),
         )
 
-        self.channel_embed_projection = nn.Sequential(
-            nn.Linear(self.d_llm, config.gcn_hidden),
-            nn.LayerNorm(config.gcn_hidden),
-            nn.GELU(),
-        )
+        self.channel_embed_projection = nn.Linear(config.node_size, config.gcn_hidden)
 
         # ── LLM 加载（分支：chatglm / llama）──────────────────
         if self.llm_type == 'chatglm':
@@ -206,17 +202,7 @@ class Model(nn.Module):
             attention_dropout=config.dropout,
         )
 
-        # --- 用 LLM 词嵌入初始化通道节点表示 ---
-        channel_name_ids = [
-            self.tokenizer.encode(name, add_special_tokens=False)
-            for name in self._pc.channel_names
-        ]
-        word_embed_weight = self._word_embeddings.weight.data
-        channel_embeds = torch.stack([
-            word_embed_weight[torch.tensor(ids)].mean(dim=0)
-            for ids in channel_name_ids
-        ])  # (C, d_llm)
-        self.register_buffer("channel_name_embeddings", channel_embeds)
+        # 节点初始特征用 one-hot → Linear 投影，训练中可学习
 
         self.head_nf = config.d_ff * config.node_size * config.num_windows
         self.output_projection = nn.Sequential(
@@ -299,10 +285,8 @@ class Model(nn.Module):
         adj_norm = normalize_adjacency(DFC_flat, threshold=0.0)
         adj_norm = adj_norm.to(dtype=self.node_projection[0].weight.dtype)
 
-        node_init = self.channel_embed_projection(
-            self.channel_name_embeddings.to(
-                dtype=self.channel_embed_projection[0].weight.dtype)
-        )  # (C, gcn_hidden)
+        eye = torch.eye(C, device=device, dtype=self.channel_embed_projection.weight.dtype)
+        node_init = self.channel_embed_projection(eye)  # (C, gcn_hidden)
         node_init = node_init.unsqueeze(0).expand(B * T, -1, -1)
         gcn_out = node_init
         for layer in self.gcn_layers:
