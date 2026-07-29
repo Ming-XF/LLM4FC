@@ -37,31 +37,40 @@ def normalize_adjacency(SFC, threshold=0.0, keep_ratio=1.0):
     B, N, _ = SFC.shape
     device = SFC.device
 
-    adj = SFC.abs().clone()
+    adj_signed = SFC.clone()          # 保留符号，承载正/负相关
+    adj_abs = SFC.abs().clone()       # 用于结构决策（Top-K、阈值、degree）
 
     idx = torch.arange(N, device=device)
-    adj[:, idx, idx] = 0
+    adj_signed[:, idx, idx] = 0
+    adj_abs[:, idx, idx] = 0
 
     # ── Top-K 稀疏化：每张图独立选择绝对值最大的 keep_ratio 条边 ──
     if keep_ratio < 1.0:
         triu_idx = torch.triu_indices(N, N, offset=1)
         for b in range(B):
-            vals = adj[b, triu_idx[0], triu_idx[1]].abs()
+            vals = adj_abs[b, triu_idx[0], triu_idx[1]]
             k = int(round(vals.shape[0] * keep_ratio))
             if k < vals.shape[0]:
                 th = vals.topk(k).values[-1]
-                adj[b] = adj[b] * (adj[b].abs() >= th)
+                mask = (adj_abs[b] >= th)
+                adj_abs[b] = adj_abs[b] * mask
+                adj_signed[b] = adj_signed[b] * mask
 
-    adj[adj < threshold] = 0
+    adj_signed[adj_abs < threshold] = 0
+    adj_abs[adj_abs < threshold] = 0
 
-    adj = adj + torch.eye(N, device=device, dtype=adj.dtype).unsqueeze(0)
+    eye = torch.eye(N, device=device, dtype=adj_abs.dtype).unsqueeze(0)
+    adj_signed = adj_signed + eye
+    adj_abs = adj_abs + eye
 
-    deg = adj.sum(dim=-1)
+    # degree 用绝对值版计算，保证非负
+    deg = adj_abs.sum(dim=-1)
     deg_inv_sqrt = deg.pow(-0.5)
     deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.0
 
     D_inv_sqrt = torch.diag_embed(deg_inv_sqrt)
-    adj_norm = D_inv_sqrt @ adj @ D_inv_sqrt
+    # 用符号矩阵参与归一化，GCN 可感知正/负相关
+    adj_norm = D_inv_sqrt @ adj_signed @ D_inv_sqrt
 
     return adj_norm
 
