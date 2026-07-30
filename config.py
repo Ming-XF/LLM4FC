@@ -73,7 +73,7 @@ def init_model_config(args, data_config: DataConfig):
                                  pooling=(False, True),
                                  pos_encoding="rrwp",  # identity, none
                                  orthogonal=True,
-                                 freeze_center=True,
+                                 freeze_center=False,
                                  project_assignment=True,
                                  num_heads=args.num_heads,
                                  # pos_embed_dim=data_config.node_size,
@@ -140,6 +140,9 @@ def init_config():
     data_group.add_argument("--train_set", default=0.6, type=float, help="")
     data_group.add_argument("--val_set", default=0.2, type=float, help="")
     data_group.add_argument("--few_shot", default=0, type=int, help="few-shot: number of subjects per class (0 = use all)")
+    data_group.add_argument("--few_shot_seed", default=42, type=int,
+                             help="Random seed for few-shot subject sampling "
+                                  "(different seeds select different subjects)")
     data_group.add_argument("--batch_size", default=64, type=int, help="")
     data_group.add_argument("--num_workers", default=5, type=int, help="")
     data_group.add_argument("--num_epochs", default=200, type=int, help="")
@@ -193,6 +196,12 @@ def init_config():
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
+    train_group.add_argument("--pretrain_path", default="", type=str,
+                             help="Pretrained checkpoint dir for transfer-learning "
+                                  "few-shot / zero-shot")
+    train_group.add_argument("--finetune_epochs", default=50, type=int,
+                             help="Fixed number of fine-tune epochs in few-shot "
+                                  "transfer mode")
     train_group.add_argument("--do_train", action="store_true", help="")
     train_group.add_argument("--do_parallel", action="store_true", help="")
     train_group.add_argument("--deepspeed", action="store_true", help="Enable DeepSpeed ZeRO-2/3")

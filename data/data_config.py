@@ -6,6 +6,9 @@ class DataConfig:
         self.data2_dir = args.data2_dir
         self.train_set = args.train_set
         self.few_shot = args.few_shot
+        self.few_shot_seed = args.few_shot_seed
+        self.pretrain_path = args.pretrain_path
+        self.finetune_epochs = args.finetune_epochs
         self.val_set = args.val_set
         self.batch_size = args.batch_size
         self.num_workers = args.num_workers

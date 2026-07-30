@@ -15,8 +15,10 @@ from .preprocess import *
 
 
 class MNREDDataset(BaseDataset):
-    def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True):
-        super(MNREDDataset, self).__init__(data_config, k, train, one_hot=one_hot)
+    def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
+                 episode_seed=None):
+        super(MNREDDataset, self).__init__(data_config, k, train, one_hot=one_hot,
+                                           episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
         data = np.load(self.data_config.data_dir, allow_pickle=True).item()

@@ -25,10 +25,11 @@ logger.setLevel(logging.DEBUG)
 
 
 class Trainer(object):
-    def __init__(self, args, local_rank=0, task_id=0):
+    def __init__(self, args, local_rank=0, task_id=0, episode_seed=None):
         self.task_id = task_id
         self.args = args
         self.local_rank = local_rank
+        self.episode_seed = episode_seed
         self.data_config = DataConfig(args)
         self.data_loaders = self.load_datasets()
 
@@ -63,13 +64,26 @@ class Trainer(object):
         self.best_result = None
         self.test_result = None
 
+    def _get_save_dir_name(self):
+        """构建保存目录名: {model}_{dataset}_{mode}"""
+        if self.args.pretrain_path:
+            # 迁移学习模式
+            if self.args.few_shot > 0:
+                mode = "fewshot"
+            else:
+                mode = "zeroshot"
+        else:
+            mode = "train"
+        return f"{self.args.model}_{self.args.dataset}_{mode}"
+
     @abstractmethod
     def prepare_inputs_kwargs(self, inputs):
         return {}
 
     def load_datasets(self):
         datasets = eval(
-            f"{self.args.dataset}Dataset")(self.data_config, k=self.task_id)
+            f"{self.args.dataset}Dataset")(self.data_config, k=self.task_id,
+                                           episode_seed=self.episode_seed)
 
         if self.args.deepspeed:
             data_loaders = init_deepspeed_dataloader(self.data_config, datasets)
@@ -110,7 +124,8 @@ class Trainer(object):
             self.scaler.scale(loss).backward()
             self.scaler.step(self.optimizer)
             self.scaler.update()
-            self.scheduler.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
 
     def train_epoch(self, epoch=None):
         train_dataloader = self.data_loaders['train']
@@ -196,7 +211,7 @@ class Trainer(object):
 
                 if self.args.save_steps > 0 and epoch % self.args.save_steps == 0:
                     ckpt_dir = os.path.join(
-                        self.args.model_dir, self.args.model,
+                        self.args.model_dir, self._get_save_dir_name(),
                         f'checkpoint-epoch-{epoch}')
                     self.save_model(path=ckpt_dir, save_optimizer=True)
                     logger.info("Checkpoint saved at epoch %d", epoch)
@@ -206,7 +221,7 @@ class Trainer(object):
                        f"Val {metric_name}: {val_metric:.4f}, Best val {metric_name}: {early_stopper.best_score:.4f}, "
                        f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                        f"Time: {(end_time - start_time):.1f}s")
-                print(msg)
+                tqdm.write(msg)
                 logger.info(msg)
 
             if self.args.deepspeed and torch.distributed.is_initialized():
@@ -235,10 +250,81 @@ class Trainer(object):
                 logger.info("  (no test result recorded)")
 
             final_dir = os.path.join(
-                self.args.model_dir, self.args.model,
+                self.args.model_dir, self._get_save_dir_name(),
                 f'final-epoch-{self.args.num_epochs}')
             self.save_model(path=final_dir)
             logger.info("Final model saved at epoch %d", self.args.num_epochs)
+
+    def finetune(self, epochs):
+        """Fixed-epoch fine-tune for few-shot transfer learning.
+
+        No validation, no early stopping, no intermediate checkpoint — just
+        train for ``epochs`` epochs on the (already few-shot reduced) training
+        set, then evaluate once on the test set and return the result dict.
+        """
+        is_rank_0 = (not torch.distributed.is_initialized()
+                     or torch.distributed.get_rank() == 0)
+
+        if is_rank_0:
+            logger.info("***** Running few-shot fine-tune (transfer) *****")
+            logger.info("  Num train examples = %d",
+                        len(self.data_loaders['train']))
+            logger.info("  Num test  examples = %d",
+                        len(self.data_loaders['test']))
+            logger.info("  Fixed fine-tune epochs = %d", epochs)
+            logger.info("  Fine-tune lr = %g", self.args.learning_rate)
+        if self.args.deepspeed:
+            # 复用 __init__ 中已创建的 engine（main.py 已提前将
+            # deepspeed_config 替换为 _finetune.json），只更新 lr
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = self.args.learning_rate
+            # No scheduler — constant lr throughout finetune
+            self.scheduler = None
+        else:
+            self.optimizer = init_optimizer(self.model, self.args)
+            # No scheduler — constant lr throughout finetune
+            self.scheduler = None
+
+        # ── Fixed-epoch loop ──
+        for epoch in tqdm(range(1, epochs + 1), desc="ft-epoch", ncols=0):
+            if self.args.deepspeed:
+                train_sampler = getattr(self.data_loaders['train'].sampler,
+                                        'set_epoch', None)
+                if train_sampler is not None:
+                    train_sampler(epoch)
+
+            start_time = timer()
+            train_loss = self.train_epoch(epoch)
+            end_time = timer()
+
+            if is_rank_0:
+                msg = (f"FT Epoch: {epoch}/{epochs}, "
+                       f"Loss: {train_loss:.5f}, "
+                       f"Time: {(end_time - start_time):.1f}s")
+                tqdm.write(msg)
+                logger.info(msg)
+
+        # ── Save fine-tuned model ──
+        save_dir = os.path.join(self.args.model_dir, self._get_save_dir_name())
+        self.save_model(path=save_dir)
+        if is_rank_0:
+            logger.info("Fine-tuned model saved to %s", save_dir)
+
+        # ── Final test evaluation on last-epoch model ──
+        result = self.evaluate(dataloader_key='test')
+        self.test_result = result
+
+        if is_rank_0:
+            logger.info("=== Few-shot fine-tune test result ===")
+            if result is not None:
+                for k, v in result.items():
+                    if v is not None:
+                        if isinstance(v, (int, float, np.floating, np.integer)):
+                            logger.info(f"  {k}: {v:.5f}")
+                        else:
+                            logger.info(f"  {k}: {v}")
+
+        return result
 
     def evaluate(self, dataloader_key='test'):
         if self.data_config.num_class == 2:
@@ -517,7 +603,7 @@ class Trainer(object):
 
     def save_model(self, path=None, save_optimizer=False):
         if path is None:
-            path = os.path.join(self.args.model_dir, self.args.model)
+            path = os.path.join(self.args.model_dir, self._get_save_dir_name())
         os.makedirs(path, exist_ok=True)
 
         do_dp = self.args.do_parallel or self.args.deepspeed
@@ -566,7 +652,7 @@ class Trainer(object):
 
     def load_model(self, path=None):
         if path is None:
-            path = os.path.join(self.args.model_dir, self.args.model)
+            path = os.path.join(self.args.model_dir, self._get_save_dir_name())
 
         do_dp = self.args.do_parallel or self.args.deepspeed
         model = self.model.module if hasattr(self.model, 'module') else self.model

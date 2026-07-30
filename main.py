@@ -1,4 +1,5 @@
 import os
+import json as _json
 
 # import wandb
 
@@ -42,53 +43,167 @@ def set_seed(seed=42):
 
 
 def main(args):
+    # ── 判断运行模式 ──
+    transfer_mode = bool(args.pretrain_path)
+    is_zero_shot = transfer_mode and args.few_shot == 0
+
     if args.do_train:
-        results = Recorder()
         local_rank = 0
         if args.deepspeed:
             # DeepSpeed launcher sets --local_rank (arg) and LOCAL_RANK (env)
             local_rank = args.local_rank
             torch.cuda.set_device(local_rank)
+            # 自动推导 DeepSpeed 配置文件路径
+            ds_path = args.deepspeed_config
+            if not os.path.exists(ds_path):
+                auto_path = f"scripts/deepspeed/{args.model}.json"
+                if os.path.exists(auto_path):
+                    args.deepspeed_config = auto_path
+                else:
+                    raise FileNotFoundError(
+                        f"DeepSpeed config not found: {ds_path} or {auto_path}")
         elif args.do_parallel:
             local_rank = int(os.environ['LOCAL_RANK'])
             world_size = int(os.environ['WORLD_SIZE'])
             rank = int(os.environ['RANK'])
             distributed.init_process_group('nccl', world_size=world_size, rank=rank)
             torch.cuda.set_device(local_rank)
-        for i in range(args.num_repeat):
-            group_name = f"{args.model}" \
-                         f"_{args.dataset}" \
-                         f"_{args.batch_size}" \
-                         f"{f'sparsity-{args.sparsity}' if 'DFaST' in args.model else ''}" \
-                         f'F{args.frequency}D{args.D}F{args.num_kernels}P{args.p1}={args.p2}_dp{args.dropout}' \
-                         f"_w{args.window_size}" \
-                         f"{'_mp' if args.mix_up else ''}" \
-                         f"-cross"
 
-            # run = wandb.init(project=args.project, entity=args.wandb_entity, reinit=True, group=f"{group_name}", tags=[args.dataset])
+        # ── 迁移学习：只跑一次，用户手动多次运行收集结果 ──
+        if transfer_mode:
+            episode_seed = args.few_shot_seed
+            pretrain_dir = os.path.basename(args.pretrain_path.rstrip('/'))
+            src_name = (args.pretrain_path.rstrip('/').split('/')[-1]
+                        if '/' in args.pretrain_path else pretrain_dir)
 
-            trainer = eval(args.model + 'Trainer')(args, local_rank=local_rank, task_id=i)
             if args.abla_channel >= 0:
-                init_logger(f'{args.log_dir}/train_{args.model}{args.append}_wo_C{args.abla_channel}_{args.dataset}.log')
+                log_file = (f'{args.log_dir}/fewshot_{args.model}{args.append}'
+                            f'_wo_C{args.abla_channel}_{src_name}pretrain'
+                            f'_{args.few_shot}shot_{args.dataset}.log')
             elif args.abla_vae != "n":
-                init_logger(f'{args.log_dir}/train_{args.model}{args.append}_wo_{args.abla_vae}_{args.dataset}.log')
+                log_file = (f'{args.log_dir}/fewshot_{args.model}{args.append}'
+                            f'_wo_{args.abla_vae}_{src_name}pretrain'
+                            f'_{args.few_shot}shot_{args.dataset}.log')
             else:
-                init_logger(f'{args.log_dir}/train_{args.model}{args.append}_{args.dataset}.log')
-            if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
-                logger.info(f"{'#'*10} Repeat:{i} {'#'*10}")
-            trainer.train()
-            results.add_record(trainer.best_result)
+                log_file = (f'{args.log_dir}/fewshot_{args.model}{args.append}'
+                            f'_{src_name}pretrain_{args.few_shot}shot'
+                            f'_{args.dataset}.log')
+            init_logger(log_file)
 
-            # run.finish()
+            if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                logger.info(f"{'#'*10} few-shot seed={episode_seed} {'#'*10}")
+
+            if is_zero_shot:
+                # Zero-shot: 不加 few-shot 采样，直接加载预训练模型评估
+                trainer = eval(args.model + 'Trainer')(
+                    args, local_rank=local_rank, task_id=0)
+                trainer.load_model(path=args.pretrain_path)
+                trainer.model.eval()
+                result = trainer.evaluate(dataloader_key='test')
+            else:
+                # K-shot: 按 few_shot_seed 采样被试，fine-tune 后评估
+                if args.deepspeed:
+                    ds_path = args.deepspeed_config
+                    if ds_path.endswith('.json') and not ds_path.endswith('_finetune.json'):
+                        finetune_ds_path = ds_path[:-5] + '_finetune.json'
+                        if os.path.exists(finetune_ds_path):
+                            args.deepspeed_config = finetune_ds_path
+                            with open(finetune_ds_path) as _f:
+                                _ds_cfg = _json.load(_f)
+                            args.learning_rate = _ds_cfg['optimizer']['params']['lr']
+                        else:
+                            logger.warning(
+                                f"Finetune DeepSpeed config not found: "
+                                f"{finetune_ds_path}, using original: {ds_path}")
+                else:
+                    args.learning_rate = 1e-5
+                trainer = eval(args.model + 'Trainer')(
+                    args, local_rank=local_rank, task_id=0,
+                    episode_seed=episode_seed)
+                trainer.load_model(path=args.pretrain_path)
+                result = trainer.finetune(epochs=args.finetune_epochs)
+
+            # ── 单次结果输出 ──
+            is_rank_0 = (not torch.distributed.is_initialized()
+                         or torch.distributed.get_rank() == 0)
+            if is_rank_0 and result is not None:
+                mode_label = (f"Zero-shot ({src_name} → {args.dataset})"
+                              if is_zero_shot else
+                              f"{args.few_shot}-shot ({src_name} → {args.dataset})")
+                header = f"\n{'='*60}\n  {mode_label}  seed={episode_seed}\n{'='*60}"
+                print(header)
+                logger.info(header)
+                for k, v in result.items():
+                    if v is not None:
+                        if isinstance(v, (int, float, np.floating, np.integer)):
+                            line = f"  {k:15s}: {v:.4f}"
+                        else:
+                            line = f"  {k:15s}: {v}"
+                        print(line)
+                        logger.info(line)
+                footer = f"{'='*60}\n"
+                print(footer)
 
             del trainer
             cleanup_memory()
-        # results.save(os.path.join(args.model_dir, args.model, 'results.json'))
+        else:
+            # ── 原有正常训练逻辑，完全不变 ──
+            all_episode_results = []
+            for i in range(args.num_repeat):
+                group_name = f"{args.model}" \
+                             f"_{args.dataset}" \
+                             f"_{args.batch_size}" \
+                             f"{f'sparsity-{args.sparsity}' if 'DFaST' in args.model else ''}" \
+                             f'F{args.frequency}D{args.D}F{args.num_kernels}P{args.p1}={args.p2}_dp{args.dropout}' \
+                             f"_w{args.window_size}" \
+                             f"{'_mp' if args.mix_up else ''}" \
+                             f"-cross"
+
+                # run = wandb.init(project=args.project, entity=args.wandb_entity, reinit=True, group=f"{group_name}", tags=[args.dataset])
+
+                trainer = eval(args.model + 'Trainer')(args, local_rank=local_rank, task_id=i)
+                if args.abla_channel >= 0:
+                    init_logger(f'{args.log_dir}/train_{args.model}{args.append}_wo_C{args.abla_channel}_{args.dataset}.log')
+                elif args.abla_vae != "n":
+                    init_logger(f'{args.log_dir}/train_{args.model}{args.append}_wo_{args.abla_vae}_{args.dataset}.log')
+                else:
+                    init_logger(f'{args.log_dir}/train_{args.model}{args.append}_{args.dataset}.log')
+                if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                    logger.info(f"{'#'*10} Repeat:{i} {'#'*10}")
+                trainer.train()
+                all_episode_results.append(trainer.best_result)
+
+                # run.finish()
+
+                del trainer
+                cleanup_memory()
+
+            # ── 正常训练结果汇总 ──
+            is_rank_0 = (not torch.distributed.is_initialized()
+                         or torch.distributed.get_rank() == 0)
+            if is_rank_0 and all_episode_results:
+                valid_results = [r for r in all_episode_results if r is not None]
+                if valid_results:
+                    results = Recorder()
+                    for r in valid_results:
+                        results.add_record(r)
+                    results.save(os.path.join(args.model_dir, args.model,
+                                              'results.json'))
     elif args.do_test:
-        trainer = eval(args.model + 'Trainer')(args)
-        init_logger(f'{args.log_dir}/test_{args.model}{args.append}_{args.dataset}.log')
-        trainer.load_model()
-        trainer.evaluate()
+        if transfer_mode and is_zero_shot:
+            # ── Zero-shot 纯评估（无训练）──
+            trainer = eval(args.model + 'Trainer')(args)
+            init_logger(f'{args.log_dir}/test_{args.model}{args.append}'
+                        f'_zero-shot_{args.dataset}.log')
+            trainer.load_model(path=args.pretrain_path)
+            trainer.model.eval()
+            trainer.evaluate()
+        else:
+            trainer = eval(args.model + 'Trainer')(args)
+            init_logger(f'{args.log_dir}/test_{args.model}{args.append}'
+                        f'_{args.dataset}.log')
+            trainer.load_model()
+            trainer.evaluate()
 
 
 def parameters(args):

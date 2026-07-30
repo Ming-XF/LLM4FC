@@ -9,6 +9,9 @@ deepspeed --num_gpus=6 main.py \
     --num_repeat 1 \
     --dataset 'MNRED' \
     --few_shot 0 \
+    --few_shot_seed 42 \
+    --pretrain_path "" \
+    --finetune_epochs 10 \
     --data_dir "../data/MNRED/mnred.npy" \
     --batch_size 3 \
     --num_epochs 200 \
@@ -25,7 +28,6 @@ deepspeed --num_gpus=6 main.py \
     --dynamic_length 600 \
     --num_layers 2 \
     --deepspeed \
-    --deepspeed_config scripts/deepspeed/STAGIN.json \
     --do_train \
     --do_evaluate \
     --do_test

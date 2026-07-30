@@ -8,7 +8,10 @@ deepspeed --num_gpus=6 main.py \
     --model "ALTER" \
     --num_repeat 1 \
     --dataset 'CAUEEG2' \
-    --few_shot 5 \
+    --few_shot 0 \
+    --few_shot_seed 42 \
+    --pretrain_path "" \
+    --finetune_epochs 10 \
     --data_dir "../data/CAUEEG/caueeg2.npz" \
     --batch_size 3 \
     --num_epochs 200 \
@@ -21,7 +24,31 @@ deepspeed --num_gpus=6 main.py \
     --early_stop_metric "AUC" \
     --num_heads 1 \
     --deepspeed \
-    --deepspeed_config scripts/deepspeed/ALTER.json \
+    --do_train \
+    --do_evaluate \
+    --do_test
+
+
+deepspeed --num_gpus=2 main.py \
+    --model "ALTER" \
+    --num_repeat 1 \
+    --dataset 'CAUEEG2' \
+    --few_shot 10 \
+    --few_shot_seed 42 \
+    --pretrain_path "./output_dir/ALTER_DS_train" \
+    --finetune_epochs 10 \
+    --data_dir "../data/CAUEEG/caueeg2.npz" \
+    --batch_size 2 \
+    --num_epochs 200 \
+    --drop_last False \
+    --train_set 0.6 \
+    --val_set 0.2 \
+    --schedule 'cos' \
+    --early_stop_patience 10 \
+    --early_stop_min_delta 0.001 \
+    --early_stop_metric "AUC" \
+    --num_heads 1 \
+    --deepspeed \
     --do_train \
     --do_evaluate \
     --do_test
