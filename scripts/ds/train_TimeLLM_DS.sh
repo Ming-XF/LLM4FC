@@ -13,15 +13,15 @@ deepspeed --num_gpus=6 main.py \
     --batch_size 3 \
     --num_epochs 200 \
     --drop_last False \
-    --train_set 0.6 \
-    --val_set 0.2 \
+    --train_set 0.7 \
+    --val_set 0.15 \
     --schedule 'cos' \
     --early_stop_patience 10 \
     --early_stop_min_delta 0.001 \
     --early_stop_metric "AUC" \
     --d_model 64 \
     --num_heads 8 \
-    --num_prototypes 500 \
+    --num_prototypes 1000 \
     --d_ff 128 \
     --gcn_hidden 128 \
     --num_gcn_layers 1 \
@@ -29,8 +29,15 @@ deepspeed --num_gpus=6 main.py \
     --save_steps 25 \
     --deepspeed \
     --deepspeed_config scripts/deepspeed/TimeLLM.json \
-    --llm_type chatglm \
-    --llm_path ./model/chatglm-6b \
+    --llm_type llama \
+    --llm_path ./model/deepseek-r1-distill-llama-8B \
     --do_train \
     --do_evaluate \
     --do_test
+
+
+    --llm_type chatglm \
+    --llm_path ./model/chatglm-6b \
+
+    --llm_type llama \
+    --llm_path ./model/deepseek-r1-distill-llama-8B \

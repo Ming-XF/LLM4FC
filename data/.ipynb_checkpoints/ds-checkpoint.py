@@ -87,8 +87,10 @@ class DSDataset(BaseDataset):
         time_series = time_series[
             :, sampling_init:sampling_init + self.data_config.time_series_size]
 
+        window_size = 3 * self.hz
+        step_size = (60 * self.hz - window_size) // 9
         SFC = self.connectivity(time_series, activate=False)
-        DFC = dynamic_connectivity(time_series.numpy(), 3 * self.hz, 1 * self.hz)
+        DFC = dynamic_connectivity(time_series.numpy(), window_size, step_size)
         DFC = torch.from_numpy(DFC).float()
 
         return {'time_series': time_series,
