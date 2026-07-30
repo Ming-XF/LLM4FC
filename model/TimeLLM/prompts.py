@@ -115,42 +115,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'prompt_task': _PROMPT_TASK_BINARY,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
-
-    'C42B': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
-        'prompt_task': _PROMPT_TASK_BINARY,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
-    'MNRED': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
-        'prompt_task': _PROMPT_TASK_BINARY,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
-    'SMR': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
-        'prompt_task': _PROMPT_TASK_4CLASS,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
-    'ZuCo': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
-        'prompt_task': _PROMPT_TASK_BINARY,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
 }
 
 

@@ -199,9 +199,6 @@ def init_config():
     train_group.add_argument("--pretrain_path", default="", type=str,
                              help="Pretrained checkpoint dir for transfer-learning "
                                   "few-shot / zero-shot")
-    train_group.add_argument("--finetune_epochs", default=50, type=int,
-                             help="Fixed number of fine-tune epochs in few-shot "
-                                  "transfer mode")
     train_group.add_argument("--do_train", action="store_true", help="")
     train_group.add_argument("--do_parallel", action="store_true", help="")
     train_group.add_argument("--deepspeed", action="store_true", help="Enable DeepSpeed ZeRO-2/3")

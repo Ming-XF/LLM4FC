@@ -23,7 +23,7 @@ def init_StratifiedKFold_dataloader(data_config: DataConfig,
     train_dataloader = utils.DataLoader(
         train_dataset,
         # sampler=train_sampler,
-        batch_size=data_config.batch_size if data_config.dataset != "ZuCo" else 1,
+        batch_size=data_config.batch_size,
         # batch_size=data_config.batch_size,
         shuffle=True,
         drop_last=data_config.drop_last,
@@ -31,14 +31,14 @@ def init_StratifiedKFold_dataloader(data_config: DataConfig,
 
     val_dataloader = utils.DataLoader(
         val_dataset,
-        batch_size=data_config.batch_size if data_config.dataset != "ZuCo" else 1,
+        batch_size=data_config.batch_size,
         shuffle=False,
         drop_last=False,
         num_workers=data_config.num_workers)
 
     test_dataloader = utils.DataLoader(
         test_dataset,
-        batch_size=data_config.batch_size if data_config.dataset != "ZuCo" else 1,
+        batch_size=data_config.batch_size,
         # batch_size=data_config.batch_size,
         shuffle=False,
         drop_last=False,

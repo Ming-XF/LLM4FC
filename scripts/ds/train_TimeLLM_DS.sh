@@ -17,7 +17,6 @@ deepspeed --num_gpus=6 main.py \
     --few_shot 0 \
     --few_shot_seed 42 \
     --pretrain_path "" \
-    --finetune_epochs 10 \
     --data_dir "../data/DS/ds.npz" \
     --batch_size 3 \
     --num_epochs 200 \
@@ -48,10 +47,9 @@ deepspeed --num_gpus=4 main.py \
     --model "TimeLLM" \
     --num_repeat 1 \
     --dataset 'DS' \
-    --few_shot 5 \
+    --few_shot 1 \
     --few_shot_seed 42 \
     --pretrain_path "./output_dir/TimeLLM_CAUEEG2_train" \
-    --finetune_epochs 200 \
     --data_dir "../data/DS/ds.npz" \
     --batch_size 2 \
     --num_epochs 200 \

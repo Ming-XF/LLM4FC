@@ -256,13 +256,14 @@ class Trainer(object):
             self.save_model(path=final_dir)
             logger.info("Final model saved at epoch %d", self.args.num_epochs)
 
-    def finetune(self, epochs):
+    def finetune(self):
         """Fine-tune for few-shot transfer learning with val-based early stopping.
 
         Evaluates on the (untouched, full-subject) validation set each epoch.
         Keeps the checkpoint with the best val AUC, stops early when AUC stops
         improving, then evaluates once on the test set.
         """
+        epochs = self.args.num_epochs
         is_rank_0 = (not torch.distributed.is_initialized()
                      or torch.distributed.get_rank() == 0)
 

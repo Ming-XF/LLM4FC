@@ -56,7 +56,7 @@ def main(args):
             # 自动推导 DeepSpeed 配置文件路径
             ds_path = args.deepspeed_config
             if not os.path.exists(ds_path):
-                auto_path = f"scripts/deepspeed/{args.model}.json"
+                auto_path = f"deepspeed/{args.model}.json"
                 if os.path.exists(auto_path):
                     args.deepspeed_config = auto_path
                 else:
@@ -121,7 +121,7 @@ def main(args):
                     args, local_rank=local_rank, task_id=0,
                     episode_seed=episode_seed)
                 trainer.load_model(path=args.pretrain_path)
-                result = trainer.finetune(epochs=args.finetune_epochs)
+                result = trainer.finetune()
 
             # ── 单次结果输出 ──
             is_rank_0 = (not torch.distributed.is_initialized()

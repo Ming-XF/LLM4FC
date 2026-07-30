@@ -11,7 +11,6 @@ deepspeed --num_gpus=6 main.py \
     --few_shot 0 \
     --few_shot_seed 42 \
     --pretrain_path "" \
-    --finetune_epochs 10 \
     --data_dir "../data/DS/ds.npz" \
     --batch_size 3 \
     --num_epochs 200 \
