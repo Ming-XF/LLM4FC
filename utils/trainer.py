@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
+
 class Trainer(object):
     def __init__(self, args, local_rank=0, task_id=0, episode_seed=None):
         self.task_id = task_id
@@ -256,11 +257,11 @@ class Trainer(object):
             logger.info("Final model saved at epoch %d", self.args.num_epochs)
 
     def finetune(self, epochs):
-        """Fixed-epoch fine-tune for few-shot transfer learning.
+        """Fine-tune for few-shot transfer learning with val-based early stopping.
 
-        No validation, no early stopping, no intermediate checkpoint — just
-        train for ``epochs`` epochs on the (already few-shot reduced) training
-        set, then evaluate once on the test set and return the result dict.
+        Evaluates on the (untouched, full-subject) validation set each epoch.
+        Keeps the checkpoint with the best val AUC, stops early when AUC stops
+        improving, then evaluates once on the test set.
         """
         is_rank_0 = (not torch.distributed.is_initialized()
                      or torch.distributed.get_rank() == 0)
@@ -269,23 +270,32 @@ class Trainer(object):
             logger.info("***** Running few-shot fine-tune (transfer) *****")
             logger.info("  Num train examples = %d",
                         len(self.data_loaders['train']))
+            logger.info("  Num val   examples = %d",
+                        len(self.data_loaders['val']))
             logger.info("  Num test  examples = %d",
                         len(self.data_loaders['test']))
-            logger.info("  Fixed fine-tune epochs = %d", epochs)
+            logger.info("  Max fine-tune epochs = %d", epochs)
             logger.info("  Fine-tune lr = %g", self.args.learning_rate)
         if self.args.deepspeed:
-            # 复用 __init__ 中已创建的 engine（main.py 已提前将
-            # deepspeed_config 替换为 _finetune.json），只更新 lr
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = self.args.learning_rate
-            # No scheduler — constant lr throughout finetune
             self.scheduler = None
         else:
             self.optimizer = init_optimizer(self.model, self.args)
-            # No scheduler — constant lr throughout finetune
             self.scheduler = None
 
-        # ── Fixed-epoch loop ──
+        # ── Early stopping (AUC: higher is better) ──
+        from utils.early_stopping import EarlyStopping
+        early_stopper = EarlyStopping(
+            patience=self.args.early_stop_patience,
+            min_delta=self.args.early_stop_min_delta,
+            mode='max',
+        )
+        best_model_dir = os.path.join(self.args.model_dir,
+                                      self._get_save_dir_name() + '_best')
+        stop_requested = False
+
+        # ── Epoch loop with validation ──
         for epoch in tqdm(range(1, epochs + 1), desc="ft-epoch", ncols=0):
             if self.args.deepspeed:
                 train_sampler = getattr(self.data_loaders['train'].sampler,
@@ -297,12 +307,54 @@ class Trainer(object):
             train_loss = self.train_epoch(epoch)
             end_time = timer()
 
-            if is_rank_0:
+            # ── Validate on full val set (not reduced by few-shot) ──
+            val_result = self.evaluate(dataloader_key='val')
+
+            if is_rank_0 and val_result is not None:
+                val_auc = val_result.get('AUC', 0.0)
+                val_loss = val_result.get('Loss', float('inf'))
+                improved = early_stopper.step(val_auc)
+
+                if improved:
+                    self.save_model(path=best_model_dir)
+                    logger.info("Best model saved (val AUC=%.4f, epoch=%d)",
+                                early_stopper.best_score, epoch)
+
                 msg = (f"FT Epoch: {epoch}/{epochs}, "
-                       f"Loss: {train_loss:.5f}, "
+                       f"Train Loss: {train_loss:.5f}, "
+                       f"Val Loss: {val_loss:.5f}, "
+                       f"Val AUC: {val_auc:.4f}, "
+                       f"Best AUC: {early_stopper.best_score:.4f}, "
+                       f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                        f"Time: {(end_time - start_time):.1f}s")
                 tqdm.write(msg)
                 logger.info(msg)
+
+                if early_stopper.early_stop:
+                    stop_requested = True
+
+            # ── Broadcast early stop across ranks ──
+            if self.args.deepspeed and torch.distributed.is_initialized():
+                stop_tensor = torch.tensor([1 if stop_requested else 0],
+                                           device=self.device, dtype=torch.int)
+                torch.distributed.broadcast(stop_tensor, src=0)
+                if stop_tensor.item() == 1:
+                    logger.info("Early stopping triggered at epoch %d", epoch)
+                    break
+            elif stop_requested:
+                break
+
+        # ── Load best checkpoint (if one was saved) ──
+        best_path = os.path.join(best_model_dir,
+                                 f'{self.args.model}-{self.task_id}.bin')
+        if os.path.exists(best_path):
+            self.load_model(path=best_model_dir)
+            if is_rank_0:
+                logger.info("Loaded best checkpoint from %s", best_model_dir)
+        else:
+            if is_rank_0:
+                logger.info("No best checkpoint found at %s, "
+                            "using current weights", best_path)
 
         # ── Save fine-tuned model ──
         save_dir = os.path.join(self.args.model_dir, self._get_save_dir_name())
@@ -310,7 +362,7 @@ class Trainer(object):
         if is_rank_0:
             logger.info("Fine-tuned model saved to %s", save_dir)
 
-        # ── Final test evaluation on last-epoch model ──
+        # ── Final test evaluation on best model ──
         result = self.evaluate(dataloader_key='test')
         self.test_result = result
 
@@ -664,21 +716,40 @@ class Trainer(object):
 
         saved_state = torch.load(bin_path, map_location=self.device,
                                 weights_only=False)
-        current_state = model.state_dict()
 
-        missing, unexpected = [], []
-        for k, v in saved_state.items():
-            if k in current_state:
-                if current_state[k].shape == v.shape:
-                    current_state[k].copy_(v)
+        if self.args.deepspeed:
+            import deepspeed
+            trainable = [p for p in model.parameters() if p.requires_grad]
+            with deepspeed.zero.GatheredParameters(trainable, modifier_rank=None):
+                current_state = model.state_dict()
+                missing, unexpected = [], []
+                for k, v in saved_state.items():
+                    if k in current_state:
+                        if current_state[k].shape == v.shape:
+                            current_state[k].copy_(v)
+                        else:
+                            logger.warning("  Shape mismatch for %s: saved %s vs current %s — skipped",
+                                           k, tuple(v.shape), tuple(current_state[k].shape))
+                    else:
+                        unexpected.append(k)
+                for k in current_state:
+                    if k not in saved_state:
+                        missing.append(k)
+        else:
+            current_state = model.state_dict()
+            missing, unexpected = [], []
+            for k, v in saved_state.items():
+                if k in current_state:
+                    if current_state[k].shape == v.shape:
+                        current_state[k].copy_(v)
+                    else:
+                        logger.warning("  Shape mismatch for %s: saved %s vs current %s — skipped",
+                                       k, tuple(v.shape), tuple(current_state[k].shape))
                 else:
-                    logger.warning("  Shape mismatch for %s: saved %s vs current %s — skipped",
-                                   k, tuple(v.shape), tuple(current_state[k].shape))
-            else:
-                unexpected.append(k)
-        for k in current_state:
-            if k not in saved_state:
-                missing.append(k)
+                    unexpected.append(k)
+            for k in current_state:
+                if k not in saved_state:
+                    missing.append(k)
 
         n_loaded = len(saved_state) - len(unexpected)
         if missing:

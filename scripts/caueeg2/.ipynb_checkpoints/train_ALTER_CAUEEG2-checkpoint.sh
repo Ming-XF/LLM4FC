@@ -29,14 +29,14 @@ deepspeed --num_gpus=6 main.py \
     --do_test
 
 
-deepspeed --num_gpus=2 main.py \
+deepspeed --num_gpus=4 main.py \
     --model "ALTER" \
     --num_repeat 1 \
     --dataset 'CAUEEG2' \
-    --few_shot 10 \
+    --few_shot 1 \
     --few_shot_seed 42 \
     --pretrain_path "./output_dir/ALTER_DS_train" \
-    --finetune_epochs 10 \
+    --finetune_epochs 200 \
     --data_dir "../data/CAUEEG/caueeg2.npz" \
     --batch_size 2 \
     --num_epochs 200 \
@@ -44,7 +44,7 @@ deepspeed --num_gpus=2 main.py \
     --train_set 0.6 \
     --val_set 0.2 \
     --schedule 'cos' \
-    --early_stop_patience 10 \
+    --early_stop_patience 25 \
     --early_stop_min_delta 0.001 \
     --early_stop_metric "AUC" \
     --num_heads 1 \
