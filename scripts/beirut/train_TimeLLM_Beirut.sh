@@ -4,6 +4,12 @@
 # GPUs: 4  |  batch_size: 3 per GPU  |  total effective: 12
 #
 
+    --llm_type chatglm \
+    --llm_path ./model/chatglm-6b \
+
+    --llm_type llama \
+    --llm_path ./model/deepseek-r1-distill-llama-8B \
+
 deepspeed --num_gpus=6 main.py \
     --model "TimeLLM" \
     --num_repeat 1 \
@@ -11,7 +17,7 @@ deepspeed --num_gpus=6 main.py \
     --few_shot 0 \
     --few_shot_seed 42 \
     --pretrain_path "" \
-    --data_dir "../data/Beirut/Beirut.npy" \
+    --data_dir "../data/Beirut/beirut.npy" \
     --batch_size 3 \
     --num_epochs 200 \
     --drop_last False \
@@ -30,8 +36,8 @@ deepspeed --num_gpus=6 main.py \
     --dropout 0.1 \
     --save_steps 25 \
     --deepspeed \
-    --llm_type chatglm \
-    --llm_path ./model/chatglm-6b \
+    --llm_type llama \
+    --llm_path ./model/deepseek-r1-distill-llama-8B \
     --do_train \
     --do_evaluate \
     --do_test

@@ -8,7 +8,7 @@ deepspeed --num_gpus=4 main.py \
     --model "BNT" \
     --num_repeat 1 \
     --dataset 'Beirut' \
-    --data_dir "../data/Beirut/Beirut.npy" \
+    --data_dir "../data/Beirut/beirut.npy" \
     --batch_size 4 \
     --num_epochs 200 \
     --drop_last False \

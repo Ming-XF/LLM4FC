@@ -107,6 +107,7 @@ class BeirutDataset(BaseDataset):
         correlation = data["corr"]
         labels = data["labels"]
         subject_id = data["subject_id"]
+        self.hz = data.get("hz", 200)
 
         self.data_config.node_size = time_series[0].shape[0]
         self.data_config.node_feature_size = time_series[0].shape[0]
@@ -120,10 +121,7 @@ class BeirutDataset(BaseDataset):
         self.all_data['subject_id'] = subject_id
 
         # ── Split via parent _create_splits (K‑Fold or train/val/test) ──
-        groups = np.array([
-            f"{int(s)}_{int(l)}"
-            for s, l in zip(self.all_data['subject_id'], self.all_data['labels'])
-        ])
+        groups = np.array([int(s) for s in self.all_data['subject_id']])
         self._create_splits(self.all_data['labels'], groups)
 
         self.all_data['labels'] = F.one_hot(
@@ -147,8 +145,16 @@ class BeirutDataset(BaseDataset):
         # FC computed on‑the‑fly (no activation → arctanh disabled)
         correlation = self.connectivity(time_series, activate=False)
 
+        # DFC: 10 sub-windows, each 3s, from the 60s segment
+        # num_windows = (total_samples - window_size) // step_size + 1 = 10
+        window_size = 3 * self.hz
+        step_size = (time_series.size(-1) - window_size) // 9
+        DFC = dynamic_connectivity(time_series.numpy(), window_size, step_size)
+        DFC = torch.from_numpy(DFC).float()
+
         return {'time_series': time_series,
                 'correlation': correlation,
+                'DFC': DFC,
                 'labels': labels}
 
 
@@ -313,6 +319,7 @@ def beirut_preprocess(path_beirut="../data/Beirut", hz=200,
         "corr": correlation_all,
         "labels": labels_all,
         "subject_id": subject_ids_all,
+        "hz": hz,
     })
     print(f"Saved to {output_path}")
 

@@ -11,7 +11,7 @@ deepspeed --num_gpus=6 main.py \
     --few_shot 0 \
     --few_shot_seed 42 \
     --pretrain_path "" \
-    --data_dir "../data/Beirut/Beirut.npy" \
+    --data_dir "../data/Beirut/beirut.npy" \
     --batch_size 3 \
     --num_epochs 200 \
     --drop_last False \
