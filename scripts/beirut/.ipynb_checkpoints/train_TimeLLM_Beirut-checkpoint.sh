@@ -18,13 +18,13 @@ deepspeed --num_gpus=6 main.py \
     --few_shot_seed 42 \
     --pretrain_path "" \
     --data_dir "../data/Beirut/beirut.npy" \
-    --batch_size 3 \
+    --batch_size 2 \
     --num_epochs 200 \
     --drop_last False \
     --train_set 0.7 \
     --val_set 0.15 \
     --schedule 'cos' \
-    --early_stop_patience 10 \
+    --early_stop_patience 20 \
     --early_stop_min_delta 0.001 \
     --early_stop_metric "AUC" \
     --d_model 64 \

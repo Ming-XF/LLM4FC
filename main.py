@@ -37,7 +37,12 @@ def set_seed(seed=42):
     # 设置CuDNN以确保确定性
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    
+
+    # 设置SDPA和cuBLAS确定性（仅cudnn.deterministic不覆盖FlashAttention和bfloat16 matmul）
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    torch.backends.cuda.enable_flash_sdp(False)
+    torch.backends.cuda.enable_mem_efficient_sdp(False)
+
     # 设置Python哈希种子（用于字典等）
     os.environ['PYTHONHASHSEED'] = str(seed)
 

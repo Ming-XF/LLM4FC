@@ -18,7 +18,7 @@ deepspeed --num_gpus=6 main.py \
     --train_set 0.6 \
     --val_set 0.2 \
     --schedule 'cos' \
-    --early_stop_patience 10 \
+    --early_stop_patience 20 \
     --early_stop_min_delta 0.001 \
     --early_stop_metric "AUC" \
     --deepspeed \

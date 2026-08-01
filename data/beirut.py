@@ -134,7 +134,7 @@ class BeirutDataset(BaseDataset):
 
         correlation = self.connectivity(time_series)
 
-        window_size = 15 * self.hz
+        window_size = 3 * self.hz
         step_size = (time_series.size(-1) - window_size) // 9
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
 
