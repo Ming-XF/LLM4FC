@@ -1,61 +1,6 @@
-import math
 import numpy as np
-import pandas as pd
 import torch
-from scipy.fftpack import fft
 from scipy.linalg import sqrtm
-from scipy.signal import firwin, lfilter, filtfilt
-
-import pdb
-
-class DementiaDataNormalizer:
-    def __init__(self, data_stats=None):
-        self.stats = data_stats or {}
-
-        self.scale_ranges = {
-            '年龄': (0, 100),
-            'MMSE': (0, 30),
-            'MoCA总分': (0, 30),
-            'Boston-初始命名': (0, 30),  # 添加Boston命名测试，范围0-30
-            'CDR_SOB': (0, 18),
-            'CDR': (0, 3),
-            'CDT': (0, 3),
-            '即刻记忆': (0, 41),  # 根据实际数据修正最大值为41
-            '延迟回忆': (0, 15),
-            '线索回忆': (0, 15),
-            '长时延迟再认': (-1, 15),  # 修正最小值允许为-1
-            '数字广度顺向': (0, 10),  # 修正最大值
-            '数字广度逆向': (0, 8),   # 修正最大值
-            '连线测验A': (0, 150),    # 修正最大值（实际截断值为150）
-            '连线测验B': (0, 300),
-            'TMT B-A': (-200, 300),   # 注意列名是"TMT B-A"（有空格）
-        }
-    
-    def normalize(self, df):
-        df_norm = df.copy()
-        # pdb.set_trace()
-        for col in self.scale_ranges.keys():
-            min_val = self.scale_ranges[col][0]
-            max_val = self.scale_ranges[col][1]
-            df_norm[col] = (df[col] - min_val) / (max_val - min_val)
-                
-        return df_norm
-
-
-class StandardScaler:
-    """
-    Standard the input
-    """
-
-    def __init__(self, mean: np.array, std: np.array):
-        self.mean = mean
-        self.std = std
-
-    def transform(self, data: np.array):
-        return (data - self.mean) / self.std
-
-    def inverse_transform(self, data: np.array):
-        return (data * self.std) + self.mean
 
 
 def continues_mixup_data(*xs, y1=None, y2=None, alpha=1.0, beta=1.0):
@@ -71,67 +16,13 @@ def continues_mixup_data(*xs, y1=None, y2=None, alpha=1.0, beta=1.0):
     y2 = lam * y2 + (1-lam) * y2[index] if y2 is not None else y2
     return *new_xs, y1, y2
 
-    # batch_size = y.size()[0]
-    # if alpha > 0:
-    #     lam = torch.tensor(np.random.beta(alpha, alpha, batch_size)).float()
-    # else:
-    #     lam = torch.ones(batch_size)
-    # index = torch.randperm(batch_size)
-    # new_xs = [torch.einsum('b, bnf -> bnf', lam, x) + torch.einsum('b, bnf -> bnf', 1 - lam, x[index, :]) for x in xs]
-    # y = torch.einsum('b, bc -> bc', lam, y) + torch.einsum('b, bc -> bc', 1-lam, y[index])
-    # return *new_xs, y
-
 
 def data_norm(data):
     data_copy = np.copy(data)
     for i in range(len(data)):
         data_copy[i] = data_copy[i] / np.maximum(np.max(abs(data[i])), 1e-8)
-        # data_copy[i] = exponential_running_standardize(data_copy[i].T).T
 
     return data_copy
-
-
-def exponential_running_standardize(
-        data, factor_new=0.001, init_block_size=1000, eps=1e-4
-):
-    """
-
-    """
-
-    df = pd.DataFrame(data)
-    meaned = df.ewm(alpha=factor_new).mean()
-    demeaned = df - meaned
-    squared = demeaned * demeaned
-    square_ewmed = squared.ewm(alpha=factor_new).mean()
-    standardized = demeaned / np.maximum(eps, np.sqrt(np.array(square_ewmed)))
-    standardized = np.array(standardized)
-    if init_block_size is not None:
-        other_axis = tuple(range(1, len(data.shape)))
-        init_mean = np.mean(
-            data[0:init_block_size], axis=other_axis, keepdims=True
-        )
-        init_std = np.std(
-            data[0:init_block_size], axis=other_axis, keepdims=True
-        )
-        init_block_standardized = (
-                                          data[0:init_block_size] - init_mean
-                                  ) / np.maximum(eps, init_std)
-        standardized[0:init_block_size] = init_block_standardized
-    return standardized
-
-
-def bandpass_cnt(data, low_cut_hz, high_cut_hz, fs, filt_order=200, zero_phase=False):
-    # nyq_freq = 0.5 * fs
-    # low = low_cut_hz / nyq_freq
-    # high = high_cut_hz / nyq_freq
-
-    # win = firwin(filt_order, [low, high], window='blackman', ass_zero='bandpass')
-    win = firwin(filt_order, [low_cut_hz, high_cut_hz], window='blackman', fs=fs, pass_zero='bandpass')
-
-    data_bandpassed = lfilter(win, 1, data)
-    if zero_phase:
-        data_bandpassed = filtfilt(win, 1, data)
-    return data_bandpassed
 
 
 def preprocess_ea(data):
@@ -139,66 +30,8 @@ def preprocess_ea(data):
     for i in range(len(data)):
         R_bar += np.dot(data[i], data[i].T)
     R_bar_mean = R_bar / len(data)
-    R_bar_mean += 1e-6 * np.eye(R_bar_mean.shape[0])  # 防止协方差矩阵近奇异导致 sqrtm 发散
-    # assert (R_bar_mean >= 0 ).all(), 'Before squr,all element must >=0'
+    R_bar_mean += 1e-6 * np.eye(R_bar_mean.shape[0])
 
     for i in range(len(data)):
         data[i] = np.dot(np.linalg.inv(sqrtm(R_bar_mean)), data[i])
     return data
-
-
-def dynamic_connectivity(time_series, window_size, step_size, activate=False, use_oas=False):
-    """计算动态脑功能连接 (sliding-window FC)。
-
-    Parameters
-    ----------
-    time_series : array-like, shape (N, L)
-        EEG 数据，N 为通道数，L 为采样点数。
-    window_size : int
-        滑动窗口大小（采样点数）。
-    step_size : int
-        滑动步长（采样点数）。
-    activate : bool
-        是否应用 Fisher z 变换（arctanh）。
-    use_oas : bool
-        是否使用 OAS 收缩协方差估计器（默认使用标准 Pearson 相关）。
-
-    Returns
-    -------
-    dynamic_conn : numpy.ndarray, shape (num_windows, N, N)
-        动态功能连接矩阵。对角线始终置零。
-    """
-    N, L = time_series.shape
-    num_windows = (L - window_size) // step_size + 1
-
-    if use_oas:
-        from sklearn.covariance import OAS
-        oas = OAS(assume_centered=False)
-
-    dynamic_conn = []
-
-    for i in range(num_windows):
-        start_idx = i * step_size
-        end_idx = start_idx + window_size
-        window_data = time_series[:, start_idx:end_idx]  # (N, window_size)
-
-        if use_oas:
-            cov = oas.fit(window_data.T).covariance_
-            d = np.sqrt(np.diag(cov))
-            conn_matrix = cov / np.outer(d, d)
-        else:
-            with np.errstate(divide='ignore', invalid='ignore'):
-                conn_matrix = np.corrcoef(window_data)
-
-        conn_matrix = np.nan_to_num(conn_matrix, nan=0.0, posinf=0.0, neginf=0.0)
-
-        if activate:
-            # Fisher z 变换：clip 输入避免 arctanh(±1) = ±inf
-            conn_matrix = np.arctanh(np.clip(conn_matrix, -0.9999, 0.9999))
-
-        # 对角线始终置零，避免自相关影响下游模型
-        np.fill_diagonal(conn_matrix, 0)
-
-        dynamic_conn.append(conn_matrix)
-
-    return np.stack(dynamic_conn, axis=0)

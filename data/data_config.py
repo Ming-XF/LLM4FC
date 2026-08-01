@@ -20,7 +20,6 @@ class DataConfig:
         self.node_size = node_size
         self.node_feature_size = node_feature_size
         self.num_class = num_class
-        self.dynamic = args.dynamic
         self.class_weight = [1]*num_class
         self.num_heads = args.num_heads
         self.abla_channel = args.abla_channel

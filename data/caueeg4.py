@@ -1,6 +1,5 @@
 import os
-import random
-from random import shuffle, randrange
+from random import shuffle
 import mne
 import numpy as np
 import torch
@@ -48,16 +47,10 @@ class CAUEEG4Dataset(BaseDataset):
         time_series = torch.from_numpy(self.all_data['time_series'][idx[item]]).float()
         labels = torch.from_numpy(self.all_data['labels'][idx[item]]).to(torch.int64)
 
-        sampling_init = (randrange(time_series.size(-1) - self.data_config.time_series_size)) \
-            if self.data_config.dynamic else 0
-        time_series = time_series[:, sampling_init:sampling_init + self.data_config.time_series_size]
-        SFC = self.connectivity(time_series, activate=False)
-        # DFC: 10 windows from 60s data
-        # num_windows = (60*hz - window_size) // step_size + 1 = 10
+        SFC = self.connectivity(time_series)
         window_size = 3 * self.hz
         step_size = (60 * self.hz - window_size) // 9
-        DFC = dynamic_connectivity(time_series.numpy(), window_size, step_size)
-        DFC = torch.from_numpy(DFC).float()
+        DFC = self.dynamic_connectivity(time_series, window_size, step_size)
 
         return {'time_series': time_series,
                 'DFC': DFC,

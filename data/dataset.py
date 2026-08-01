@@ -25,8 +25,6 @@ class BaseDataset(Dataset):
         self.train_index = None
         self.val_index = None                    # 新增 — 仅 train/val/test 模式有效
         self.test_index = None
-        self.train_data = None
-        self.test_data = None
         self.load_data(one_hot=one_hot)
 
     # ── mode 属性 — 取代旧的 train boolean ────────────────────────────
@@ -174,36 +172,41 @@ class BaseDataset(Dataset):
         pass
 
     @staticmethod
-    def connectivity(time_series, activate=True):
+    def connectivity(time_series):
+        """Compute static functional connectivity (Pearson correlation matrix).
+
+        Uses nilearn ConnectivityMeasure under the hood.
+        time_series: (N, T) tensor → returns (N, N) correlation matrix.
+        """
         conn_measure = connectome.ConnectivityMeasure(kind='correlation')
-        # conn_measure = connectome.ConnectivityMeasure(kind='correlation', cov_estimator=OAS(store_precision=False))
-        connectivity = conn_measure.fit_transform(time_series.T.unsqueeze(0).numpy())[0]
-        connectivity = torch.from_numpy(connectivity)
-        if activate:
-            connectivity = torch.arctanh(connectivity)
-            connectivity = torch.clamp(connectivity, -1.0, 1.0)
-            diag = torch.diag_embed(torch.diag(connectivity))
-            connectivity = connectivity - diag
-        return connectivity
+        conn = conn_measure.fit_transform(time_series.T.unsqueeze(0).numpy())[0]
+        return torch.from_numpy(conn)
 
     @staticmethod
-    def correlation(time_series, activate=True):
-        feature = torch.einsum('nt, mt ->nm', time_series, time_series) / (time_series.size(1)-1)
-        feature = torch.clamp(feature, -1.0, 1.0)
-        if activate:
-            feature = torch.arctanh(feature)
-            feature = torch.clamp(feature, -1.0, 1.0)
-            diag = torch.diag_embed(torch.diag(feature))
-            feature = feature - diag
-        return feature
+    def dynamic_connectivity(time_series, window_size, step_size):
+        """Compute dynamic FC via sliding windows.
 
-    @staticmethod
-    def norm(time_series):
-        time_series -= torch.mean(time_series, dim=1, keepdim=True)
-        std = torch.std(time_series, dim=1, keepdim=True)
-        std[std < torch.finfo(torch.float64).eps] = 1.
-        time_series /= std
-        return time_series
+        Each window calls connectivity() (nilearn Pearson correlation).
+
+        Args:
+            time_series: (N, T) tensor.
+            window_size: int, samples per window.
+            step_size:   int, stride between window starts.
+
+        Returns:
+            (num_windows, N, N) tensor.
+        """
+        N, T = time_series.shape
+        num_windows = (T - window_size) // step_size + 1
+
+        dfc = []
+        for i in range(num_windows):
+            start = i * step_size
+            end = start + window_size
+            window_data = time_series[:, start:end]
+            dfc.append(BaseDataset.connectivity(window_data))
+
+        return torch.stack(dfc, dim=0)
 
     def __len__(self):
         return len(self._active_index)

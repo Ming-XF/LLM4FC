@@ -1,5 +1,5 @@
 import os
-from random import shuffle, randrange
+from random import shuffle
 
 import mne
 import numpy as np
@@ -83,17 +83,10 @@ class DSDataset(BaseDataset):
         labels = torch.from_numpy(
             self.all_data['labels'][idx[item]]).to(torch.int64)
 
-        sampling_init = (randrange(
-            time_series.size(-1) - self.data_config.time_series_size)
-            if self.data_config.dynamic else 0)
-        time_series = time_series[
-            :, sampling_init:sampling_init + self.data_config.time_series_size]
-
         window_size = 3 * self.hz
         step_size = (60 * self.hz - window_size) // 9
-        SFC = self.connectivity(time_series, activate=False)
-        DFC = dynamic_connectivity(time_series.numpy(), window_size, step_size)
-        DFC = torch.from_numpy(DFC).float()
+        SFC = self.connectivity(time_series)
+        DFC = self.dynamic_connectivity(time_series, window_size, step_size)
 
         return {'time_series': time_series,
                 'DFC': DFC,

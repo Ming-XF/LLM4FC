@@ -1,6 +1,6 @@
 import os
 from datetime import date, datetime, time, timedelta
-from random import shuffle, randrange
+from random import shuffle
 
 import mne
 import numpy as np
@@ -82,15 +82,14 @@ _CHANNEL_ORDER = [
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class BeirutDataset(BaseDataset):
-    """Beirut seizure-prediction dataset.
+    """Beirut seizure-classification dataset.
 
-    Task: given a 1‑minute sliding window of 19‑channel EEG as FC,
-    predict whether a seizure will start within the next 10 minutes.
+    Task: given a 1‑minute sliding window of 19‑channel EEG time series,
+    classify the window as positive (pre‑ictal) or negative (inter‑ictal).
 
-    - Pre‑ictal  (label 1): seizure onset inside [window_end, window_end + 10 min]
-    - Inter‑ictal (label 0): no seizure in the prediction window  AND
-      the window is ≥ 10 min away from any seizure
-    - Ictal windows (overlapping a seizure) are discarded.
+    - Positive (label 1): seizure onset inside [window_end, window_end + 10 min]
+    - Negative (label 0): ≥ 10 min away from any seizure
+    - Ictal windows and buffer-zone windows are discarded.
 
     Patients 11–15, patient 10 excluded.
     """
@@ -104,7 +103,6 @@ class BeirutDataset(BaseDataset):
         data = np.load(self.data_config.data_dir, allow_pickle=True).item()
 
         time_series = data["timeseries"]
-        correlation = data["corr"]
         labels = data["labels"]
         subject_id = data["subject_id"]
         self.hz = data.get("hz", 200)
@@ -116,12 +114,11 @@ class BeirutDataset(BaseDataset):
         self.data_config.class_weight = [1, 1]
 
         self.all_data['time_series'] = time_series
-        self.all_data['correlation'] = correlation
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
         # ── Split via parent _create_splits (K‑Fold or train/val/test) ──
-        groups = np.array([int(s) for s in self.all_data['subject_id']])
+        groups = np.arange(len(self.all_data['labels']))
         self._create_splits(self.all_data['labels'], groups)
 
         self.all_data['labels'] = F.one_hot(
@@ -135,22 +132,11 @@ class BeirutDataset(BaseDataset):
         labels = torch.from_numpy(
             self.all_data['labels'][idx[item]]).to(torch.int64)
 
-        # Optional dynamic sub‑window sampling
-        sampling_init = (randrange(
-            time_series.size(-1) - self.data_config.time_series_size)
-            if self.data_config.dynamic else 0)
-        time_series = time_series[
-            :, sampling_init:sampling_init + self.data_config.time_series_size]
+        correlation = self.connectivity(time_series)
 
-        # FC computed on‑the‑fly (no activation → arctanh disabled)
-        correlation = self.connectivity(time_series, activate=False)
-
-        # DFC: 10 sub-windows, each 3s, from the 60s segment
-        # num_windows = (total_samples - window_size) // step_size + 1 = 10
-        window_size = 3 * self.hz
+        window_size = 9 * self.hz
         step_size = (time_series.size(-1) - window_size) // 9
-        DFC = dynamic_connectivity(time_series.numpy(), window_size, step_size)
-        DFC = torch.from_numpy(DFC).float()
+        DFC = self.dynamic_connectivity(time_series, window_size, step_size)
 
         return {'time_series': time_series,
                 'correlation': correlation,
@@ -190,7 +176,6 @@ def beirut_preprocess(path_beirut="../data/Beirut", hz=200,
     buffer_samples = buffer_sec * hz
 
     time_series_all = []
-    correlation_all = []
     labels_all = []
     subject_ids_all = []
 
@@ -237,8 +222,8 @@ def beirut_preprocess(path_beirut="../data/Beirut", hz=200,
             total_samples = eeg.shape[1]
 
             # ── Per‑window classification ──
-            preictal_samples = []    # (window, fc, label=1)
-            interictal_samples = []  # (window, fc, label=0)
+            preictal_samples = []    # (window, label=1)
+            interictal_samples = []  # (window, label=0)
 
             for start in range(0, total_samples - window_samples,
                                stride_samples):
@@ -260,10 +245,8 @@ def beirut_preprocess(path_beirut="../data/Beirut", hz=200,
 
                 if is_preictal:
                     label = 1
-                    fc = np.corrcoef(eeg[:, start:end])
-                    fc = np.nan_to_num(fc, nan=0.0)
                     preictal_samples.append(
-                        (eeg[:, start:end], fc, label))
+                        (eeg[:, start:end], label))
                 else:
                     # ── Buffer check for inter‑ictal ──
                     too_close = any(
@@ -275,10 +258,8 @@ def beirut_preprocess(path_beirut="../data/Beirut", hz=200,
                         continue
 
                     label = 0
-                    fc = np.corrcoef(eeg[:, start:end])
-                    fc = np.nan_to_num(fc, nan=0.0)
                     interictal_samples.append(
-                        (eeg[:, start:end], fc, label))
+                        (eeg[:, start:end], label))
 
             # ── 1:1 balance per record ──
             n_pre = len(preictal_samples)
@@ -295,15 +276,13 @@ def beirut_preprocess(path_beirut="../data/Beirut", hz=200,
                 idx = rng.choice(n_int, n_keep, replace=False)
                 interictal_samples = [interictal_samples[i] for i in idx]
 
-            for window, fc, label in preictal_samples + interictal_samples:
+            for window, label in preictal_samples + interictal_samples:
                 time_series_all.append(window)
-                correlation_all.append(fc)
                 labels_all.append(label)
                 subject_ids_all.append(float(patient))
 
     # ── Stack and normalize ──
     time_series_all = np.array(time_series_all)
-    correlation_all = np.array(correlation_all)
     labels_all = np.array(labels_all)
     subject_ids_all = np.array(subject_ids_all)
 
@@ -316,7 +295,6 @@ def beirut_preprocess(path_beirut="../data/Beirut", hz=200,
 
     np.save(output_path, {
         "timeseries": time_series_all,
-        "corr": correlation_all,
         "labels": labels_all,
         "subject_id": subject_ids_all,
         "hz": hz,

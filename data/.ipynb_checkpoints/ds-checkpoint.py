@@ -1,5 +1,5 @@
 import os
-from random import shuffle, randrange
+from random import shuffle
 
 import mne
 import numpy as np
@@ -49,8 +49,10 @@ class DSDataset(BaseDataset):
     with channels reordered to match the CAUEEG standard order.
     """
 
-    def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True):
-        super(DSDataset, self).__init__(data_config, k, train, one_hot=one_hot)
+    def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
+                 episode_seed=None):
+        super(DSDataset, self).__init__(data_config, k, train, one_hot=one_hot,
+                                        episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
         raw = np.load(self.data_config.data_dir, allow_pickle=True)
@@ -81,17 +83,10 @@ class DSDataset(BaseDataset):
         labels = torch.from_numpy(
             self.all_data['labels'][idx[item]]).to(torch.int64)
 
-        sampling_init = (randrange(
-            time_series.size(-1) - self.data_config.time_series_size)
-            if self.data_config.dynamic else 0)
-        time_series = time_series[
-            :, sampling_init:sampling_init + self.data_config.time_series_size]
-
         window_size = 3 * self.hz
         step_size = (60 * self.hz - window_size) // 9
-        SFC = self.connectivity(time_series, activate=False)
-        DFC = dynamic_connectivity(time_series.numpy(), window_size, step_size)
-        DFC = torch.from_numpy(DFC).float()
+        SFC = self.connectivity(time_series)
+        DFC = self.dynamic_connectivity(time_series, window_size, step_size)
 
         return {'time_series': time_series,
                 'DFC': DFC,
