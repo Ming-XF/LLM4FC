@@ -19,7 +19,7 @@ deepspeed --num_gpus=4 main.py \
     --learning_rate 1e-4 \
     --weight_decay 1e-4 \
     --eps 1e-8 \
-    --early_stop_patience 20 \
+    --early_stop_patience 25 \
     --early_stop_min_delta 0.001 \
     --early_stop_metric "Loss" \
     --d_model 64 \

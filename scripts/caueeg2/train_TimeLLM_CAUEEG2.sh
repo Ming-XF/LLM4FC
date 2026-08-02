@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # TimeLLM DeepSpeed ZeRO-2 training on CAUEEG2 (caueeg2)
-# GPUs: 4  |  batch_size: 3 per GPU  |  total effective: 12
+# GPUs: 4  |  batch_size: 2 per GPU  |  total effective: 12
 #
     --llm_type chatglm \
     --llm_path ./model/chatglm-6b \
@@ -18,13 +18,13 @@ deepspeed --num_gpus=6 main.py \
     --few_shot_seed 42 \
     --pretrain_path "" \
     --data_dir "../data/CAUEEG/caueeg2.npz" \
-    --batch_size 3 \
+    --batch_size 2 \
     --num_epochs 200 \
     --drop_last False \
     --train_set 0.6 \
     --val_set 0.2 \
     --schedule 'cos' \
-    --early_stop_patience 20 \
+    --early_stop_patience 25 \
     --early_stop_min_delta 0.001 \
     --early_stop_metric "AUC" \
     --d_model 64 \
@@ -57,7 +57,7 @@ deepspeed --num_gpus=4 main.py \
     --train_set 0.6 \
     --val_set 0.2 \
     --schedule 'cos' \
-    --early_stop_patience 20 \
+    --early_stop_patience 25 \
     --early_stop_min_delta 0.001 \
     --early_stop_metric "AUC" \
     --d_model 64 \
