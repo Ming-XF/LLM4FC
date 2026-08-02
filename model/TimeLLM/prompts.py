@@ -30,12 +30,12 @@ _EEG_HOMOLOGOUS_PAIRS = [
 # ── Prompt 模板 ──────────────────────────────────────
 
 _PROMPT_DATASET_CAUEEG = (
-    "This dataset is used for Alzheimer's disease (AD) dementia diagnosis, "
-    "based on resting-state EEG data from over a thousand subjects. Each "
+    "This dataset is used for AD dementia diagnosis, "
+    "based on resting-state EEG data. Each "
     "subject's 60-second recording is divided into 10 consecutive time "
-    "windows (3-second window, ~6.3-second stride), and Pearson correlation "
+    "windows, and Pearson correlation "
     "is computed between each of the 19 EEG channels within each window to "
-    "produce dynamic functional connectivity (DFC) matrices. The following "
+    "produce DFC matrices. The following "
     "data are presented as a sequence of 190 tokens: for each of the 19 channels, "
     "10 time-window representations (T0 to T9) are provided in order (channel-first "
     "ordering). The 19 channels (international 10-20 system) are: Fp1, F3, C3, P3, "
@@ -44,7 +44,7 @@ _PROMPT_DATASET_CAUEEG = (
 
 _PROMPT_TASK_BINARY = (
     "Given 19-channel brain functional connectivity, classify the subject "
-    "as AD (Alzheimer's disease) or NC (normal cognition)."
+    "as AD or NC."
 )
 
 _PROMPT_DATASET_BEIRUT = (
@@ -68,8 +68,8 @@ _PROMPT_TASK_BEIRUT = (
 
 _PROMPT_TASK_4CLASS = (
     "Given 19-channel brain functional connectivity, classify the subject "
-    "as AD (Alzheimer's disease), MCI (mild cognitive impairment), "
-    "SCD (subjective cognitive decline), or NC (normal cognition)."
+    "as AD, MCI, "
+    "SCD (subjective cognitive decline), or NC."
 )
 
 _PROMPT_STATS_EEG = (
@@ -132,6 +132,24 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_BEIRUT,
         'prompt_task': _PROMPT_TASK_BEIRUT,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+
+    'TUAB': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
+        'prompt_task': _PROMPT_TASK_BINARY,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+
+    'TUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
+        'prompt_task': _PROMPT_TASK_BINARY,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
 }
