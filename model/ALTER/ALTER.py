@@ -224,7 +224,7 @@ class ALTER(nn.Module):
         else:
             self.loss_fn = torch.nn.MSELoss()
 
-    def forward(self, time_series: torch.tensor, node_feature: torch.tensor, labels: torch.tensor):
+    def forward(self, node_feature: torch.tensor, labels: torch.tensor):
 
         bz, _, _, = node_feature.shape
 

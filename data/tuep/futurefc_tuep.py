@@ -101,16 +101,11 @@ class FutureFCTUEPDataset(BaseDataset):
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
         DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
 
-        dfc_input = DFC[:self.n_input_windows]
-        dfc_target = DFC[self.n_input_windows:]
-
-        return {'time_series': time_series,
+        return {
                 'DFC': DFC,
                 'correlation': SFC,
-                'DFC_input': dfc_input,
-                'DFC_target': dfc_target,
-                'labels': dfc_target,
-                'sample_idx': idx[item]}
+                'labels': DFC[self.n_input_windows:],
+        }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

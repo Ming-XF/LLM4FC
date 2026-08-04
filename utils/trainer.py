@@ -15,7 +15,6 @@ from scipy.stats import pearsonr
 from config import init_model_config
 from .optimizer import init_optimizer
 from .schedule import init_schedule
-from .accuracy import accuracy
 from data import *
 from data.dataloader import init_deepspeed_dataloader
 

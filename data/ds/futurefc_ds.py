@@ -96,17 +96,12 @@ class FutureFCDSDataset(BaseDataset):
         SFC = self.connectivity(time_series)
         SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
 
-        # ── Split into input (history) and target (future) ──
-        dfc_input = DFC[:self.n_input_windows]   # (k, 19, 19)
-        dfc_target = DFC[self.n_input_windows:]  # (T-k, 19, 19)
-
-        return {'time_series': time_series,
+        # ── labels 即 DFC 的未来窗口 ──
+        return {
                 'DFC': DFC,
-                'DFC_input': dfc_input,
-                'DFC_target': dfc_target,
                 'correlation': SFC,
-                'labels': dfc_target,
-                'sample_idx': idx[item]}
+                'labels': DFC[self.n_input_windows:],
+        }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

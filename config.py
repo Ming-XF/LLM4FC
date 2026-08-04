@@ -23,53 +23,11 @@ def init_model_config(args, data_config: DataConfig):
                                  output_dim=data_config.output_dim,
                                  )
         model = BNT(model_config)
-    elif args.model == "FBNetGen":
-        model_config = FBNetGenConfig(activation='gelu',
-                                      dropout=0.5,
-                                      # extractor_type='gru',  # gru or cnn
-                                      extractor_type='cnn',  # gru or cnn
-                                      # d_model=16,
-                                      d_model=40,
-                                      node_size=data_config.node_size,
-                                      node_feature_size=data_config.node_feature_size,
-                                      time_series_size=data_config.time_series_size,
-                                      # window_size=5,
-                                      # window_size=40,
-                                      window_size=50,
-                                      cnn_pool_size=16,
-                                      graph_generation='product',  # product or linear
-                                      num_gru_layers=4,
-                                      group_loss=True,
-                                      sparsity_loss=True,
-                                      sparsity_loss_weight=1.0e-4,
-                                      task_type=data_config.task_type,
-                                      output_dim=data_config.output_dim)
-        model = FBNetGen(model_config)
     elif args.model == 'BrainNetCNN':
         model_config = BrainNetCNNConfig(node_size=data_config.node_size,
                                          task_type=data_config.task_type,
                                          output_dim=data_config.output_dim)
         model = BrainNetCNN(model_config)
-    elif args.model == 'STAGIN':
-        model_config = STAGINConfig(node_size=data_config.node_size,
-                                    d_model=args.d_model,
-                                    num_layers=args.num_layers,
-                                    window_size=args.window_size,
-                                    window_stride=args.window_stride,
-                                    dynamic_length=args.dynamic_length,
-                                    sampling_init=args.sampling_init,
-                                    task_type=data_config.task_type,
-                                    output_dim=data_config.output_dim)
-        model = STAGIN(model_config)
-    elif args.model == "TCACNet":
-        model_config = TCACNetConfig(node_size=data_config.node_size,
-                                     time_series_size=data_config.time_series_size,
-                                     node_feature_size=data_config.node_feature_size,
-                                     task_type=data_config.task_type,
-                                     output_dim=data_config.output_dim,
-                                     )
-        model_config.class_weight = data_config.class_weight
-        model = TCACNet(model_config)
     elif args.model == "ALTER":
         model_config = ALTERConfig(node_size=data_config.node_size,
                                  # sizes=(data_config.node_size, data_config.node_size // 2),
@@ -173,12 +131,7 @@ def init_config():
     model_group.add_argument("--k", default=5, type=int, help="")
     model_group.add_argument("--num_kernels", default=5, type=int, help="")
     model_group.add_argument("--sparsity", default=0.7, type=float, help="")
-    model_group.add_argument("--window_size", default=50, type=int, help="")
-    model_group.add_argument("--window_stride", default=3, type=int, help="")
-    model_group.add_argument("--dynamic_length", default=600, type=int, help="")
     model_group.add_argument("--dynamic_stride", default=1, type=int, help="")
-    model_group.add_argument("--dim_feedforward", default=1024, type=int, help="")
-    model_group.add_argument("--sampling_init", default=None, type=int, help="")
     model_group.add_argument("--hidden_dim", default=1024, type=int, help="")
     model_group.add_argument("--num_heads", default=1, type=int, help="")
     model_group.add_argument("--abla_channel", default=-1, type=int, help="Channel Ablation EXP")

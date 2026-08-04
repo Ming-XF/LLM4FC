@@ -1,8 +1,6 @@
-from .logger import *
+from .logger import init_logger
 from .schedule import init_schedule
-from .optimizer import init_optimizer, get_param_group_no_wd
-from .accuracy import accuracy
+from .optimizer import init_optimizer
 from .recorder import Recorder
-from .dynmic import process_dynamic_fc, corrcoef, process_dynamic_muti_type_fc
 from .trainer import *
 

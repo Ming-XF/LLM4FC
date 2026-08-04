@@ -55,11 +55,11 @@ class DiseaseCAUEEG2Dataset(BaseDataset):
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
         DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
 
-        return {'time_series': time_series,
+        return {
                 'DFC': DFC,
                 'correlation': SFC,  # SFC, for backward compat
                 'labels': labels,
-                'sample_idx': idx[item]}
+        }
 
 
 
