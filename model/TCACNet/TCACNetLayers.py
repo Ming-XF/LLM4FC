@@ -108,7 +108,7 @@ class LocalNetwork(nn.Module):
 class TopNetwork(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.conv1 = nn.Conv2d(config.num_kernels, config.num_classes,
+        self.conv1 = nn.Conv2d(config.num_kernels, config.output_dim,
                                kernel_size=(1, ((config.time_series_size-19) - 60) // 40 + 1),
                                stride=(1, 1))
         nn.init.xavier_uniform_(self.conv1.weight, gain=1)

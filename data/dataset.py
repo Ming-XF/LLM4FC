@@ -59,31 +59,99 @@ class BaseDataset(Dataset):
             return self.test_index
 
     # ── 数据划分 — 自动选择 K-Fold 或 train/val/test 模式 ──────────────
+    # ── 辅助：被试标签聚合 ────────────────────────────────────────────
+    @staticmethod
+    def _make_subject_labels(labels, groups, unique_subjs):
+        """为每个被试聚合样本级别的标签为被试级别。
+
+        分类任务：取多数类（bincount argmax）；
+        回归任务：取均值。
+        """
+        subj_lbls = np.zeros(len(unique_subjs))
+        for i, s in enumerate(unique_subjs):
+            mask = groups == s
+            lbls = labels[mask]
+            if np.issubdtype(lbls.dtype, np.integer):
+                subj_lbls[i] = np.bincount(lbls.astype(int)).argmax()
+            else:
+                subj_lbls[i] = float(lbls.mean())
+        return subj_lbls
+
+    @staticmethod
+    def _bin_continuous_labels(continuous_labels, n_bins=5):
+        """将连续标签按分位数分箱为离散类别（用于回归任务的分层划分）。
+
+        若唯一值不足 n_bins，则直接返回原值作为类别标识。
+        """
+        uniq = np.unique(continuous_labels)
+        if len(uniq) < n_bins:
+            # 唯一值太少，直接用原值（如婴幼儿年龄集中在 0-2）
+            n_bins = len(uniq)
+        if n_bins <= 1:
+            return np.zeros_like(continuous_labels, dtype=int)
+        bins = np.percentile(continuous_labels, np.linspace(0, 100, n_bins + 1))
+        bins[-1] += 1e-6  # 确保最大值不被漏掉
+        return np.digitize(continuous_labels, bins[:-1]) - 1
+
+    # ── 数据划分 — 自动选择 K-Fold 或 train/val/test 模式 ──────────────
     def _create_splits(self, labels, groups):
         """创建数据划分。
 
         当 ``num_repeat >= 2`` 时沿用原有 GroupKFold 逻辑；
         当 ``num_repeat == 1`` 时自动切换为 60/20/20 按被试分组划分。
+
+        分层策略按 ``task_type`` 自适应：
+        - 分类：按每被试多数类分层
+        - 回归：按等价分箱后的类别分层
+        - 多值回归：不做分层，随机划分
         """
+        task_type = self.data_config.task_type
+        from .data_config import DataConfig as DC
+
+        # ── 计算被试级别标签（用于分层）──
+        unique_subjs = np.unique(groups)
+        subj_labels_raw = self._make_subject_labels(labels, groups, unique_subjs)
+
+        # ── 决定是否分层 + 分层用标签 ──
+        if task_type == DC.TASK_MULTI_OUTPUT_REGRESSION:
+            do_stratify = False
+            stratify_labels = None
+        elif task_type == DC.TASK_REGRESSION:
+            do_stratify = True
+            stratify_labels = self._bin_continuous_labels(subj_labels_raw)
+        else:
+            # classification（含二分类与多分类）
+            do_stratify = True
+            stratify_labels = subj_labels_raw.astype(int)
+
         if self.k_fold is not None:
             # ── 原有 K-Fold 模式（num_repeat >= 2）──
+            stratify_for_kfold = stratify_labels[np.searchsorted(
+                unique_subjs, groups)] if do_stratify else None
             self.train_index, self.test_index = list(
-                self.k_fold.split(np.zeros(len(labels)), labels, groups=groups)
+                self.k_fold.split(np.zeros(len(labels)),
+                                  y=stratify_for_kfold,
+                                  groups=groups)
             )[self.k]
 
-            # Create a val split from within train (10% of train, by subject)
+            # Create a val split from within train (by subject)
             train_groups = groups[self.train_index]
-            train_lbls = labels[self.train_index]
             unique_train_subjs = np.unique(train_groups)
             if len(unique_train_subjs) >= 3:
-                subj_lbls = np.array([
-                    np.bincount(train_lbls[train_groups == s].astype(int)).argmax()
-                    for s in unique_train_subjs
-                ])
+                # per-subject labels for train subset
+                train_subj_lbls = self._make_subject_labels(
+                    labels[self.train_index], train_groups, unique_train_subjs)
+                if task_type == DC.TASK_REGRESSION:
+                    train_strat = self._bin_continuous_labels(train_subj_lbls)
+                elif task_type == DC.TASK_MULTI_OUTPUT_REGRESSION:
+                    train_strat = None
+                else:
+                    train_strat = train_subj_lbls.astype(int)
                 val_ratio = self.data_config.val_set / self.data_config.train_set
                 train_subjs, val_subjs = train_test_split(
                     unique_train_subjs, test_size=min(val_ratio, 0.3),
-                    stratify=subj_lbls, random_state=42)
+                    stratify=train_strat,
+                    random_state=42)
                 val_mask = np.isin(train_groups, val_subjs)
                 train_mask = np.isin(train_groups, train_subjs)
                 self.val_index = self.train_index[val_mask]
@@ -94,30 +162,28 @@ class BaseDataset(Dataset):
             # ── train/val/test 模式 — 按被试分组划分，防止数据泄露 ──
             train_ratio = self.data_config.train_set   # default 0.6
             val_ratio = self.data_config.val_set        # default 0.2
-            unique_subjs = np.unique(groups)
 
-            # 每个被试的主标签（用于分层抽样）
-            subj_labels = np.array([
-                np.bincount(labels[groups == s].astype(int)).argmax()
-                for s in unique_subjs
-            ])
+            stratify_arg = stratify_labels if do_stratify else None
 
             # Step 1: train vs (val + test)
             train_subjs, rest_subjs = train_test_split(
                 unique_subjs,
                 test_size=1.0 - train_ratio,
-                stratify=subj_labels,
+                stratify=stratify_arg,
                 random_state=42,
             )
 
             # Step 2: val vs test from rest
             rest_mask = np.isin(unique_subjs, rest_subjs)
-            rest_labels = subj_labels[rest_mask]
+            if do_stratify:
+                rest_stratify = stratify_labels[rest_mask]
+            else:
+                rest_stratify = None
             val_frac = val_ratio / (1.0 - train_ratio)    # 0.1 / 0.2 = 0.5
             val_subjs, test_subjs = train_test_split(
                 rest_subjs,
                 test_size=1.0 - val_frac,
-                stratify=rest_labels,
+                stratify=rest_stratify,
                 random_state=42,
             )
 

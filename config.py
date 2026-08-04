@@ -10,7 +10,6 @@ def init_model_config(args, data_config: DataConfig):
     if args.model == "BNT":
         model_config = BNTConfig(node_size=data_config.node_size,
                                  sizes=(data_config.node_size, data_config.node_size // 2),
-                                 num_classes=data_config.num_class,
                                  pooling=(False, True),
                                  pos_encoding=None,  # identity, none
                                  orthogonal=True,
@@ -20,6 +19,8 @@ def init_model_config(args, data_config: DataConfig):
                                  num_heads=args.num_heads,
                                  pos_embed_dim=data_config.node_size,
                                  dim_feedforward=1024,
+                                 task_type=data_config.task_type,
+                                 output_dim=data_config.output_dim,
                                  )
         model = BNT(model_config)
     elif args.model == "FBNetGen":
@@ -32,7 +33,6 @@ def init_model_config(args, data_config: DataConfig):
                                       node_size=data_config.node_size,
                                       node_feature_size=data_config.node_feature_size,
                                       time_series_size=data_config.time_series_size,
-                                      num_classes=data_config.num_class,
                                       # window_size=5,
                                       # window_size=40,
                                       window_size=50,
@@ -41,27 +41,32 @@ def init_model_config(args, data_config: DataConfig):
                                       num_gru_layers=4,
                                       group_loss=True,
                                       sparsity_loss=True,
-                                      sparsity_loss_weight=1.0e-4)
+                                      sparsity_loss_weight=1.0e-4,
+                                      task_type=data_config.task_type,
+                                      output_dim=data_config.output_dim)
         model = FBNetGen(model_config)
     elif args.model == 'BrainNetCNN':
         model_config = BrainNetCNNConfig(node_size=data_config.node_size,
-                                         num_classes=data_config.num_class)
+                                         task_type=data_config.task_type,
+                                         output_dim=data_config.output_dim)
         model = BrainNetCNN(model_config)
     elif args.model == 'STAGIN':
         model_config = STAGINConfig(node_size=data_config.node_size,
-                                    num_classes=data_config.num_class,
                                     d_model=args.d_model,
                                     num_layers=args.num_layers,
                                     window_size=args.window_size,
                                     window_stride=args.window_stride,
                                     dynamic_length=args.dynamic_length,
-                                    sampling_init=args.sampling_init)
+                                    sampling_init=args.sampling_init,
+                                    task_type=data_config.task_type,
+                                    output_dim=data_config.output_dim)
         model = STAGIN(model_config)
     elif args.model == "TCACNet":
         model_config = TCACNetConfig(node_size=data_config.node_size,
                                      time_series_size=data_config.time_series_size,
                                      node_feature_size=data_config.node_feature_size,
-                                     num_classes=data_config.num_class
+                                     task_type=data_config.task_type,
+                                     output_dim=data_config.output_dim,
                                      )
         model_config.class_weight = data_config.class_weight
         model = TCACNet(model_config)
@@ -69,7 +74,6 @@ def init_model_config(args, data_config: DataConfig):
         model_config = ALTERConfig(node_size=data_config.node_size,
                                  # sizes=(data_config.node_size, data_config.node_size // 2),
                                  sizes=(360, 100),
-                                 num_classes=data_config.num_class,
                                  pooling=(False, True),
                                  pos_encoding="rrwp",  # identity, none
                                  orthogonal=True,
@@ -79,16 +83,18 @@ def init_model_config(args, data_config: DataConfig):
                                  # pos_embed_dim=data_config.node_size,
                                  pos_embed_dim=32,
                                  dim_feedforward=1024,
+                                 task_type=data_config.task_type,
+                                 output_dim=data_config.output_dim,
                                  )
         model = ALTER(model_config)
     elif args.model == 'GCDGCN':
         model_config = GCDGCNConfig(node_size=data_config.node_size,
-                                         num_classes=data_config.num_class)
+                                         task_type=data_config.task_type,
+                                         output_dim=data_config.output_dim)
         model = GCDGCN(model_config)
     elif args.model == 'TimeLLM':
         model_config = TimeLLMConfig(
             node_size=data_config.node_size,
-            num_classes=data_config.num_class,
             d_model=args.d_model,
             n_heads=args.num_heads,
             d_ff=args.d_ff,
@@ -97,6 +103,8 @@ def init_model_config(args, data_config: DataConfig):
             num_gcn_layers=args.num_gcn_layers,
             dropout=args.dropout,
             num_windows=args.num_windows,
+            task_type=data_config.task_type,
+            output_dim=data_config.output_dim,
             dataset_name=args.dataset,
             llm_type=args.llm_type,
             llm_path=args.llm_path,

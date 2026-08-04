@@ -12,14 +12,15 @@ class FBNetGenConfig(BaseConfig):
                  dropout=0.5,
                  extractor_type='gru',  # gru or cnn
                  d_model=16,
-                 num_classes=2,
                  window_size=4,
                  cnn_pool_size=16,
                  graph_generation='product',  # product or linear
                  num_gru_layers=4,
                  group_loss=True,
                  sparsity_loss=True,
-                 sparsity_loss_weight=1.0e-4
+                 sparsity_loss_weight=1.0e-4,
+                 task_type='classification',
+                 output_dim=2,
                  ):
         super(FBNetGenConfig, self).__init__(d_model=d_model,
                                              node_size=node_size,
@@ -27,7 +28,7 @@ class FBNetGenConfig(BaseConfig):
                                              time_series_size=time_series_size,
                                              activation=activation,
                                              dropout=dropout,
-                                             num_classes=num_classes)
+                                             output_dim=output_dim)
         self.extractor_type = extractor_type
         self.window_size = window_size
         self.cnn_pool_size = cnn_pool_size
@@ -36,6 +37,8 @@ class FBNetGenConfig(BaseConfig):
         self.group_loss = group_loss
         self.sparsity_loss = sparsity_loss
         self.sparsity_loss_weight = sparsity_loss_weight
+        self.task_type = task_type
+        self.output_dim = output_dim
 
 
 class FBNetGen(nn.Module):
@@ -71,10 +74,14 @@ class FBNetGen(nn.Module):
             self.emb2graph = Embed2GraphByProduct(
                 config.d_model, node_size=config.node_size)
 
+        self.task_type = config.task_type
         self.predictor = GNNPredictor(
-            config.node_feature_size, node_size=config.node_size, num_classes=config.num_classes)
+            config.node_feature_size, node_size=config.node_size, num_classes=config.output_dim)
 
-        self.loss_fn = torch.nn.CrossEntropyLoss()
+        if self.task_type == 'classification':
+            self.loss_fn = torch.nn.CrossEntropyLoss()
+        else:
+            self.loss_fn = torch.nn.MSELoss()
 
     def forward(self, time_series, node_feature, labels):
         x = self.extract(time_series)               # [batch_sz, node_sz, embedding_size]
@@ -83,7 +90,16 @@ class FBNetGen(nn.Module):
         m = m[:, :, :, 0]                           # [batch_sz, node_sz, node_sz]
 
         logits = self.predictor(m, node_feature)
-        loss = self.loss_fn(logits, labels)
+
+        if self.task_type == 'classification':
+            loss = self.loss_fn(logits, labels)
+        elif self.task_type == 'regression':
+            pred = logits.squeeze(-1) if logits.dim() > 1 and logits.shape[-1] == 1 else logits
+            lbl = labels.float().view(-1) if labels.dim() > 1 else labels.float()
+            loss = self.loss_fn(pred, lbl)
+        else:  # multi_output_regression
+            target_flat = labels.reshape(labels.shape[0], -1).float()
+            loss = self.loss_fn(logits, target_flat)
         return ModelOutputs(logits=logits,
                             loss=loss,
                             hidden_state=m)

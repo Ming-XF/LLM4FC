@@ -31,7 +31,8 @@ class DiseaseCAUEEG4Dataset(BaseDataset):
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
-        self.data_config.num_class = 4
+        self.data_config.output_dim = 4
+        self.data_config.task_type = DataConfig.TASK_CLASSIFICATION
 
         self.data_config.class_weight = [1, 1, 1, 1]
         self.all_data['time_series'] = time_series

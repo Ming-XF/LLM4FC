@@ -20,11 +20,12 @@ class BNTConfig(BaseConfig):
                  pos_embed_dim=360,
                  dim_feedforward=1024,
                  num_heads=4,
-                 num_classes=2,
+                 task_type='classification',
+                 output_dim=2,
                  ):
         super(BNTConfig, self).__init__(node_size=node_size,
                                         dim_feedforward=dim_feedforward,
-                                        num_classes=num_classes)
+                                        output_dim=output_dim)
         self.sizes = sizes
         self.pooling = pooling
         self.pos_encoding = pos_encoding
@@ -33,6 +34,8 @@ class BNTConfig(BaseConfig):
         self.project_assignment = project_assignment
         self.pos_embed_dim = pos_embed_dim
         self.num_heads = num_heads
+        self.task_type = task_type
+        self.output_dim = output_dim
 
 
 class TransPoolingEncoder(nn.Module):
@@ -135,15 +138,18 @@ class BNT(nn.Module):
             nn.LeakyReLU()
         )
 
+        self.task_type = config.task_type
         self.fc = nn.Sequential(
             nn.Linear(8 * sizes[-1], 256),
             nn.LeakyReLU(),
             nn.Linear(256, 32),
             nn.LeakyReLU(),
-            nn.Linear(32, config.num_classes)
+            nn.Linear(32, config.output_dim)
         )
-        self.loss_fn = torch.nn.CrossEntropyLoss(reduction='sum')
-        # self.loss_fn = torch.nn.CrossEntropyLoss()
+        if self.task_type == 'classification':
+            self.loss_fn = torch.nn.CrossEntropyLoss(reduction='sum')
+        else:
+            self.loss_fn = torch.nn.MSELoss()
 
     def forward(self, node_feature: torch.tensor, labels: torch.tensor):
 
@@ -164,7 +170,16 @@ class BNT(nn.Module):
         node_feature = node_feature.reshape((bz, -1))
 
         logits = self.fc(node_feature)
-        loss = self.loss_fn(logits, labels)
+
+        if self.task_type == 'classification':
+            loss = self.loss_fn(logits, labels)
+        elif self.task_type == 'regression':
+            pred = logits.squeeze(-1) if logits.dim() > 1 and logits.shape[-1] == 1 else logits
+            loss = self.loss_fn(pred, labels.float().view(-1)
+                                if labels.dim() > 1 else labels.float())
+        else:  # multi_output_regression
+            target_flat = labels.reshape(labels.shape[0], -1).float()
+            loss = self.loss_fn(logits, target_flat)
         return ModelOutputs(logits=logits,
                             loss=loss)
 

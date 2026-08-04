@@ -42,8 +42,7 @@ class AgeDSDataset(BaseDataset):
     Uses the same subjects as the disease classification task (AD + CN from
     participants.tsv).  Age labels are float32.
 
-    Note: ``num_class`` is set to 1 (regression); existing trainers are
-    classification-only and a regression trainer must be used.
+    Note: ``output_dim`` is set to 1 (regression).
     """
 
     def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
@@ -61,15 +60,15 @@ class AgeDSDataset(BaseDataset):
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
-        self.data_config.num_class = 1  # regression
+        self.data_config.output_dim = 1  # regression
+        self.data_config.task_type = DataConfig.TASK_REGRESSION
 
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        # ── Binned labels for stratified subject-level splits ──
-        age_binned = (labels // 10).astype(int)
-        self._create_splits(age_binned, self.all_data['subject_id'])
+        # ── 传原始连续标签，由 _create_splits 内部自动分箱 ──
+        self._create_splits(labels, self.all_data['subject_id'])
         # No one_hot — labels are continuous floats
         shuffle(self.train_index)
 

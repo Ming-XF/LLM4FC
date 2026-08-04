@@ -74,7 +74,9 @@ class FutureFCDSDataset(BaseDataset):
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
-        self.data_config.num_class = time_series[0].shape[0]  # 19, for compat
+        self.data_config.task_type = DataConfig.TASK_MULTI_OUTPUT_REGRESSION
+        n_out = self.n_total_windows - self.n_input_windows
+        self.data_config.output_dim = n_out * self.data_config.node_size ** 2
 
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
@@ -87,10 +89,6 @@ class FutureFCDSDataset(BaseDataset):
         idx = self._active_index
         time_series = torch.from_numpy(
             self.all_data['time_series'][idx[item]]).float()
-        # dummy label (not used for loss)
-        dummy_label = torch.tensor(
-            self.all_data['labels'][idx[item]], dtype=torch.int64)
-
         window_size = 6 * self.hz
         step_size = (60 * self.hz - window_size) // (self.n_total_windows - 1)
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
@@ -105,7 +103,7 @@ class FutureFCDSDataset(BaseDataset):
                 'DFC_input': dfc_input,
                 'DFC_target': dfc_target,
                 'correlation': SFC,
-                'labels': dummy_label,
+                'labels': dfc_target,
                 'sample_idx': idx[item]}
 
 

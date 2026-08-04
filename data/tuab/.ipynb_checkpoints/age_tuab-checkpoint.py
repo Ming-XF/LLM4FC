@@ -21,7 +21,7 @@ warnings.filterwarnings("ignore")
 # Standard 19-channel 10-20 EEG order (CAUEEG-compatible)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_TUEP_CHANNEL_ORDER = [
+_TUAB_CHANNEL_ORDER = [
     'Fp1', 'F3', 'C3', 'P3', 'O1',
     'Fp2', 'F4', 'C4', 'P4', 'O2',
     'F7', 'T3', 'T5',
@@ -71,19 +71,21 @@ def _parse_age_from_edf_header(edf_path):
 # Dataset
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class AgeTUEPDataset(BaseDataset):
-    """TUEP age regression dataset — predict chronological age from EEG.
+class AgeTUABDataset(BaseDataset):
+    """TUAB age regression dataset — predict chronological age from EEG.
 
     Task: given a 1‑minute window of 19‑channel EEG time series,
     predict the subject's age (continuous value in years).
 
-    Uses all subjects from the TUH EEG Epilepsy Corpus.  Age is extracted
-    from the EDF file header (``Age:NN`` field in Patient ID).
+    Uses all subjects from the TUH Abnormal EEG Corpus.  Age is extracted
+    from the EDF file header (Patient ID field).
+
+    Files with age=999 (unknown) are excluded; infant ages (<1 year) are kept.
     """
 
     def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
                  episode_seed=None):
-        super(AgeTUEPDataset, self).__init__(data_config, k, train, one_hot=one_hot,
+        super(AgeTUABDataset, self).__init__(data_config, k, train, one_hot=one_hot,
                                              episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
@@ -96,15 +98,15 @@ class AgeTUEPDataset(BaseDataset):
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
-        self.data_config.output_dim = 1  # regression
-        self.data_config.task_type = DataConfig.TASK_REGRESSION
+        self.data_config.num_class = 1  # regression
 
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        # ── 传原始连续标签，由 _create_splits 内部自动分箱 ──
-        self._create_splits(labels, self.all_data['subject_id'])
+        # ── Binned labels for stratified subject-level splits ──
+        age_binned = np.clip((labels // 10).astype(int), 0, 9)
+        self._create_splits(age_binned, self.all_data['subject_id'])
         shuffle(self.train_index)
 
     def __getitem__(self, item):
@@ -130,10 +132,11 @@ class AgeTUEPDataset(BaseDataset):
 # Preprocessing — worker (module-level for multiprocessing)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _process_tuep_file_age(args):
-    """Process a single TUEP EDF file for age regression.
+def _process_tuab_file_age(args):
+    """Process a single TUAB EDF file for age regression.
 
     Age is extracted from the EDF header bytes (Patient ID ``Age:NN`` field).
+    Files with unparseable age are skipped.
 
     Parameters
     ----------
@@ -152,6 +155,9 @@ def _process_tuep_file_age(args):
     age = _parse_age_from_edf_header(edf_path)
     if age is None:
         return None, None, None
+    # Exclude placeholder age=999 (unknown)
+    if age >= 999:
+        return None, None, None
 
     try:
         raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
@@ -166,12 +172,12 @@ def _process_tuep_file_age(args):
         ch_index[norm] = i
 
     # ── Check all 19 standard channels exist ──
-    missing = [ch for ch in _TUEP_CHANNEL_ORDER if ch not in ch_index]
+    missing = [ch for ch in _TUAB_CHANNEL_ORDER if ch not in ch_index]
     if missing:
         return None, None, None
 
     # ── Pick and reorder the 19 EEG channels ──
-    pick_idx = [ch_index[ch] for ch in _TUEP_CHANNEL_ORDER]
+    pick_idx = [ch_index[ch] for ch in _TUAB_CHANNEL_ORDER]
     raw.pick([edf_ch_names[i] for i in pick_idx], verbose=False)
 
     # ── Average reference, resample ──
@@ -200,55 +206,44 @@ def _process_tuep_file_age(args):
 # Preprocessing — main entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def age_tuep_preprocess(path="../data/TUEP", hz=200):
-    """Preprocess the TUH EEG Epilepsy Corpus for age regression.
+def age_tuab_preprocess(path="../data/TUAB", hz=200):
+    """Preprocess the TUH Abnormal EEG Corpus for age regression.
 
-    Reads EDF files from ``00_epilepsy/`` and ``01_no_epilepsy/`` using the
-    ``01_tcp_ar`` montage.  Extracts the standard 19‑channel 10-20 EEG,
-    resamples to ``hz`` Hz, and segments into non‑overlapping 1‑minute windows.
+    Reads all EDF files under ``edf/train/`` and ``edf/eval/``, extracts the
+    standard 19‑channel 10-20 EEG, resamples to ``hz`` Hz, and segments into
+    non‑overlapping 1‑minute windows.
 
     Age labels are extracted from the EDF file header (``Age:NN`` field).
+    Files with age=999 (unknown placeholder) are excluded.
 
     Parameters
     ----------
     path : str
-        Path to the TUEP dataset root.
+        Path to the TUAB dataset root.
     hz : int
         Resampling rate in Hz.  Default 200.
     """
-    output_path = os.path.join(path, "tuep_age.npz")
+    edf_root = os.path.join(path, "edf")
+    output_path = os.path.join(path, "tuab_age.npz")
 
-    # ── Collect EDF files ──
+    # ── Collect all EDF files ──
     file_list = []
     subject_map = {}
 
-    for cls_dir_name in ['00_epilepsy', '01_no_epilepsy']:
-        cls_dir = os.path.join(path, cls_dir_name)
-        if not os.path.isdir(cls_dir):
-            print(f"  [SKIP] directory not found: {cls_dir}")
-            continue
-
-        for subj_name in sorted(os.listdir(cls_dir)):
-            subj_dir = os.path.join(cls_dir, subj_name)
-            if not os.path.isdir(subj_dir):
+    for split in ['train', 'eval']:
+        for cls_name in ['normal', 'abnormal']:
+            cls_dir = os.path.join(edf_root, split, cls_name, '01_tcp_ar')
+            if not os.path.isdir(cls_dir):
+                print(f"  [SKIP] directory not found: {cls_dir}")
                 continue
-
-            for sess_name in sorted(os.listdir(subj_dir)):
-                sess_dir = os.path.join(subj_dir, sess_name)
-                if not os.path.isdir(sess_dir):
+            for fname in sorted(os.listdir(cls_dir)):
+                if not fname.endswith('.edf'):
                     continue
+                edf_path = os.path.join(cls_dir, fname)
+                subj_str = fname.split('_s')[0]
+                file_list.append((edf_path, subj_str))
 
-                montage_dir = os.path.join(sess_dir, '01_tcp_ar')
-                if not os.path.isdir(montage_dir):
-                    continue
-
-                for fname in sorted(os.listdir(montage_dir)):
-                    if not fname.endswith('.edf'):
-                        continue
-                    edf_path = os.path.join(montage_dir, fname)
-                    file_list.append((edf_path, subj_name))
-
-    print(f"Found {len(file_list)} EDF files")
+    print(f"Found {len(file_list)} EDF files in {edf_root}")
 
     # ── Assign sequential integer subject IDs ──
     for _, subj_str in file_list:
@@ -270,9 +265,9 @@ def age_tuep_preprocess(path="../data/TUEP", hz=200):
     skipped = 0
     with Pool(processes=n_workers) as pool:
         for data, labels_arr, subj_arr in tqdm(
-                pool.imap_unordered(_process_tuep_file_age, task_args),
+                pool.imap_unordered(_process_tuab_file_age, task_args),
                 total=len(task_args),
-                desc="Processing TUEP age"):
+                desc="Processing TUAB age"):
             if data is None:
                 skipped += 1
                 continue
@@ -281,7 +276,7 @@ def age_tuep_preprocess(path="../data/TUEP", hz=200):
             subj_list.append(subj_arr)
 
     print(f"Skipped {skipped} files (missing channels, too short, "
-          f"or unparseable age)")
+          f"or unparseable/missing age)")
 
     if not ts_list:
         raise RuntimeError("No valid EDF files processed — check dataset path.")
@@ -312,4 +307,4 @@ def age_tuep_preprocess(path="../data/TUEP", hz=200):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    age_tuep_preprocess("../data/TUEP", hz=200)
+    age_tuab_preprocess("../data/TUAB", hz=200)

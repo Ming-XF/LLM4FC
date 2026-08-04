@@ -8,8 +8,9 @@ import numpy as np
 from abc import abstractmethod
 from torch.nn import functional as F
 from tqdm import tqdm
-from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.metrics import roc_auc_score, accuracy_score, r2_score
 from sklearn.metrics import precision_recall_fscore_support, classification_report
+from scipy.stats import pearsonr
 
 from config import init_model_config
 from .optimizer import init_optimizer
@@ -167,7 +168,18 @@ class Trainer(object):
 
         from utils.early_stopping import EarlyStopping
         metric_name = self.args.early_stop_metric
-        mode = 'min' if metric_name == 'Loss' else 'max'
+        # ── 指标方向：越小越好 vs 越大越好 ──
+        LOWER_IS_BETTER = {'Loss', 'MSE', 'MAE', 'RMSE'}
+        HIGHER_IS_BETTER = {'Accuracy', 'AUC', 'Precision', 'Sensitivity',
+                           'Specificity', 'Recall', 'F_score', 'R2', 'PearsonR',
+                           'PearsonR_mean'}
+        if metric_name in LOWER_IS_BETTER:
+            mode = 'min'
+        elif metric_name in HIGHER_IS_BETTER:
+            mode = 'max'
+        else:
+            # 未知指标：默认越小越好
+            mode = 'min'
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
             min_delta=self.args.early_stop_min_delta,
@@ -195,7 +207,20 @@ class Trainer(object):
 
             if is_rank_0:
                 val_loss = val_result.get('Loss', float('inf'))
-                val_metric = val_result.get(metric_name, float('inf') if mode == 'min' else 0.0)
+                val_metric = val_result.get(metric_name)
+                if val_metric is None:
+                    # 回退：若请求的指标不在结果中（如回归任务无 Accuracy），使用 Loss
+                    logger.warning(
+                        f"Metric '{metric_name}' not in eval result; "
+                        f"falling back to 'Loss'")
+                    val_metric = val_result.get('Loss', float('inf'))
+                    # 回退时强制 mode='min'（Loss 越小越好）
+                    if mode != 'min':
+                        early_stopper = EarlyStopping(
+                            patience=self.args.early_stop_patience,
+                            min_delta=self.args.early_stop_min_delta,
+                            mode='min',
+                        )
 
                 if self._early_stop_enabled(epoch):
                     improved = early_stopper.step(val_metric)
@@ -380,10 +405,17 @@ class Trainer(object):
         return result
 
     def evaluate(self, dataloader_key='test'):
-        if self.data_config.num_class == 2:
-            result = self.binary_evaluate(dataloader_key)
+        if self.data_config.is_classification:
+            if self.data_config.output_dim == 2:
+                result = self.binary_evaluate(dataloader_key)
+            else:
+                result = self.multiple_evaluate(dataloader_key)
+        elif self.data_config.is_regression:
+            result = self.regression_evaluate(dataloader_key)
+        elif self.data_config.is_multi_output_regression:
+            result = self.multi_output_regression_evaluate(dataloader_key)
         else:
-            result = self.multiple_evaluate(dataloader_key)
+            result = {}
         return result
 
     def binary_evaluate(self, dataloader_key='test'):
@@ -654,6 +686,226 @@ class Trainer(object):
 
         return result
 
+    # ── 回归评估（年龄预测等）────────────────────────────────
+    def regression_evaluate(self, dataloader_key='test'):
+        """单值回归评估：MSE, MAE, RMSE, R², Pearson r。
+
+        适用于年龄预测等连续标量标签任务。
+        """
+        import torch.distributed as dist
+        is_dist = dist.is_initialized()
+        rank = dist.get_rank() if is_dist else 0
+        world_size = dist.get_world_size() if is_dist else 1
+
+        if rank == 0:
+            logger.info(f"***** Running regression evaluation on "
+                        f"{dataloader_key}{self.task_id} dataset *****")
+        self.model.eval()
+        evaluate_dataloader = self.data_loaders[dataloader_key]
+        losses = 0
+        loss_list = []
+        preds_local = []
+        labels_local = []
+        result = {}
+
+        iterator = tqdm(evaluate_dataloader,
+                        desc=f"{dataloader_key}-eval-R{rank}", ncols=0)
+
+        with torch.no_grad():
+            for inputs in iterator:
+                input_kwargs = self.prepare_inputs_kwargs(inputs)
+                outputs = self._forward(input_kwargs)
+                loss = outputs.loss
+                losses += loss.item()
+                loss_list.append(loss.item())
+
+                # 回归：logits 是 (B, 1) 或 (B,) 标量
+                batch_preds = outputs.logits.float().detach().cpu()
+                if batch_preds.dim() > 1:
+                    batch_preds = batch_preds.squeeze(-1)
+                preds_local.append(batch_preds.numpy())
+
+                lbl = input_kwargs['labels']
+                if lbl.dim() > 1:
+                    lbl = lbl.squeeze(-1)
+                labels_local.append(lbl.float().cpu().numpy())
+
+        preds = np.concatenate(preds_local, axis=0)
+        labels = np.concatenate(labels_local, axis=0)
+
+        # ── Distributed gather (rank 0 only needs to aggregate) ──
+        if is_dist:
+            local_count = len(preds)
+            counts = [torch.zeros(1, dtype=torch.long, device=self.device)
+                      for _ in range(world_size)]
+            t = torch.tensor([local_count], dtype=torch.long, device=self.device)
+            dist.all_gather(counts, t)
+            counts = [c.item() for c in counts]
+            max_count = max(counts)
+
+            # Pad and gather preds
+            if local_count < max_count:
+                pad = np.full(max_count - local_count, np.nan, dtype=preds.dtype)
+                preds_padded = np.concatenate([preds, pad])
+            else:
+                preds_padded = preds
+            preds_t = torch.from_numpy(preds_padded).to(self.device)
+            preds_list = [torch.zeros(max_count, dtype=preds_t.dtype, device=self.device)
+                          for _ in range(world_size)]
+            dist.all_gather(preds_list, preds_t)
+
+            # Pad and gather labels
+            if local_count < max_count:
+                pad = np.full(max_count - local_count, np.nan, dtype=labels.dtype)
+                labels_padded = np.concatenate([labels, pad])
+            else:
+                labels_padded = labels
+            labels_t = torch.from_numpy(labels_padded).to(self.device)
+            labels_list = [torch.zeros(max_count, dtype=labels_t.dtype, device=self.device)
+                           for _ in range(world_size)]
+            dist.all_gather(labels_list, labels_t)
+
+            all_preds = np.concatenate(
+                [preds_list[i][:counts[i]].cpu().numpy() for i in range(world_size)])
+            all_labels = np.concatenate(
+                [labels_list[i][:counts[i]].cpu().numpy() for i in range(world_size)])
+
+            loss_avg = np.mean(loss_list) if loss_list else 0.0
+            local_losses = torch.tensor([loss_avg, float(local_count)], device=self.device)
+            all_losses = [torch.zeros(2, device=self.device) for _ in range(world_size)]
+            dist.all_gather(all_losses, local_losses)
+
+            if rank == 0:
+                w_sum = 0.0
+                w_loss = 0.0
+                for i in range(world_size):
+                    n = all_losses[i][1].item()
+                    w_loss += all_losses[i][0].item() * n
+                    w_sum += n
+                result['Loss'] = w_loss / w_sum if w_sum > 0 else 0.0
+            preds = all_preds
+            labels = all_labels
+        else:
+            result['Loss'] = losses / len(loss_list) if loss_list else 0.0
+
+        # ── 回归指标（rank 0 only）──
+        if rank == 0:
+            # 过滤掉 NaN（来自 padding）
+            valid = ~(np.isnan(preds) | np.isnan(labels))
+            preds_v = preds[valid]
+            labels_v = labels[valid]
+
+            if len(preds_v) > 1:
+                mse = np.mean((preds_v - labels_v) ** 2)
+                mae = np.mean(np.abs(preds_v - labels_v))
+                rmse = np.sqrt(mse)
+                r2 = r2_score(labels_v, preds_v)
+                pearson_r, pearson_p = pearsonr(preds_v, labels_v)
+                result['MSE'] = float(mse)
+                result['MAE'] = float(mae)
+                result['RMSE'] = float(rmse)
+                result['R2'] = float(r2)
+                result['PearsonR'] = float(pearson_r)
+            else:
+                result['MSE'] = 0.0
+                result['MAE'] = 0.0
+                result['RMSE'] = 0.0
+                result['R2'] = 0.0
+                result['PearsonR'] = 0.0
+
+            print()
+            print(f'{dataloader_key}{self.task_id} : Loss:{result["Loss"]:.5f}, '
+                  f'MSE:{result["MSE"]:.5f}, MAE:{result["MAE"]:.5f}, '
+                  f'RMSE:{result["RMSE"]:.5f}, R²:{result["R2"]:.5f}, '
+                  f'PearsonR:{result["PearsonR"]:.5f}')
+            for k, v in result.items():
+                if v is not None and isinstance(v, (int, float, np.floating, np.integer)):
+                    logger.info(f"{k}: {v:.5f}")
+        else:
+            result = {'MSE': 0.0}
+
+        return result
+
+    # ── 多值回归评估（未来FC预测等）───────────────────────────
+    def multi_output_regression_evaluate(self, dataloader_key='test'):
+        """多输出回归评估：整体 MSE, MAE, 逐元素 Pearson r（均值）。
+
+        适用于 FutureFC 预测等矩阵输出的任务。
+        labels 是形状为 (B, T_out, N, N) 的 DFC 矩阵。
+        """
+        import torch.distributed as dist
+        is_dist = dist.is_initialized()
+        rank = dist.get_rank() if is_dist else 0
+        world_size = dist.get_world_size() if is_dist else 1
+
+        if rank == 0:
+            logger.info(f"***** Running multi-output regression evaluation on "
+                        f"{dataloader_key}{self.task_id} dataset *****")
+        self.model.eval()
+        evaluate_dataloader = self.data_loaders[dataloader_key]
+        losses = 0
+        loss_list = []
+        preds_local = []
+        labels_local = []
+        result = {}
+
+        iterator = tqdm(evaluate_dataloader,
+                        desc=f"{dataloader_key}-eval-R{rank}", ncols=0)
+
+        with torch.no_grad():
+            for inputs in iterator:
+                input_kwargs = self.prepare_inputs_kwargs(inputs)
+                outputs = self._forward(input_kwargs)
+                loss = outputs.loss
+                losses += loss.item()
+                loss_list.append(loss.item())
+
+                batch_preds = outputs.logits.float().detach().cpu().numpy()
+                preds_local.append(batch_preds)
+
+                lbl = input_kwargs['labels']
+                labels_local.append(lbl.float().cpu().numpy())
+
+        preds = np.concatenate(preds_local, axis=0)
+        labels = np.concatenate(labels_local, axis=0)
+        # 确保是二维：(N_samples, dim)
+        if preds.ndim > 2:
+            preds = preds.reshape(preds.shape[0], -1)
+        if labels.ndim > 2:
+            labels = labels.reshape(labels.shape[0], -1)
+
+        result['Loss'] = losses / len(loss_list) if loss_list else 0.0
+
+        # ── 多值回归指标（rank 0 only，暂不处理分布式）──
+        if rank == 0 and len(preds) > 1:
+            mse = np.mean((preds - labels) ** 2)
+            mae = np.mean(np.abs(preds - labels))
+            rmse = np.sqrt(mse)
+            # 逐特征 Pearson r 均值
+            pearson_vals = []
+            for j in range(preds.shape[1]):
+                if np.std(preds[:, j]) > 1e-8 and np.std(labels[:, j]) > 1e-8:
+                    r, _ = pearsonr(preds[:, j], labels[:, j])
+                    pearson_vals.append(r)
+            mean_pearson = float(np.mean(pearson_vals)) if pearson_vals else 0.0
+
+            result['MSE'] = float(mse)
+            result['MAE'] = float(mae)
+            result['RMSE'] = float(rmse)
+            result['PearsonR_mean'] = mean_pearson
+
+            print()
+            print(f'{dataloader_key}{self.task_id} : Loss:{result["Loss"]:.5f}, '
+                  f'MSE:{result["MSE"]:.5f}, MAE:{result["MAE"]:.5f}, '
+                  f'RMSE:{result["RMSE"]:.5f}, PearsonR(mean):{result["PearsonR_mean"]:.5f}')
+            for k, v in result.items():
+                if v is not None and isinstance(v, (int, float, np.floating, np.integer)):
+                    logger.info(f"{k}: {v:.5f}")
+        elif rank != 0:
+            result = {}
+
+        return result
+
     def save_model(self, path=None, save_optimizer=False):
         if path is None:
             path = os.path.join(self.args.model_dir, self._get_save_dir_name())
@@ -761,9 +1013,17 @@ class Trainer(object):
 
     def visualize(self):
         self.model.eval()
+        # 构造虚拟输入，兼容分类和回归
+        if self.data_config.is_classification:
+            dummy_labels = F.one_hot(
+                torch.randint(0, self.model_config.output_dim,
+                              (self.data_config.batch_size,)))
+        else:
+            dummy_labels = torch.rand(self.data_config.batch_size,
+                                      dtype=torch.float32)
         inputs = (torch.rand((self.data_config.batch_size, self.data_config.node_size, self.data_config.time_series_size)),
                   torch.rand((self.data_config.batch_size, self.data_config.node_size, self.data_config.node_size)),
-                  F.one_hot(torch.randint(0, self.model_config.num_classes, (self.data_config.batch_size,))))
+                  dummy_labels)
         input_kwargs = self.prepare_inputs_kwargs(inputs)
         self.model.config.dict_output = False
         torch.onnx.export(self.model,

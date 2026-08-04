@@ -11,7 +11,7 @@ class BaseConfig:
                  time_series_size=100,
                  activation='gelu',
                  dropout=0.1,
-                 num_classes=2,
+                 output_dim=2,
                  num_sites=19,
                  initializer=None,
                  dict_output=True,
@@ -25,10 +25,10 @@ class BaseConfig:
         self.node_feature_size = node_feature_size
         self.activation = activation
         self.dropout = dropout
-        self.num_classes = num_classes
+        self.output_dim = output_dim
         self.num_sites = num_sites
         self.initializer = initializer
         self.dict_output = dict_output
         self.label_smoothing = label_smoothing
-        self.class_weight = [1]*num_classes
+        self.class_weight = [1] * output_dim
 

@@ -22,17 +22,20 @@ class TCACNetConfig(BaseConfig):
                  node_size,
                  node_feature_size,
                  time_series_size,
-                 num_classes,
+                 output_dim=2,
                  n_slices=1,
                  alpha=0.05,
-                 num_kernels=40):
+                 num_kernels=40,
+                 task_type='classification'):
         super(TCACNetConfig, self).__init__(node_size=node_size,
                                             node_feature_size=node_feature_size,
                                             time_series_size=time_series_size,
-                                            num_classes=num_classes)
+                                            output_dim=output_dim)
         self.n_slices = n_slices
         self.alpha = alpha
         self.num_kernels = num_kernels
+        self.task_type = task_type
+        self.output_dim = output_dim
 
 
 class EntropyLoss(nn.Module):
@@ -74,15 +77,42 @@ class TCACNet(nn.Module):
         super(TCACNet, self).__init__()
         self.config = config
         self.n_slices = config.n_slices
+        self.task_type = getattr(config, 'task_type', 'classification')
         self.local_network = LocalNetwork(config)
         self.global_network = GlobalNetwork(config)
         self.top_layer = TopNetwork(config)
         self.entropy_loss_fn = EntropyLoss()
         self.hint_loss = HintLoss(config)
-        self.loss_fn = nn.CrossEntropyLoss(label_smoothing=config.label_smoothing,
-                                           weight=torch.tensor(config.class_weight))
+        if self.task_type == 'classification':
+            self.loss_fn = nn.CrossEntropyLoss(label_smoothing=config.label_smoothing,
+                                               weight=torch.tensor(config.class_weight))
+        else:
+            self.loss_fn = nn.MSELoss()
 
     def forward(self, time_series, node_feature, labels):
+        # 回归/多值回归：简化前向路径，跳过 entropy/hint 逻辑
+        if self.task_type != 'classification':
+            time_series = time_series.unsqueeze(1)
+            global_features = self.global_network(time_series)
+            logits1 = self.top_layer(global_features)
+
+            if self.task_type == 'regression':
+                pred = logits1.squeeze(-1) if logits1.dim() > 1 and logits1.shape[-1] == 1 else logits1
+                lbl = labels.float().view(-1) if labels.dim() > 1 else labels.float()
+                loss = self.loss_fn(pred, lbl)
+            else:
+                target_flat = labels.reshape(labels.shape[0], -1).float()
+                loss = self.loss_fn(logits1.squeeze(-1)
+                                    if logits1.shape[-1] == target_flat.shape[-1] else logits1, target_flat)
+
+            if self.config.dict_output:
+                return TCACNetModelOutput(logits=logits1,
+                                          loss=loss,
+                                          loss_local_and_top=loss,
+                                          loss_global_model=loss)
+            else:
+                return logits1, loss, loss
+
         time_series = time_series.unsqueeze(1)
         node_feature = node_feature.unsqueeze(1)
         with torch.enable_grad():

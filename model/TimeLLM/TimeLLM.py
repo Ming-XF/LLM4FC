@@ -76,7 +76,7 @@ def normalize_adjacency(SFC, threshold=0.0, keep_ratio=0.6):
 
 
 class TimeLLMConfig(BaseConfig):
-    def __init__(self, node_size, num_classes,
+    def __init__(self, node_size,
                  d_model=64,
                  n_heads=8,
                  d_ff=128,
@@ -85,10 +85,12 @@ class TimeLLMConfig(BaseConfig):
                  num_gcn_layers=1,
                  dropout=0.1,
                  num_windows=10,
+                 task_type='classification',
+                 output_dim=2,
                  dataset_name='CAUEEG2',
                  llm_type='chatglm',
                  llm_path='./model/chatglm-6b'):
-        super().__init__(node_size=node_size, num_classes=num_classes)
+        super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
         self.d_ff = d_ff
@@ -97,6 +99,8 @@ class TimeLLMConfig(BaseConfig):
         self.num_gcn_layers = num_gcn_layers
         self.dropout = dropout
         self.num_windows = num_windows
+        self.task_type = task_type
+        self.output_dim = output_dim
         self.dataset_name = dataset_name
         self.llm_type = llm_type
         self.llm_path = llm_path
@@ -233,17 +237,46 @@ class Model(nn.Module):
         # 节点初始特征用 one-hot → Linear 投影，训练中可学习
 
         self.head_nf = config.d_ff * config.node_size * config.num_windows
-        self.output_projection = nn.Sequential(
-            nn.Flatten(start_dim=1),
-            nn.Linear(self.head_nf, config.num_classes),
-            nn.Dropout(config.dropout),
-        )
+        self.task_type = config.task_type
+
+        if self.task_type == 'multi_output_regression':
+            # Next-FC prediction head 不使用 Linear 投影；
+            # 改为在 forward 中对 LLM 输出的节点 token 做 Pearson 相关得到 FC 矩阵。
+            self.output_projection = None  # 由 forward 中的 pearson_fc_head 替代
+            self.num_windows = config.num_windows
+        else:
+            # 分类 / 回归 / fallback 共用同一 Linear 头
+            self.output_projection = nn.Sequential(
+                nn.Flatten(start_dim=1),
+                nn.Linear(self.head_nf, config.output_dim),
+                nn.Dropout(config.dropout),
+            )
 
         for param in self.llm.parameters():
             param.requires_grad = False
 
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+
+    @staticmethod
+    def _pearson_fc_head(node_embeddings):
+        """从节点嵌入计算 FC 矩阵（成对 Pearson 相关，完全可微）。
+
+        Args:
+            node_embeddings: (B, C, d) — C 个节点，每个 d 维表示
+
+        Returns:
+            fc: (B, C, C) — 预测的功能连接矩阵，值域 [-1, 1]
+        """
+        B, C, d = node_embeddings.shape
+        centered = node_embeddings - node_embeddings.mean(dim=-1, keepdim=True)
+        # 协方差分子: (B, C, C)
+        cov = torch.einsum('bic,bjc->bij', centered, centered) / (d - 1)
+        # 每节点标准差: (B, C)
+        std = torch.sqrt(torch.diagonal(cov, dim1=1, dim2=2) + 1e-8)
+        # Pearson r = cov / (std_i * std_j)
+        fc = cov / (std.unsqueeze(1) * std.unsqueeze(2) + 1e-8)
+        return fc
 
     def _build_stats_prompts(self, SFC):
         pc = self._pc
@@ -424,13 +457,51 @@ class Model(nn.Module):
         else:
             raise ValueError(f"Unsupported llm_type: {self.llm_type}")
 
-        HL_patches = HL[:, P_skip:, :self.config.d_ff].to(
-            dtype=self.output_projection[1].weight.dtype)
-        logits = self.output_projection(HL_patches)
+        # ── 输出头：分类/回归 用 Linear，多值回归用 Pearson 相关 ──
+        if self.task_type == 'multi_output_regression':
+            # ── Next-FC Token Prediction Head ──
+            # 从 LLM 输出中截取 EEG patch token（不含 prompt 前缀）
+            HL_patches = HL[:, P_skip:, :self.config.d_ff]
+            B, S_patch, d_ff = HL_patches.shape
+            T = self.config.num_windows        # 总窗口数 (10)
+            C = self.config.node_size          # 节点数 (19)
+            T_out = labels.shape[1]            # 未来窗口数 (2)，由 labels 形状动态推导
 
-        if labels.dim() > 1 and labels.shape[-1] > 1:
-            labels = labels.argmax(dim=-1)
-        loss = F.cross_entropy(logits, labels)
+            # token 顺序为 channel-first: C0T0, C0T1, ..., C0T9, C1T0, ..., C18T9
+            # 未来窗口索引: T-T_out 到 T-1（即第 8, 9 个窗口）
+            future_windows = torch.arange(T - T_out, T, device=HL_patches.device)
+
+            fc_preds = []
+            for w in future_windows:
+                # 窗口 w 的 C 个节点 token 索引: w, w+T, w+2T, ..., w+(C-1)*T
+                indices = w + torch.arange(C, device=HL_patches.device) * T
+                node_tokens = HL_patches[:, indices, :]               # (B, C, d_ff)
+                fc_window = self._pearson_fc_head(node_tokens)        # (B, C, C)
+                fc_preds.append(fc_window)
+
+            logits = torch.stack(fc_preds, dim=1)    # (B, T_out, C, C) = (B, 2, 19, 19)
+
+            # labels 即 DFC_target，形状 (B, T_out, C, C)，直接逐元素 MSE
+            loss = F.mse_loss(logits, labels.float())
+        else:
+            # ── 分类 / 回归：沿用原有 Linear 头 ──
+            HL_patches = HL[:, P_skip:, :self.config.d_ff].to(
+                dtype=self.output_projection[1].weight.dtype)
+            logits = self.output_projection(HL_patches)
+
+            if self.task_type == 'classification':
+                if labels.dim() > 1 and labels.shape[-1] > 1:
+                    labels = labels.argmax(dim=-1)
+                loss = F.cross_entropy(logits, labels)
+            elif self.task_type == 'regression':
+                pred = logits.squeeze(-1)
+                if labels.dim() > 1 and labels.shape[-1] == 1:
+                    labels = labels.squeeze(-1)
+                loss = F.mse_loss(pred, labels.float())
+            else:
+                if labels.dim() > 1 and labels.shape[-1] > 1:
+                    labels = labels.argmax(dim=-1)
+                loss = F.cross_entropy(logits, labels)
 
         return ModelOutputs(
             logits=logits,

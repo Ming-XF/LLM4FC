@@ -20,9 +20,12 @@ class E2EBlock(torch.nn.Module):
 class BrainNetCNNConfig(BaseConfig):
     def __init__(self,
                  node_size,
-                 num_classes):
+                 output_dim=2,
+                 task_type='classification'):
         super(BrainNetCNNConfig, self).__init__(node_size=node_size,
-                                                num_classes=num_classes)
+                                                output_dim=output_dim)
+        self.task_type = task_type
+        self.output_dim = output_dim
 
 
 class BrainNetCNN(nn.Module):
@@ -38,9 +41,14 @@ class BrainNetCNN(nn.Module):
         self.N2G = torch.nn.Conv2d(1, 256, (self.d, 1))
         self.dense1 = torch.nn.Linear(256, 128)
         self.dense2 = torch.nn.Linear(128, 30)
-        self.dense3 = torch.nn.Linear(30, config.num_classes)
+        self.task_type = getattr(config, 'task_type', 'classification')
+        self.dense3 = torch.nn.Linear(30, config.output_dim
+                                      if hasattr(config, 'output_dim') else config.output_dim)
 
-        self.loss_fn = torch.nn.CrossEntropyLoss()
+        if self.task_type == 'classification':
+            self.loss_fn = torch.nn.CrossEntropyLoss()
+        else:
+            self.loss_fn = torch.nn.MSELoss()
 
     def forward(self, node_feature: torch.tensor, labels: torch.tensor):
         node_feature = node_feature.unsqueeze(dim=1)
@@ -56,6 +64,14 @@ class BrainNetCNN(nn.Module):
             self.dense2(out), negative_slope=0.33), p=0.5)
         out = F.leaky_relu(self.dense3(out), negative_slope=0.33)
 
-        loss = self.loss_fn(out, labels)
+        if self.task_type == 'classification':
+            loss = self.loss_fn(out, labels)
+        elif self.task_type == 'regression':
+            pred = out.squeeze(-1) if out.dim() > 1 and out.shape[-1] == 1 else out
+            loss = self.loss_fn(pred, labels.float().squeeze(-1)
+                                if labels.dim() > 1 else labels.float())
+        else:  # multi_output_regression
+            target_flat = labels.reshape(labels.shape[0], -1).float()
+            loss = self.loss_fn(out, target_flat)
         return ModelOutputs(logits=out,
                             loss=loss)

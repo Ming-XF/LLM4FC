@@ -65,7 +65,9 @@ class FutureFCBeirutDataset(BaseDataset):
         self.data_config.node_size = time_series[0].shape[0]
         self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
-        self.data_config.num_class = time_series[0].shape[0]
+        self.data_config.task_type = DataConfig.TASK_MULTI_OUTPUT_REGRESSION
+        n_out = self.n_total_windows - self.n_input_windows
+        self.data_config.output_dim = n_out * self.data_config.node_size ** 2
 
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
@@ -79,8 +81,6 @@ class FutureFCBeirutDataset(BaseDataset):
         idx = self._active_index
         time_series = torch.from_numpy(
             self.all_data['time_series'][idx[item]]).float()
-        dummy_label = torch.tensor(
-            self.all_data['labels'][idx[item]], dtype=torch.int64)
 
         SFC = self.connectivity(time_series)
 
@@ -96,7 +96,7 @@ class FutureFCBeirutDataset(BaseDataset):
                 'DFC': DFC,
                 'DFC_input': dfc_input,
                 'DFC_target': dfc_target,
-                'labels': dummy_label}
+                'labels': dfc_target}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

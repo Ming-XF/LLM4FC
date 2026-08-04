@@ -140,7 +140,7 @@ class GNNPredictor(nn.Module):
             nn.LeakyReLU(negative_slope=0.2),
             nn.Linear(256, 32),
             nn.LeakyReLU(negative_slope=0.2),
-            nn.Linear(32, num_classes)
+            nn.Linear(32, num_classes)  # num_classes 也可以是 output_dim
         )
 
     def forward(self, m, node_feature):

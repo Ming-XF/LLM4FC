@@ -6,7 +6,6 @@ class STAGINConfig(BaseConfig):
     def __init__(self,
                  node_size,
                  d_model=128,
-                 num_classes=2,
                  num_heads=1,
                  num_layers=4,
                  sparsity=30,
@@ -16,24 +15,27 @@ class STAGINConfig(BaseConfig):
                  window_size=50,
                  window_stride=3,
                  dynamic_length=99,
-                 sampling_init=None
+                 sampling_init=None,
+                 task_type='classification',
+                 output_dim=2,
                  ):
         super(STAGINConfig, self).__init__(dropout=dropout)
         self.node_size = node_size
         self.d_model = d_model
-        self.num_classes = num_classes
+        self.output_dim = output_dim
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.sparsity = sparsity
         self.cls_token = cls_token
         self.readout = readout
-        # self.readout = "mean"
         self.clip_grad = 0.0
         self.reg_lambda = 1e-5
         self.window_size = window_size
         self.window_stride = window_stride
         self.dynamic_length = dynamic_length
         self.sampling_init = sampling_init
+        self.task_type = task_type
+        self.output_dim = output_dim
 
 
 class STAGIN(nn.Module):
@@ -56,7 +58,7 @@ class STAGIN(nn.Module):
         self.token_parameter = nn.Parameter(
             torch.randn([config.num_layers, 1, 1, config.d_model])) if config.cls_token == 'param' else None
 
-        self.num_classes = config.num_classes
+        self.output_dim = config.output_dim
         self.sparsity = config.sparsity
 
         # define modules
@@ -74,9 +76,13 @@ class STAGIN(nn.Module):
             self.readout_modules.append(readout_module(hidden_dim=config.d_model, input_dim=config.node_size, dropout=0.1))
             self.transformer_modules.append(
                 ModuleTransformer(config.d_model, 2 * config.d_model, num_heads=config.num_heads, dropout=0.1))
-            self.linear_layers.append(nn.Linear(config.d_model, config.num_classes))
+            self.linear_layers.append(nn.Linear(config.d_model, config.output_dim))
 
-        self.loss_fn = torch.nn.CrossEntropyLoss()
+        self.task_type = config.task_type
+        if self.task_type == 'classification':
+            self.loss_fn = torch.nn.CrossEntropyLoss()
+        else:
+            self.loss_fn = torch.nn.MSELoss()
 
     def _collate_adjacency(self, a, sparsity, sparse=True):
         i_list = []
@@ -138,7 +144,15 @@ class STAGIN(nn.Module):
         attention['time-attention'] = torch.stack(attention['time-attention'], dim=1).detach().cpu()
         latent = torch.stack(latent_list, dim=1)
 
-        loss = self.loss_fn(logits, labels) + self.config.reg_lambda * reg_ortho
+        if self.task_type == 'classification':
+            loss = self.loss_fn(logits, labels) + self.config.reg_lambda * reg_ortho
+        elif self.task_type == 'regression':
+            pred = logits.squeeze(-1) if logits.dim() > 1 and logits.shape[-1] == 1 else logits
+            lbl = labels.float().view(-1) if labels.dim() > 1 else labels.float()
+            loss = self.loss_fn(pred, lbl) + self.config.reg_lambda * reg_ortho
+        else:  # multi_output_regression
+            target_flat = labels.reshape(labels.shape[0], -1).float()
+            loss = self.loss_fn(logits, target_flat) + self.config.reg_lambda * reg_ortho
         return ModelOutputs(logits=logits,
                             loss=loss,
                             hidden_state={'attention': attention,

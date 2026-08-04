@@ -1,8 +1,6 @@
 from .data_config import *
 from .dataloader import init_StratifiedKFold_dataloader, init_distributed_dataloader, init_deepspeed_dataloader
 from .beirut.disease_beirut import DiseaseBeirutDataset
-from .beirut.gender_beirut import GenderBeirutDataset
-from .beirut.age_beirut import AgeBeirutDataset
 from .beirut.futurefc_beirut import FutureFCBeirutDataset
 from .caueeg.disease_caueeg2 import DiseaseCAUEEG2Dataset
 from .caueeg.disease_caueeg4 import DiseaseCAUEEG4Dataset

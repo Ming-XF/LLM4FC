@@ -10,18 +10,19 @@ import pdb
 class GCDGCNConfig(BaseConfig):
     def __init__(self,
                  node_size,
-                 num_classes,
+                 output_dim=2,
                  layer_sizes=[16, 4],
                  dropout=0.5,
                  readout='fc',
                  embedding_hidden_layers=[240, 240],
                  gamma=0.0001,
                  temperature=0.1,
-                 smoothing=0.1):
-        super(GCDGCNConfig, self).__init__(node_size=node_size, num_classes=num_classes)
+                 smoothing=0.1,
+                 task_type='classification'):
+        super(GCDGCNConfig, self).__init__(node_size=node_size, output_dim=output_dim)
 
         self.node_size=node_size
-        self.num_classes=num_classes
+        self.output_dim=output_dim
         self.layer_sizes=[node_size] + layer_sizes
         self.dropout=dropout
         self.readout=readout
@@ -29,6 +30,7 @@ class GCDGCNConfig(BaseConfig):
         self.gamma=gamma
         self.temperature=temperature
         self.smoothing=smoothing
+        self.task_type = task_type
 
 
 class GCDGCN(nn.Module):
@@ -39,21 +41,22 @@ class GCDGCN(nn.Module):
 
         # GCD模块 - 独立的前置模块
         self.gcd_embedding = GCDEmbedding(config.node_size, config.embedding_hidden_layers)
-        
+
         # GCN层，每层都包含GCD嵌入
         self.gcn_layers = nn.ModuleList()
         for i in range(len(config.layer_sizes) - 1):
             self.gcn_layers.append(
                GCNLayer(config.layer_sizes[i], config.layer_sizes[i + 1])
             )
-        
-        # 分类头
+
+        # 输出头
         if config.readout == 'fc':
             fc_input_dim = config.node_size * config.layer_sizes[-1]
         else:  # 'mean', 'sum', 'max'
             fc_input_dim = config.layer_sizes[-1]
-        
-        self.fc = nn.Linear(fc_input_dim, config.num_classes)
+
+        self.task_type = config.task_type
+        self.fc = nn.Linear(fc_input_dim, config.output_dim)
 
     def normalize_adj(self, adj):
         """归一化邻接矩阵（计算归一化拉普拉斯）"""
@@ -69,19 +72,21 @@ class GCDGCN(nn.Module):
     def forward(self, node_feature, labels, stage='pretrain'):
         """
         统一前向传播，根据stage计算不同损失
-        
+
         Args:
             adj: 原始邻接矩阵 (batch_size, node_size, node_size)
             labels: 标签 (batch_size)，计算损失时需要
             stage: 'pretrain' 或 'finetune'
-            
+
         Returns:
             pretrain: (contrastive_loss, logits)
             finetune: (logits, classification_loss)
         """
 
-        labels = torch.argmax(labels, dim=1)
-        
+        if self.task_type == 'classification':
+            if labels.dim() > 1 and labels.shape[-1] > 1:
+                labels = torch.argmax(labels, dim=1)
+
         B, C, _ = node_feature.shape
         device = node_feature.device
         
@@ -122,7 +127,15 @@ class GCDGCN(nn.Module):
             loss = self._contrastive_loss(embedding_vec, labels)
             return ModelOutputs(logits=final_output, loss=loss)
         elif stage == 'finetune':
-            loss = self._classification_loss(final_output, labels)
+            if self.task_type == 'classification':
+                loss = self._classification_loss(final_output, labels)
+            elif self.task_type == 'regression':
+                pred = final_output.squeeze(-1) if final_output.dim() > 1 and final_output.shape[-1] == 1 else final_output
+                lbl = labels.float().view(-1) if labels.dim() > 1 else labels.float()
+                loss = F.mse_loss(pred, lbl)
+            else:  # multi_output_regression
+                target_flat = labels.reshape(labels.shape[0], -1).float()
+                loss = F.mse_loss(final_output, target_flat)
             return ModelOutputs(logits=final_output, loss=loss)
         else:
             raise ValueError(f"Invalid stage: {stage}")

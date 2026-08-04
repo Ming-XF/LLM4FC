@@ -98,15 +98,15 @@ class AgeTUABDataset(BaseDataset):
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
-        self.data_config.num_class = 1  # regression
+        self.data_config.output_dim = 1  # regression
+        self.data_config.task_type = DataConfig.TASK_REGRESSION
 
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        # ── Binned labels for stratified subject-level splits ──
-        age_binned = np.clip((labels // 10).astype(int), 0, 9)
-        self._create_splits(age_binned, self.all_data['subject_id'])
+        # ── 传原始连续标签，由 _create_splits 内部自动分箱 ──
+        self._create_splits(labels, self.all_data['subject_id'])
         shuffle(self.train_index)
 
     def __getitem__(self, item):

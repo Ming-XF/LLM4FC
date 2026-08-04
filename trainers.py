@@ -264,12 +264,26 @@ class TimeLLMTrainer(Trainer):
 
         Uses dynamic FC (DFC) as main graph input;
         static FC (correlation) for stats prompt.
+
+        按任务类型自适应：
+        - 分类：标签 → integer index
+        - 回归：标签 → float32
+        - 多值回归：DFC → DFC_input（前 k 个窗口），标签 → DFC_target
         """
         labels = inputs['labels']
-        if labels.dim() > 1 and labels.shape[-1] > 1:
-            labels = labels.argmax(dim=-1)
+        if self.data_config.is_classification:
+            if labels.dim() > 1 and labels.shape[-1] > 1:
+                labels = labels.argmax(dim=-1)
+            labels = labels.long()
+        elif self.data_config.is_regression:
+            labels = labels.float()
+        elif self.data_config.is_multi_output_regression:
+            # Next-FC prediction: 使用完整 10 窗口 DFC 作为输入
+            # LLM 因果注意力自动实现 next-token prediction —
+            # 未来窗口 token 只能 attend 历史窗口，无法看到真实未来
+            labels = labels.float()
         return {
             "DFC": inputs['DFC'].float().to(self.device),
             "SFC": inputs['correlation'].float().to(self.device),
-            "labels": labels.long().to(self.device),
+            "labels": labels.to(self.device),
         }
