@@ -61,7 +61,7 @@ def main(args):
             # 自动推导 DeepSpeed 配置文件路径
             ds_path = args.deepspeed_config
             if not os.path.exists(ds_path):
-                auto_path = f"deepspeed/{args.model}.json"
+                auto_path = "deepspeed/train.json"
                 if os.path.exists(auto_path):
                     args.deepspeed_config = auto_path
                 else:
@@ -109,8 +109,7 @@ def main(args):
                 # K-shot: 按 few_shot_seed 采样被试，fine-tune 后评估
                 if args.deepspeed:
                     ds_path = args.deepspeed_config
-                    if ds_path.endswith('.json') and not ds_path.endswith('_finetune.json'):
-                        finetune_ds_path = ds_path[:-5] + '_finetune.json'
+                    finetune_ds_path = "deepspeed/finetune.json"
                         if os.path.exists(finetune_ds_path):
                             args.deepspeed_config = finetune_ds_path
                             with open(finetune_ds_path) as _f:
