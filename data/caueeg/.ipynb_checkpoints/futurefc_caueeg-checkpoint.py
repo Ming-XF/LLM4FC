@@ -1,9 +1,11 @@
 import os
 from random import shuffle
+
 import mne
 import numpy as np
 import torch
-import torch.nn.functional as F
+from tqdm import tqdm
+from multiprocessing import Pool, cpu_count
 
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
@@ -11,19 +13,40 @@ from ..preprocess import *
 
 import json
 import re
-from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
+import warnings
+
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore")
+
+_N_INPUT_WINDOWS = 8
+_N_TOTAL_WINDOWS = 10
 
 
-class DiseaseCAUEEG2Dataset(BaseDataset):
+# ═══════════════════════════════════════════════════════════════════════════════
+# Dataset
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class FutureFCCAUEEGDataset(BaseDataset):
+    """CAUEEG future FC prediction dataset.
+
+    Task: given the first ``k`` dynamic FC windows from a 1‑minute EEG
+    segment, predict the remaining ``T−k`` future FC matrices.
+
+    Uses all subjects from the CAUEEG dataset regardless of disease label.
+    """
+
     def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
-                 episode_seed=None):
-        super(DiseaseCAUEEG2Dataset, self).__init__(data_config, k, train, one_hot=one_hot,
+                 episode_seed=None,
+                 n_input_windows=_N_INPUT_WINDOWS,
+                 n_total_windows=_N_TOTAL_WINDOWS):
+        super(FutureFCCAUEEGDataset, self).__init__(data_config, k, train, one_hot=one_hot,
                                                     episode_seed=episode_seed)
+        self.n_input_windows = n_input_windows
+        self.n_total_windows = n_total_windows
 
     def load_data(self, one_hot=True):
         raw = np.load(self.data_config.data_dir, allow_pickle=True)
-        data = dict(raw) if hasattr(raw, 'files') else raw.item()  # 兼容 .npz / .npy
+        data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
         labels = data["labels"]
         subject_id = data["subject_id"]
@@ -31,40 +54,44 @@ class DiseaseCAUEEG2Dataset(BaseDataset):
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
-        self.data_config.output_dim = 2
-        self.data_config.task_type = DataConfig.TASK_CLASSIFICATION
+        self.data_config.task_type = DataConfig.TASK_MULTI_OUTPUT_REGRESSION
+        n_out = self.n_total_windows - self.n_input_windows
+        self.data_config.output_dim = n_out * self.data_config.node_size ** 2
 
-        self.data_config.class_weight = [1, 1]
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
         self._create_splits(labels, self.all_data['subject_id'])
-        self.all_data['labels'] = F.one_hot(torch.from_numpy(self.all_data['labels']).to(torch.int64)).numpy()
         shuffle(self.train_index)
 
     def __getitem__(self, item):
         idx = self._active_index
-        time_series = torch.from_numpy(self.all_data['time_series'][idx[item]]).float()
-        labels = torch.from_numpy(self.all_data['labels'][idx[item]]).to(torch.int64)
-
+        time_series = torch.from_numpy(
+            self.all_data['time_series'][idx[item]]).float()
         SFC = self.connectivity(time_series)
         SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
         window_size = 6 * self.hz
-        step_size = (60 * self.hz - window_size) // 9
+        step_size = (60 * self.hz - window_size) // (self.n_total_windows - 1)
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
         DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
 
         return {
                 'DFC': DFC,
-                'correlation': SFC,  # SFC, for backward compat
-                'labels': labels,
+                'correlation': SFC,
+                'labels': DFC[self.n_input_windows:],
         }
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Preprocessing — worker
+# ═══════════════════════════════════════════════════════════════════════════════
 
-def _process_one_sample(args):
-    """处理单个 EDF 样本，供 multiprocessing worker 调用（模块级函数以支持 pickle）"""
+def _process_one_sample_futurefc(args):
+    """Process a single EDF sample for future FC prediction (multiprocessing worker).
+
+    Returns dummy labels (all zeros).
+    """
     sample, signal_folder, hz = args
     serial = sample['serial']
     subject_id = int(re.findall(r'\d+', serial)[0])
@@ -79,13 +106,15 @@ def _process_one_sample(args):
     data = data.reshape(data.shape[0], data.shape[1] // (hz * 60), -1)
     data = np.transpose(data, (1, 0, 2))
 
-    # 二分类: AD=1, Normal=0
-    label = np.ones(data.shape[0]) if 'ad' in sample['symptom'] else np.zeros(data.shape[0])
-
+    label = np.zeros(data.shape[0], dtype=np.int8)  # dummy
     subj_ids = np.full(data.shape[0], subject_id)
 
     return data, label, subj_ids
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Preprocessing — main entry point
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def _resolve_param(val, pos):
     """Resolve a per-class parameter that may be an int (both classes) or
@@ -98,39 +127,45 @@ def _resolve_param(val, pos):
     return val[0] if pos else val[1]
 
 
-def disease_caueeg2_preprocess(path="../data/CAUEEG/", hz=200,
+def futurefc_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
                                max_windows_per_subject=None,
                                max_subjects=None):
-    # 配置路径
-    annotation_file = os.path.join(path, "caueeg-dataset/annotation.json")
-    signal_folder = os.path.join(path, os.path.join('caueeg-dataset/signal', "edf"))
-    output_path = os.path.join(path, "caueeg2_disease.npz")
+    """Preprocess the CAUEEG dataset for future FC prediction.
 
-    # 读取标注文件
+    Uses all subjects from annotation.json.  Saves dummy labels; the actual
+    prediction target is computed on-the-fly from the time series.
+
+    Parameters
+    ----------
+    path : str
+        Path to the CAUEEG dataset root.
+    hz : int
+        Resampling rate in Hz.  Default 200.
+    """
+    annotation_file = os.path.join(path, "caueeg-dataset/annotation.json")
+    signal_folder = os.path.join(path, 'caueeg-dataset/signal', "edf")
+    output_path = os.path.join(path, "caueeg_futurefc.npz")
+
     with open(annotation_file, 'r') as f:
         annotation = json.load(f)
 
-    # 筛选目标样本 — 二分类: 仅 AD 和 Normal
-    target_samples = [s for s in annotation['data']
-                      if 'ad' in s['symptom'] or 'cb_normal' in s['symptom']]
+    target_samples = annotation['data']
+    print(f"Total subjects: {len(target_samples)}")
 
     n_workers = min(cpu_count(), len(target_samples), 16)
+    print(f"Processing {len(target_samples)} samples with {n_workers} workers...")
 
-    print(f"并行处理 {len(target_samples)} 个样本，使用 {n_workers} 个进程...")
-
-    # 构建参数列表
     task_args = [(sample, signal_folder, hz) for sample in target_samples]
 
-    # 多进程并行处理
     ts_list, lbl_list, subj_list = [], [], []
     with Pool(processes=n_workers) as pool:
-        for data, label, subj_ids in tqdm(pool.imap_unordered(_process_one_sample, task_args),
-                                          total=len(task_args), desc="加载EDF"):
+        for data, label, subj_ids in tqdm(
+                pool.imap_unordered(_process_one_sample_futurefc, task_args),
+                total=len(task_args), desc="Loading EDF"):
             ts_list.append(data)
             lbl_list.append(label)
             subj_list.append(subj_ids)
 
-    # 一次性拼接，避免循环中 np.append 的 O(n²) 开销
     time_series = np.concatenate(ts_list, axis=0)
     labels = np.concatenate(lbl_list, axis=0)
     subject_ids = np.concatenate(subj_list, axis=0)
@@ -184,16 +219,22 @@ def disease_caueeg2_preprocess(path="../data/CAUEEG/", hz=200,
 
         _, subject_ids = np.unique(subject_ids, return_inverse=True)
         subject_ids = subject_ids + 1
-        print(f"Sampled {n_pos} AD + {n_neg} Normal = "
+        print(f"Sampled {n_pos} + {n_neg} = "
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
 
     time_series = time_series.astype(np.float32)
     labels = labels.astype(np.int8)
 
-    print(time_series.shape)
-    np.savez(output_path, timeseries=time_series, labels=labels, subject_id=subject_ids, hz=hz)
+    print(f"\nTotal samples: {len(labels)}")
+    print(f"  Shape: {time_series.shape}")
 
+    np.savez(output_path, timeseries=time_series,
+             labels=labels, subject_id=subject_ids, hz=hz)
+    print(f"Saved to {output_path}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    disease_caueeg2_preprocess("../data/CAUEEG", hz=200)
+    futurefc_caueeg_preprocess("../data/CAUEEG/", hz=200)

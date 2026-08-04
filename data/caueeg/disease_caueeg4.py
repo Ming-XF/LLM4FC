@@ -121,7 +121,7 @@ def disease_caueeg4_preprocess(path="../data/CAUEEG/", hz=200,
                       if 'ad' in s['symptom'] or 'cb_normal' in s['symptom']
                       or 'smi' in s['symptom'] or 'mci_amnestic' in s['symptom']]
 
-    n_workers = min(cpu_count(), len(target_samples), 8)
+    n_workers = min(cpu_count(), len(target_samples), 16)
 
     print(f"并行处理 {len(target_samples)} 个样本，使用 {n_workers} 个进程...")
 
@@ -194,8 +194,6 @@ def disease_caueeg4_preprocess(path="../data/CAUEEG/", hz=200,
         print(f"Sampled {n_pos} + {n_neg} = "
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
-    time_series = data_norm(time_series)
-    time_series = preprocess_ea(time_series)
 
     time_series = time_series.astype(np.float32)
     labels = labels.astype(np.int8)

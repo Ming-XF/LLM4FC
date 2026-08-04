@@ -166,7 +166,7 @@ def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
     print(f"Total subjects: {len(target_samples)}")
     print(f"Age range: {min(ages)}–{max(ages)} (mean={np.mean(ages):.1f})")
 
-    n_workers = min(cpu_count(), len(target_samples), 8)
+    n_workers = min(cpu_count(), len(target_samples), 16)
     print(f"Processing {len(target_samples)} samples with {n_workers} workers...")
 
     task_args = [(sample, signal_folder, hz) for sample in target_samples]
@@ -236,8 +236,6 @@ def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
         print(f"Sampled {n_pos} + {n_neg} = "
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
-    time_series = data_norm(time_series)
-    time_series = preprocess_ea(time_series)
 
     time_series = time_series.astype(np.float32)
     labels = labels.astype(np.float32)

@@ -255,8 +255,6 @@ def disease_ds_preprocess(path="../data/DS", hz=200,
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
     # ── Normalize ──
-    time_series = data_norm(time_series)
-    time_series = preprocess_ea(time_series)
 
     time_series = time_series.astype(np.float32)
     labels = labels.astype(np.int8)

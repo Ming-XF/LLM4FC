@@ -354,8 +354,6 @@ def disease_beirut_preprocess(path_beirut="../data/Beirut", hz=200,
         print(f"Sampled {n_pos} pre-ictal + {n_neg} inter-ictal = "
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
-    time_series_all = data_norm(time_series_all)
-    time_series_all = preprocess_ea(time_series_all)
 
     print(f"Total samples: {len(labels_all)}, "
           f"Pre-ictal: {int(labels_all.sum())}, "

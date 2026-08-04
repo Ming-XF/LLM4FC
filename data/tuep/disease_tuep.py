@@ -279,7 +279,7 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
         for edf_path, label, subj_str in file_list
     ]
 
-    n_workers = min(cpu_count(), len(task_args), 8)
+    n_workers = min(cpu_count(), len(task_args), 16)
     print(f"Processing {len(task_args)} files with {n_workers} workers...")
 
     ts_list, lbl_list, subj_list = [], [], []
@@ -366,8 +366,6 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
     # ── Normalize ──
-    time_series = data_norm(time_series)
-    time_series = preprocess_ea(time_series)
 
     time_series = time_series.astype(np.float32)
     labels = labels.astype(np.int8)
