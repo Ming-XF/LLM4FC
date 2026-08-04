@@ -108,7 +108,20 @@ class FutureFCDSDataset(BaseDataset):
 # Preprocessing
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def futurefc_ds_preprocess(path="../data/DS", hz=200):
+def _resolve_param(val, pos):
+    """Resolve a per-class parameter that may be an int (both classes) or
+    tuple ``(pos_val, neg_val)``.
+    """
+    if val is None:
+        return None
+    if isinstance(val, (int, np.integer)):
+        return val
+    return val[0] if pos else val[1]
+
+
+def futurefc_ds_preprocess(path="../data/DS", hz=200,
+                           max_windows_per_subject=None,
+                           max_subjects=None):
     """Preprocess the DS dataset for future FC prediction.
 
     Identical signal processing to ``ds_preprocess()`` but saves dummy labels
@@ -179,6 +192,58 @@ def futurefc_ds_preprocess(path="../data/DS", hz=200):
     time_series = np.concatenate(ts_list, axis=0)
     labels = np.concatenate(lbl_list, axis=0)
     subject_ids = np.concatenate(subj_list, axis=0)
+
+    # ── Per-subject window cap (evenly spaced sampling along time axis) ──
+    if max_windows_per_subject is not None:
+        unique_subjs = np.unique(subject_ids)
+        keep_mask = np.ones(len(subject_ids), dtype=bool)
+        n_capped = 0
+        for subj in unique_subjs:
+            idx = np.where(subject_ids == subj)[0]
+            subj_label = labels[idx[0]]
+            cap = _resolve_param(max_windows_per_subject, pos=(subj_label == 1))
+            if cap is not None and len(idx) > cap:
+                sample_idx = np.linspace(0, len(idx) - 1, cap, dtype=int)
+                keep_mask[idx] = False
+                keep_mask[idx[sample_idx]] = True
+                n_capped += 1
+        time_series = time_series[keep_mask]
+        labels = labels[keep_mask]
+        subject_ids = subject_ids[keep_mask]
+        print(f"Capped {n_capped} subjects (evenly spaced)")
+
+    # ── Per-class stratified subject sampling (deterministic: keep first N) ──
+    if max_subjects is not None:
+        unique_subjs = np.unique(subject_ids)
+        subj_labels = np.array([
+            np.bincount(labels[subject_ids == s].astype(int)).argmax()
+            for s in unique_subjs
+        ])
+        pos_subjs = unique_subjs[subj_labels == 1]
+        neg_subjs = unique_subjs[subj_labels == 0]
+
+        n_pos_limit = _resolve_param(max_subjects, pos=True)
+        n_neg_limit = _resolve_param(max_subjects, pos=False)
+
+        if isinstance(max_subjects, (int, np.integer)):
+            n_pos_limit = max_subjects // 2
+            n_neg_limit = max_subjects // 2
+
+        n_pos = len(pos_subjs) if n_pos_limit is None else min(n_pos_limit, len(pos_subjs))
+        n_neg = len(neg_subjs) if n_neg_limit is None else min(n_neg_limit, len(neg_subjs))
+        kept_pos = pos_subjs[:n_pos]
+        kept_neg = neg_subjs[:n_neg]
+        kept_subjs = np.concatenate([kept_pos, kept_neg])
+
+        keep_mask = np.isin(subject_ids, kept_subjs)
+        time_series = time_series[keep_mask]
+        labels = labels[keep_mask]
+        subject_ids = subject_ids[keep_mask]
+
+        _, subject_ids = np.unique(subject_ids, return_inverse=True)
+        subject_ids = subject_ids + 1
+        print(f"Sampled {n_pos} + {n_neg} = "
+              f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
     time_series = data_norm(time_series)
     time_series = preprocess_ea(time_series)
