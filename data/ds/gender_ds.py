@@ -1,0 +1,212 @@
+import os
+from random import shuffle
+
+import mne
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn.functional as F
+from tqdm import tqdm
+
+from ..data_config import DataConfig
+from ..dataset import BaseDataset
+from ..preprocess import *
+
+import warnings
+
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CAUEEG-compatible channel order (19 EEG, 10-20 system)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_DS_CHANNEL_ORDER = [
+    'Fp1', 'F3', 'C3', 'P3', 'O1',
+    'Fp2', 'F4', 'C4', 'P4', 'O2',
+    'F7', 'T3', 'T5',
+    'F8', 'T4', 'T6',
+    'Fz', 'Cz', 'Pz',
+]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Dataset
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class GenderDSDataset(BaseDataset):
+    """DS gender classification dataset — Female vs Male binary classification.
+
+    Task: given a 1‑minute window of 19‑channel resting‑state EEG,
+    classify the subject's gender as Female (0) or Male (1).
+
+    Uses the same subjects as the disease classification task (AD + CN from
+    participants.tsv), but with gender labels instead of disease labels.
+    """
+
+    def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
+                 episode_seed=None):
+        super(GenderDSDataset, self).__init__(data_config, k, train, one_hot=one_hot,
+                                              episode_seed=episode_seed)
+
+    def load_data(self, one_hot=True):
+        raw = np.load(self.data_config.data_dir, allow_pickle=True)
+        data = dict(raw) if hasattr(raw, 'files') else raw.item()
+        time_series = data["timeseries"]
+        labels = data["labels"]
+        subject_id = data["subject_id"]
+        self.hz = data["hz"]
+
+        self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
+        self.data_config.time_series_size = time_series[0].shape[1]
+        self.data_config.num_class = 2
+
+        self.data_config.class_weight = [1, 1]
+        self.all_data['time_series'] = time_series
+        self.all_data['labels'] = labels
+        self.all_data['subject_id'] = subject_id
+
+        self._create_splits(labels, self.all_data['subject_id'])
+        self.all_data['labels'] = F.one_hot(
+            torch.from_numpy(self.all_data['labels']).to(torch.int64)).numpy()
+        shuffle(self.train_index)
+
+    def __getitem__(self, item):
+        idx = self._active_index
+        time_series = torch.from_numpy(
+            self.all_data['time_series'][idx[item]]).float()
+        labels = torch.from_numpy(
+            self.all_data['labels'][idx[item]]).to(torch.int64)
+
+        window_size = 6 * self.hz
+        step_size = (60 * self.hz - window_size) // 9
+        SFC = self.connectivity(time_series)
+        DFC = self.dynamic_connectivity(time_series, window_size, step_size)
+
+        return {'time_series': time_series,
+                'DFC': DFC,
+                'correlation': SFC,
+                'labels': labels,
+                'sample_idx': idx[item]}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Preprocessing
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def gender_ds_preprocess(path="../data/DS", hz=200):
+    """Preprocess the DS dataset for gender (M/F) classification.
+
+    Reads preprocessed .set files from ``derivatives/``, selects the first
+    19 EEG channels, reorders them to the CAUEEG-compatible standard order,
+    resamples to ``hz`` Hz, and segments into non‑overlapping 1‑minute windows.
+
+    Labels: Female=0, Male=1 (extracted from participants.tsv Gender column).
+
+    Only subjects in Group A (AD) and C (CN) are included — the same set as
+    the disease classification task.
+
+    Parameters
+    ----------
+    path : str
+        Path to the DS dataset root directory.
+    hz : int
+        Resampling rate in Hz.  Default 200.
+    """
+    participants_path = os.path.join(path, "participants.tsv")
+    derivatives_dir = os.path.join(path, "derivatives")
+    output_path = os.path.join(path, "ds_gender.npz")
+
+    # ── Load participant metadata ──
+    participants = pd.read_csv(participants_path, sep='\t')
+    # Filter: AD (Group=A) and CN (Group=C) only, same as disease task
+    target_participants = participants[participants['Group'].isin(['A', 'C'])]
+
+    print(f"Total subjects in participants.tsv: {len(participants)}")
+    print(f"Target subjects (AD + CN): {len(target_participants)}")
+
+    # ── Gender distribution ──
+    gender_counts = target_participants['Gender'].value_counts()
+    print(f"Gender distribution: {dict(gender_counts)}")
+
+    ts_list, lbl_list, subj_list = [], [], []
+
+    for _, row in tqdm(target_participants.iterrows(),
+                       total=len(target_participants),
+                       desc="Processing subjects"):
+        subj_id = row['participant_id']           # e.g. "sub-001"
+        gender_str = row['Gender']                 # "M" or "F"
+        gender_label = 1 if gender_str == 'M' else 0  # F=0, M=1
+
+        set_path = os.path.join(
+            derivatives_dir, subj_id, 'eeg',
+            f'{subj_id}_task-eyesclosed_eeg.set')
+
+        if not os.path.exists(set_path):
+            print(f"  [SKIP] {set_path} not found — "
+                  f"run 'datalad get' to download data files")
+            continue
+
+        # ── Read .set file ──
+        raw = mne.io.read_raw_eeglab(set_path, preload=True, verbose=False)
+
+        # ── Pick and reorder 19 EEG channels to CAUEEG-compatible order ──
+        available = set(raw.info['ch_names'])
+        missing = [ch for ch in _DS_CHANNEL_ORDER if ch not in available]
+        if missing:
+            print(f"  [WARN] {subj_id}: missing channels: {missing}")
+            continue
+
+        raw.pick(_DS_CHANNEL_ORDER, verbose=False)
+
+        # ── Resample ──
+        raw = raw.copy().resample(sfreq=hz, verbose=False)
+        data = raw.get_data()  # (19, n_samples)
+
+        # ── Truncate to whole minutes, reshape to 1‑minute windows ──
+        n_total = data.shape[1]
+        window_samples = hz * 60
+        n_windows = n_total // window_samples
+        if n_windows == 0:
+            print(f"  [SKIP] {subj_id}: too short ({n_total / hz:.1f}s)")
+            continue
+
+        data = data[:, :n_windows * window_samples]
+        data = data.reshape(data.shape[0], n_windows, window_samples)
+        data = np.transpose(data, (1, 0, 2))  # (n_windows, 19, hz*60)
+
+        labels_arr = np.full(data.shape[0], gender_label)
+        subj_ids_arr = np.full(data.shape[0], int(subj_id.split('-')[1]))
+
+        ts_list.append(data)
+        lbl_list.append(labels_arr)
+        subj_list.append(subj_ids_arr)
+
+    # ── Concatenate ──
+    time_series = np.concatenate(ts_list, axis=0)
+    labels = np.concatenate(lbl_list, axis=0)
+    subject_ids = np.concatenate(subj_list, axis=0)
+
+    # ── Normalize ──
+    time_series = data_norm(time_series)
+    time_series = preprocess_ea(time_series)
+
+    time_series = time_series.astype(np.float32)
+    labels = labels.astype(np.int8)
+
+    n_f = int((labels == 0).sum())
+    n_m = int((labels == 1).sum())
+    print(f"\nTotal samples: {len(labels)}")
+    print(f"  Female (label=0): {n_f}")
+    print(f"  Male   (label=1): {n_m}")
+    print(f"  Shape: {time_series.shape}")
+
+    np.savez(output_path, timeseries=time_series,
+             labels=labels, subject_id=subject_ids, hz=hz)
+    print(f"Saved to {output_path}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+
+if __name__ == '__main__':
+    gender_ds_preprocess("../data/DS", hz=200)

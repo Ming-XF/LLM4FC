@@ -133,7 +133,7 @@ def init_config():
     global_group.add_argument("--append", default="", type=str, help="")
 
     data_group = parser.add_argument_group(title="data", description="")
-    data_group.add_argument("--dataset", default='BR', type=str, help="")
+    data_group.add_argument("--dataset", default='DiseaseBeirut', type=str, help="")
     data_group.add_argument("--data_dir", default="", type=str, help="")
     data_group.add_argument("--data2_dir", default="", type=str, help="")
     data_group.add_argument("--data_processors", default=0, type=int, help="")
