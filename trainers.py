@@ -21,14 +21,8 @@ class BNTTrainer(Trainer):
         node_feature = inputs['correlation']
         labels = inputs['labels']
 
-        if self.model.training and self.args.mix_up:
-            time_series, node_feature, labels, _ = continues_mixup_data(
-                time_series, node_feature, y1=labels.float())
-            return {"node_feature": node_feature.to(self.device),
-                    "labels": labels.to(self.device)}
-        else:
-            return {"node_feature": node_feature.to(self.device),
-                    "labels": labels.float().to(self.device)}
+        return {"node_feature": node_feature.to(self.device),
+                "labels": labels.float().to(self.device)}
 
 
 class FBNetGenTrainer(Trainer):
@@ -42,21 +36,14 @@ class FBNetGenTrainer(Trainer):
         time_series = time_series[:, :, :time_series_size]
         node_feature = inputs['correlation']
         labels = inputs['labels']
-        if self.model.training and self.args.mix_up:
-            time_series, node_feature, labels, _ = continues_mixup_data(
-                time_series, node_feature, y1=labels.float())
-            return {"time_series": time_series.to(self.device),
-                    "node_feature": node_feature.to(self.device),
-                    "labels": labels.to(self.device)}
-        else:
-            return {"time_series": time_series.to(self.device),
-                    "node_feature": node_feature.to(self.device),
-                    "labels": labels.float().to(self.device)}
+        return {"time_series": time_series.to(self.device),
+                "node_feature": node_feature.to(self.device),
+                "labels": labels.float().to(self.device)}
 
 
 class BrainNetCNNTrainer(BNTTrainer):
     def __init__(self, args, local_rank=0, task_id=0, episode_seed=None):
-        super(BrainNetCNNTrainer, self).__init__(args, local_rank=local_rank, task_id=task_id,
+        super(BrainNetCNNTrainer, self ).__init__(args, local_rank=local_rank, task_id=task_id,
                                                   episode_seed=episode_seed)
 
 
@@ -113,9 +100,6 @@ class TCACNetTrainer(Trainer):
         time_series = inputs['time_series']
         wpser = self.wpser(time_series)
         labels = inputs['labels']
-        if self.model.training and self.args.mix_up:
-            time_series, wpser, labels, _ = continues_mixup_data(
-                time_series, wpser, y1=labels.float())
         return {"time_series": time_series.to(self.device),
                 "node_feature": wpser.to(self.device),
                 "labels": labels.float().to(self.device)}
@@ -196,16 +180,9 @@ class ALTERTrainer(Trainer):
         node_feature = inputs['correlation']
         labels = inputs['labels']
 
-        if self.model.training and self.args.mix_up:
-            time_series, node_feature, labels, _ = continues_mixup_data(
-                time_series, node_feature, y1=labels.float())
-            return {"time_series": time_series.to(self.device),
-                    "node_feature": node_feature.to(self.device),
-                    "labels": labels.to(self.device)}
-        else:
-            return {"time_series": time_series.to(self.device),
-                    "node_feature": node_feature.to(self.device),
-                    "labels": labels.float().to(self.device)}
+        return {"time_series": time_series.to(self.device),
+                "node_feature": node_feature.to(self.device),
+                "labels": labels.float().to(self.device)}
 
 class GCDGCNTrainer(Trainer):
     def __init__(self, args, local_rank=0, task_id=0, episode_seed=None):

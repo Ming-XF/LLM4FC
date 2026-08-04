@@ -161,7 +161,7 @@ def main(args):
                              f"{f'sparsity-{args.sparsity}' if 'DFaST' in args.model else ''}" \
                              f'F{args.frequency}D{args.D}F{args.num_kernels}P{args.p1}={args.p2}_dp{args.dropout}' \
                              f"_w{args.window_size}" \
-                             f"{'_mp' if args.mix_up else ''}" \
+
                              f"-cross"
 
                 # run = wandb.init(project=args.project, entity=args.wandb_entity, reinit=True, group=f"{group_name}", tags=[args.dataset])

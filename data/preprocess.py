@@ -1,20 +1,5 @@
 import numpy as np
-import torch
 from scipy.linalg import sqrtm
-
-
-def continues_mixup_data(*xs, y1=None, y2=None, alpha=1.0, beta=1.0):
-    """Returns mixed inputs, pairs of targets, and lambda"""
-    if alpha > 0:
-        lam = np.random.beta(alpha, beta)
-    else:
-        lam = 1
-    batch_size = y1.size()[0]
-    index = torch.randperm(batch_size)
-    new_xs = [lam * x + (1 - lam) * x[index, :] for x in xs]
-    y1 = lam * y1 + (1-lam) * y1[index]
-    y2 = lam * y2 + (1-lam) * y2[index] if y2 is not None else y2
-    return *new_xs, y1, y2
 
 
 def data_norm(data):

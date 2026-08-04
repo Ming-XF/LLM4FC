@@ -438,11 +438,7 @@ class Model(nn.Module):
                 dtype=self.output_projection[1].weight.dtype)
             logits = self.output_projection(HL_patches)
 
-            if self.task_type == 'classification':
-                if labels.dim() > 1 and labels.shape[-1] > 1:
-                    labels = labels.argmax(dim=-1)
-                loss = F.cross_entropy(logits, labels)
-            elif self.task_type == 'regression':
+            if self.task_type == 'regression':
                 pred = logits.squeeze(-1)
                 if labels.dim() > 1 and labels.shape[-1] == 1:
                     labels = labels.squeeze(-1)
