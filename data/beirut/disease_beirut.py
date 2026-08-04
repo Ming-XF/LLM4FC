@@ -134,10 +134,12 @@ class DiseaseBeirutDataset(BaseDataset):
             self.all_data['labels'][idx[item]]).to(torch.int64)
 
         correlation = self.connectivity(time_series)
+        correlation = self.sparsify_fc(correlation, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
 
         window_size = 6 * self.hz
         step_size = (time_series.size(-1) - window_size) // 9
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
+        DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
 
         return {'time_series': time_series,
                 'correlation': correlation,

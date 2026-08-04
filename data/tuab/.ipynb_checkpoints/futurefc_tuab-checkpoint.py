@@ -4,7 +4,6 @@ from random import shuffle
 import mne
 import numpy as np
 import torch
-import torch.nn.functional as F
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
@@ -46,24 +45,29 @@ def _normalize_channel(name):
     return _CHANNEL_NORM_MAP.get(name, name)
 
 
+_N_INPUT_WINDOWS = 8
+_N_TOTAL_WINDOWS = 10
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Dataset
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class GenderTUABDataset(BaseDataset):
-    """TUAB gender classification — Female vs Male binary classification.
+class FutureFCTUABDataset(BaseDataset):
+    """TUAB future FC prediction dataset.
 
-    Task: given a 1‑minute window of 19‑channel EEG time series,
-    classify the subject's gender as Female (0) or Male (1).
-
-    Uses all subjects from the TUH Abnormal EEG Corpus regardless of
-    normal/abnormal label.  Gender is extracted from the EDF file header.
+    Task: given the first ``k`` dynamic FC windows from a 1‑minute EEG
+    segment, predict the remaining ``T−k`` future FC matrices.
     """
 
     def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
-                 episode_seed=None):
-        super(GenderTUABDataset, self).__init__(data_config, k, train, one_hot=one_hot,
-                                                episode_seed=episode_seed)
+                 episode_seed=None,
+                 n_input_windows=_N_INPUT_WINDOWS,
+                 n_total_windows=_N_TOTAL_WINDOWS):
+        super(FutureFCTUABDataset, self).__init__(data_config, k, train, one_hot=one_hot,
+                                                  episode_seed=episode_seed)
+        self.n_input_windows = n_input_windows
+        self.n_total_windows = n_total_windows
 
     def load_data(self, one_hot=True):
         raw = np.load(self.data_config.data_dir, allow_pickle=True)
@@ -75,37 +79,35 @@ class GenderTUABDataset(BaseDataset):
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
-        self.data_config.output_dim = 2
-        self.data_config.task_type = DataConfig.TASK_CLASSIFICATION
+        self.data_config.task_type = DataConfig.TASK_MULTI_OUTPUT_REGRESSION
+        n_out = self.n_total_windows - self.n_input_windows
+        self.data_config.output_dim = n_out * self.data_config.node_size ** 2
 
-        self.data_config.class_weight = [1, 1]
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
         self._create_splits(labels, self.all_data['subject_id'])
-        self.all_data['labels'] = F.one_hot(
-            torch.from_numpy(self.all_data['labels']).to(torch.int64)).numpy()
         shuffle(self.train_index)
 
     def __getitem__(self, item):
         idx = self._active_index
         time_series = torch.from_numpy(
             self.all_data['time_series'][idx[item]]).float()
-        labels = torch.from_numpy(
-            self.all_data['labels'][idx[item]]).to(torch.int64)
-
         SFC = self.connectivity(time_series)
-        SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
         window_size = 6 * self.hz
-        step_size = (60 * self.hz - window_size) // 9
+        step_size = (60 * self.hz - window_size) // (self.n_total_windows - 1)
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
-        DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
+
+        dfc_input = DFC[:self.n_input_windows]
+        dfc_target = DFC[self.n_input_windows:]
 
         return {'time_series': time_series,
                 'DFC': DFC,
                 'correlation': SFC,
-                'labels': labels,
+                'DFC_input': dfc_input,
+                'DFC_target': dfc_target,
+                'labels': dfc_target,
                 'sample_idx': idx[item]}
 
 
@@ -113,11 +115,11 @@ class GenderTUABDataset(BaseDataset):
 # Preprocessing — worker (module-level for multiprocessing)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _process_tuab_file_gender(args):
-    """Process a single TUAB EDF file into 1‑minute windows with gender label.
+def _process_tuab_file_futurefc(args):
+    """Process a single TUAB EDF file for future FC prediction.
 
-    Gender is extracted from the EDF file header (Patient ID field).
-    MNE maps sex=1 → Male, sex=2 → Female; unknown/0 files are skipped.
+    Returns dummy labels (all zeros) — the prediction target is computed
+    on-the-fly from the time series in __getitem__.
 
     Parameters
     ----------
@@ -127,7 +129,7 @@ def _process_tuab_file_gender(args):
     Returns
     -------
     data : ndarray (n_windows, 19, hz*60) or None
-    labels : ndarray (n_windows,) or None
+    labels : ndarray (n_windows,) or None — dummy zeros
     subj_ids : ndarray (n_windows,) or None
     """
     edf_path, hz, subject_id = args
@@ -137,41 +139,23 @@ def _process_tuab_file_gender(args):
     except Exception:
         return None, None, None
 
-    # ── Extract gender from EDF header ──
-    sex = raw.info.get('subject_info')
-    if sex is not None:
-        sex_val = sex.get('sex', 0) if hasattr(sex, 'get') else getattr(sex, 'sex', 0)
-    else:
-        sex_val = 0
-
-    if sex_val not in (1, 2):
-        # Unknown or missing sex — skip this file
-        return None, None, None
-
-    gender_label = 0 if sex_val == 2 else 1  # F=0, M=1
-
-    # ── Build mapping from normalised channel name → EDF index ──
     edf_ch_names = raw.info['ch_names']
     ch_index = {}
     for i, ch in enumerate(edf_ch_names):
         norm = _normalize_channel(ch)
         ch_index[norm] = i
 
-    # ── Check all 19 standard channels exist ──
     missing = [ch for ch in _TUAB_CHANNEL_ORDER if ch not in ch_index]
     if missing:
         return None, None, None
 
-    # ── Pick and reorder the 19 EEG channels ──
     pick_idx = [ch_index[ch] for ch in _TUAB_CHANNEL_ORDER]
     raw.pick([edf_ch_names[i] for i in pick_idx], verbose=False)
 
-    # ── Average reference, resample ──
     raw.set_eeg_reference('average', verbose=False)
     raw = raw.copy().resample(sfreq=hz, verbose=False)
-    data = raw.get_data()  # (19, n_samples)
+    data = raw.get_data()
 
-    # ── Truncate to whole minutes, reshape to 1‑minute windows ──
     n_total = data.shape[1]
     window_samples = hz * 60
     n_windows = n_total // window_samples
@@ -180,9 +164,9 @@ def _process_tuab_file_gender(args):
 
     data = data[:, :n_windows * window_samples]
     data = data.reshape(data.shape[0], n_windows, window_samples)
-    data = np.transpose(data, (1, 0, 2))  # (n_windows, 19, hz*60)
+    data = np.transpose(data, (1, 0, 2))
 
-    labels_arr = np.full(data.shape[0], gender_label, dtype=np.int8)
+    labels_arr = np.zeros(data.shape[0], dtype=np.int8)  # dummy
     subj_arr = np.full(data.shape[0], subject_id, dtype=np.int32)
 
     return data, labels_arr, subj_arr
@@ -192,27 +176,22 @@ def _process_tuab_file_gender(args):
 # Preprocessing — main entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def gender_tuab_preprocess(path="../data/TUAB", hz=200):
-    """Preprocess the TUH Abnormal EEG Corpus for gender (M/F) classification.
+def futurefc_tuab_preprocess(path="../data/TUAB", hz=200):
+    """Preprocess the TUH Abnormal EEG Corpus for future FC prediction.
 
-    Reads all EDF files under ``edf/train/`` and ``edf/eval/``, extracts the
-    standard 19‑channel 10-20 EEG, resamples to ``hz`` Hz, and segments into
-    non‑overlapping 1‑minute windows.
-
-    Gender labels are extracted from the EDF file header (Patient ID field):
-    Female=0, Male=1.  Files with unknown/missing sex are skipped.
+    Signal processing identical to ``tuab_preprocess()`` but saves dummy
+    labels.  The prediction target is computed on-the-fly from the time series.
 
     Parameters
     ----------
     path : str
-        Path to the TUAB dataset root (contains ``edf/`` subdirectory).
+        Path to the TUAB dataset root.
     hz : int
         Resampling rate in Hz.  Default 200.
     """
     edf_root = os.path.join(path, "edf")
-    output_path = os.path.join(path, "tuab_gender.npz")
+    output_path = os.path.join(path, "tuab_futurefc.npz")
 
-    # ── Collect all EDF files ──
     file_list = []
     subject_map = {}
 
@@ -231,14 +210,12 @@ def gender_tuab_preprocess(path="../data/TUAB", hz=200):
 
     print(f"Found {len(file_list)} EDF files in {edf_root}")
 
-    # ── Assign sequential integer subject IDs ──
     for _, subj_str in file_list:
         if subj_str not in subject_map:
-            subject_map[subj_str] = len(subject_map) + 1  # 1-indexed
+            subject_map[subj_str] = len(subject_map) + 1
 
     print(f"Unique subjects: {len(subject_map)}")
 
-    # ── Build multiprocessing task args ──
     task_args = [
         (edf_path, hz, subject_map[subj_str])
         for edf_path, subj_str in file_list
@@ -249,12 +226,11 @@ def gender_tuab_preprocess(path="../data/TUAB", hz=200):
 
     ts_list, lbl_list, subj_list = [], [], []
     skipped = 0
-    skipped_sex = 0
     with Pool(processes=n_workers) as pool:
         for data, labels_arr, subj_arr in tqdm(
-                pool.imap_unordered(_process_tuab_file_gender, task_args),
+                pool.imap_unordered(_process_tuab_file_futurefc, task_args),
                 total=len(task_args),
-                desc="Processing TUAB gender"):
+                desc="Processing TUAB futurefc"):
             if data is None:
                 skipped += 1
                 continue
@@ -262,29 +238,23 @@ def gender_tuab_preprocess(path="../data/TUAB", hz=200):
             lbl_list.append(labels_arr)
             subj_list.append(subj_arr)
 
-    print(f"Skipped {skipped} files (missing channels, too short, or unknown sex)")
+    if skipped:
+        print(f"Skipped {skipped} files (missing channels or too short)")
 
     if not ts_list:
         raise RuntimeError("No valid EDF files processed — check dataset path.")
 
-    # ── Concatenate ──
     time_series = np.concatenate(ts_list, axis=0)
     labels = np.concatenate(lbl_list, axis=0)
     subject_ids = np.concatenate(subj_list, axis=0)
 
-    # ── Normalize ──
     time_series = data_norm(time_series)
     time_series = preprocess_ea(time_series)
 
     time_series = time_series.astype(np.float32)
     labels = labels.astype(np.int8)
 
-    # ── Report ──
-    n_f = int((labels == 0).sum())
-    n_m = int((labels == 1).sum())
     print(f"\nTotal samples: {len(labels)}")
-    print(f"  Female (label=0): {n_f}")
-    print(f"  Male   (label=1): {n_m}")
     print(f"  Shape: {time_series.shape}")
 
     np.savez(output_path, timeseries=time_series,
@@ -295,4 +265,4 @@ def gender_tuab_preprocess(path="../data/TUAB", hz=200):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    gender_tuab_preprocess("../data/TUAB", hz=200)
+    futurefc_tuab_preprocess("../data/TUAB", hz=200)

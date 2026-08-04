@@ -27,6 +27,8 @@ class DataConfig:
         self.num_heads = args.num_heads
         self.abla_channel = args.abla_channel
         self.abla_vae = args.abla_vae
+        self.fc_threshold = args.fc_threshold
+        self.fc_keep_ratio = args.fc_keep_ratio
 
         # 任务类型：由各数据集 load_data 显式设置；
         # 未设置时根据 output_dim 推断（向后兼容旧数据集）

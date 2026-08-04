@@ -21,6 +21,8 @@ deepspeed --num_gpus=6 main.py \
     --few_shot_seed 42 \
     --pretrain_path "" \
     --data_dir "$DATA_DIR" \
+    --fc_threshold 0.0 \
+    --fc_keep_ratio 1.0 \
     --d_model 64 \
     --window_size 50 \
     --window_stride 3 \

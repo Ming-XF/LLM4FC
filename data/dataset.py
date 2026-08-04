@@ -249,6 +249,63 @@ class BaseDataset(Dataset):
         return torch.from_numpy(conn)
 
     @staticmethod
+    def sparsify_fc(fc, threshold=0.0, keep_ratio=1.0):
+        """对 FC 矩阵进行阈值 + Top-K 稀疏化（保留自环，保持对称）。
+
+        支持 2D (N, N) 和 3D (W, N, N) 输入。
+        当 threshold <= 0 且 keep_ratio >= 1.0 时直接返回原矩阵。
+
+        Parameters
+        ----------
+        fc : Tensor, shape (N, N) or (W, N, N)
+        threshold : float  绝对值低于此值的边置零（0 = 不过滤）
+        keep_ratio : float  Top-K 保留比例（1.0 = 全保留），仅作用于非对角线
+
+        Returns
+        -------
+        fc_sparse : Tensor, same shape as fc
+        """
+        if threshold <= 0.0 and keep_ratio >= 1.0:
+            return fc
+
+        single = (fc.dim() == 2)
+        if single:
+            fc = fc.unsqueeze(0)  # → (1, N, N)
+
+        B, N, _ = fc.shape
+        device = fc.device
+
+        fc_sparse = fc.clone()
+        fc_abs = fc.abs().clone()
+
+        # 临时清零对角线，避免自环参与 Top-K 竞争
+        idx = torch.arange(N, device=device)
+        fc_sparse[:, idx, idx] = 0.0
+        fc_abs[:, idx, idx] = 0.0
+
+        # ── Top-K 稀疏化：每张图独立选择绝对值最大的 keep_ratio 条边 ──
+        if keep_ratio < 1.0:
+            triu_idx = torch.triu_indices(N, N, offset=1)
+            for b in range(B):
+                vals = fc_abs[b, triu_idx[0], triu_idx[1]]
+                k = max(1, int(round(vals.shape[0] * keep_ratio)))
+                th = vals.topk(k).values[-1]
+                mask = (fc_abs[b] >= th)
+                fc_abs[b] = fc_abs[b] * mask
+                fc_sparse[b] = fc_sparse[b] * mask
+
+        # ── 阈值稀疏化 ──
+        if threshold > 0.0:
+            fc_sparse[fc_abs < threshold] = 0.0
+
+        # ── 恢复对角线为 1 ──
+        fc_sparse[:, idx, idx] = 1.0
+
+        if single:
+            fc_sparse = fc_sparse.squeeze(0)
+        return fc_sparse
+
+    @staticmethod
     def dynamic_connectivity(time_series, window_size, step_size):
         """Compute dynamic FC via sliding windows.
 

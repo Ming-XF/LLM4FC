@@ -21,7 +21,7 @@ warnings.filterwarnings("ignore")
 # Standard 19-channel 10-20 EEG order (CAUEEG-compatible)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_TUEP_CHANNEL_ORDER = [
+_TUAB_CHANNEL_ORDER = [
     'Fp1', 'F3', 'C3', 'P3', 'O1',          # left hemisphere
     'Fp2', 'F4', 'C4', 'P4', 'O2',          # right hemisphere
     'F7', 'T3', 'T5',                         # left temporal
@@ -30,6 +30,7 @@ _TUEP_CHANNEL_ORDER = [
 ]
 
 # Mapping from EDF channel-name variants to standard 10-20 short names.
+# EDF channels appear as "EEG FP1-REF", "EEG FZ-LE", etc.
 _CHANNEL_NORM_MAP = {
     'FP1': 'Fp1', 'FP2': 'Fp2',
     'FZ': 'Fz', 'CZ': 'Cz', 'PZ': 'Pz',
@@ -41,6 +42,7 @@ def _normalize_channel(name):
 
     ``EEG FP1-REF`` → ``Fp1``, ``EEG C3-LE`` → ``C3``.
     """
+    # Strip known prefix / suffix
     for prefix in ['EEG ']:
         if name.startswith(prefix):
             name = name[len(prefix):]
@@ -75,19 +77,19 @@ def _resolve_param(val, pos):
 # Dataset
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class DiseaseTUEPDataset(BaseDataset):
-    """TUH EEG Epilepsy Corpus — epilepsy vs no-epilepsy binary classification.
+class DiseaseTUABDataset(BaseDataset):
+    """TUH Abnormal EEG Corpus — normal vs abnormal binary classification.
 
     Task: given a 1‑minute window of 19‑channel EEG time series,
-    classify the subject as having epilepsy (1) or not (0).
+    classify the subject's EEG as normal (0) or abnormal (1).
 
-    The dataset is preprocessed by ``disease_tuep_preprocess()`` and stored as a
+    The dataset is preprocessed by ``disease_tuab_preprocess()`` and stored as a
     single ``.npz`` file.
     """
 
     def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
                  episode_seed=None):
-        super(DiseaseTUEPDataset, self).__init__(data_config, k, train, one_hot=one_hot,
+        super(DiseaseTUABDataset, self).__init__(data_config, k, train, one_hot=one_hot,
                                                  episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
@@ -121,11 +123,9 @@ class DiseaseTUEPDataset(BaseDataset):
             self.all_data['labels'][idx[item]]).to(torch.int64)
 
         SFC = self.connectivity(time_series)
-        SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
         window_size = 6 * self.hz
         step_size = (60 * self.hz - window_size) // 9
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
-        DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
 
         return {'time_series': time_series,
                 'DFC': DFC,
@@ -138,8 +138,8 @@ class DiseaseTUEPDataset(BaseDataset):
 # Preprocessing — worker (module-level for multiprocessing)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _process_tuep_file(args):
-    """Process a single TUEP EDF file into 1-minute windows.
+def _process_tuab_file(args):
+    """Process a single TUAB EDF file into 1-minute windows.
 
     Parameters
     ----------
@@ -159,7 +159,7 @@ def _process_tuep_file(args):
     except Exception:
         return None, None, None
 
-    # ── Build mapping from normalised channel name → EDF index ──
+    # ── Build a mapping from normalised channel name → EDF index ──
     edf_ch_names = raw.info['ch_names']
     ch_index = {}
     for i, ch in enumerate(edf_ch_names):
@@ -167,12 +167,12 @@ def _process_tuep_file(args):
         ch_index[norm] = i
 
     # ── Check all 19 standard channels exist ──
-    missing = [ch for ch in _TUEP_CHANNEL_ORDER if ch not in ch_index]
+    missing = [ch for ch in _TUAB_CHANNEL_ORDER if ch not in ch_index]
     if missing:
         return None, None, None
 
     # ── Pick and reorder the 19 EEG channels ──
-    pick_idx = [ch_index[ch] for ch in _TUEP_CHANNEL_ORDER]
+    pick_idx = [ch_index[ch] for ch in _TUAB_CHANNEL_ORDER]
     raw.pick([edf_ch_names[i] for i in pick_idx], verbose=False)
 
     # ── Average reference, resample ──
@@ -201,70 +201,53 @@ def _process_tuep_file(args):
 # Preprocessing — main entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject=60,
+def disease_tuab_preprocess(path="../data/TUAB", hz=200, max_windows_per_subject=None,
                             max_subjects=None):
-    """Preprocess the TUH EEG Epilepsy Corpus for epilepsy classification.
+    """Preprocess the TUH Abnormal EEG Corpus for normal/abnormal classification.
 
-    Reads EDF files from ``00_epilepsy/`` (label=1) and ``01_no_epilepsy/``
-    (label=0).  For each session the ``01_tcp_ar`` montage is preferred;
-    sessions without it are skipped.
-
-    Each file is resampled to ``hz`` Hz, reduced to the standard 19-channel
-    10-20 EEG, and segmented into non‑overlapping 1‑minute windows.
+    Reads all EDF files under ``edf/train/`` and ``edf/eval/``, extracts the
+    standard 19-channel 10-20 EEG, resamples to ``hz`` Hz, and segments into
+    non‑overlapping 1‑minute windows.
 
     Parameters
     ----------
     path : str
-        Path to the TUEP dataset root (contains ``00_epilepsy/`` and
-        ``01_no_epilepsy/`` subdirectories).
+        Path to the TUAB dataset root (contains ``edf/`` subdirectory).
     hz : int
         Resampling rate in Hz.  Default 200.
     max_windows_per_subject : int, tuple, or None
-        Max windows retained per subject.  ``int`` → same for both classes.
-        ``(pos, neg)`` → label=1 / label=0 separately.
-        ``None`` to disable.  Default 60.
+        Max windows retained per subject.  When an ``int``, the same limit
+        applies to both classes.  When a ``(pos, neg)`` tuple, the first
+        element applies to label=1 (abnormal) and the second to label=0
+        (normal).  ``None`` or ``(None, None)`` disables capping for that
+        class.  Default ``None``.
     max_subjects : int, tuple, or None
         Max subjects retained (stratified by class, deterministically).
         ``int`` → ``max_subjects // 2`` per class.
         ``(pos, neg)`` → explicit limits per class.  Default ``None``.
     """
-    output_path = os.path.join(path, "tuep_disease.npz")
+    edf_root = os.path.join(path, "edf")
+    output_path = os.path.join(path, "tuab_disease.npz")
 
-    # ── Collect EDF files ──
-    # For each (class_dir, label) pair, walk subject/session/montage
+    # ── Collect all EDF files with their labels ──
     file_list = []       # list of (edf_path, label, subject_str)
     subject_map = {}     # subject_str → sequential int ID
 
-    for cls_dir_name, label in [('00_epilepsy', 1), ('01_no_epilepsy', 0)]:
-        cls_dir = os.path.join(path, cls_dir_name)
-        if not os.path.isdir(cls_dir):
-            print(f"  [SKIP] directory not found: {cls_dir}")
-            continue
-
-        for subj_name in sorted(os.listdir(cls_dir)):
-            subj_dir = os.path.join(cls_dir, subj_name)
-            if not os.path.isdir(subj_dir):
+    for split in ['train', 'eval']:
+        for cls_name, label in [('normal', 0), ('abnormal', 1)]:
+            cls_dir = os.path.join(edf_root, split, cls_name, '01_tcp_ar')
+            if not os.path.isdir(cls_dir):
+                print(f"  [SKIP] directory not found: {cls_dir}")
                 continue
-
-            for sess_name in sorted(os.listdir(subj_dir)):
-                sess_dir = os.path.join(subj_dir, sess_name)
-                if not os.path.isdir(sess_dir):
+            for fname in sorted(os.listdir(cls_dir)):
+                if not fname.endswith('.edf'):
                     continue
+                edf_path = os.path.join(cls_dir, fname)
+                # Extract subject ID from filename: "aaaaaaav_s004_t000.edf"
+                subj_str = fname.split('_s')[0]
+                file_list.append((edf_path, label, subj_str))
 
-                # ── Prefer 01_tcp_ar montage ──
-                montage_dir = os.path.join(sess_dir, '01_tcp_ar')
-                if not os.path.isdir(montage_dir):
-                    continue  # skip sessions without AR montage
-
-                for fname in sorted(os.listdir(montage_dir)):
-                    if not fname.endswith('.edf'):
-                        continue
-                    edf_path = os.path.join(montage_dir, fname)
-                    file_list.append((edf_path, label, subj_name))
-
-    print(f"Found {len(file_list)} EDF files")
-    print(f"  Epilepsy:     {sum(1 for _, l, _ in file_list if l == 1)}")
-    print(f"  No epilepsy:  {sum(1 for _, l, _ in file_list if l == 0)}")
+    print(f"Found {len(file_list)} EDF files in {edf_root}")
 
     # ── Assign sequential integer subject IDs ──
     for _, _, subj_str in file_list:
@@ -286,9 +269,9 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
     skipped = 0
     with Pool(processes=n_workers) as pool:
         for data, labels_arr, subj_arr in tqdm(
-                pool.imap_unordered(_process_tuep_file, task_args),
+                pool.imap_unordered(_process_tuab_file, task_args),
                 total=len(task_args),
-                desc="Processing TUEP"):
+                desc="Processing TUAB"):
             if data is None:
                 skipped += 1
                 continue
@@ -362,7 +345,7 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
         # Re-assign sequential IDs (1-indexed)
         _, subject_ids = np.unique(subject_ids, return_inverse=True)
         subject_ids = subject_ids + 1
-        print(f"Sampled {n_pos} epilepsy + {n_neg} no-epilepsy = "
+        print(f"Sampled {n_pos} abnormal + {n_neg} normal = "
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
     # ── Normalize ──
@@ -373,11 +356,11 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
     labels = labels.astype(np.int8)
 
     # ── Report ──
-    n_epi = int(labels.sum())
-    n_no_epi = int(len(labels) - n_epi)
+    n_abnormal = int(labels.sum())
+    n_normal = int(len(labels) - n_abnormal)
     print(f"\nTotal samples: {len(labels)}")
-    print(f"  Epilepsy     (label=1): {n_epi}")
-    print(f"  No epilepsy  (label=0): {n_no_epi}")
+    print(f"  Abnormal (label=1): {n_abnormal}")
+    print(f"  Normal   (label=0): {n_normal}")
     print(f"  Shape: {time_series.shape}")
 
     np.savez(output_path, timeseries=time_series,
@@ -388,4 +371,4 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    disease_tuep_preprocess("../data/TUEP", hz=200, max_windows_per_subject=(80, None), max_subjects=None)
+    disease_tuab_preprocess("../data/TUAB", hz=200, max_windows_per_subject=(10, 8), max_subjects=None)

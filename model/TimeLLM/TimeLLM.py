@@ -24,56 +24,6 @@ class GCNLayer(nn.Module):
         return out
 
 
-def normalize_adjacency(SFC, threshold=0.0, keep_ratio=0.6):
-    """对称归一化邻接矩阵（含自环），支持 Top-K 稀疏化。
-
-    Parameters
-    ----------
-    SFC : (B, N, N) 原始邻接矩阵（DFC 或静态 FC）。
-    threshold : float  绝对值低于此值的边直接置零（0 = 不过滤）。
-    keep_ratio : float  按绝对值排序后保留的边比例（1.0 = 全保留），
-                        仅作用于非对角线元素。
-    """
-    B, N, _ = SFC.shape
-    device = SFC.device
-
-    adj_signed = SFC.clone()          # 保留符号，承载正/负相关
-    adj_abs = SFC.abs().clone()       # 用于结构决策（Top-K、阈值、degree）
-
-    idx = torch.arange(N, device=device)
-    adj_signed[:, idx, idx] = 0
-    adj_abs[:, idx, idx] = 0
-
-    # ── Top-K 稀疏化：每张图独立选择绝对值最大的 keep_ratio 条边 ──
-    if keep_ratio < 1.0:
-        triu_idx = torch.triu_indices(N, N, offset=1)
-        for b in range(B):
-            vals = adj_abs[b, triu_idx[0], triu_idx[1]]
-            k = int(round(vals.shape[0] * keep_ratio))
-            if k < vals.shape[0]:
-                th = vals.topk(k).values[-1]
-                mask = (adj_abs[b] >= th)
-                adj_abs[b] = adj_abs[b] * mask
-                adj_signed[b] = adj_signed[b] * mask
-
-    adj_signed[adj_abs < threshold] = 0
-    adj_abs[adj_abs < threshold] = 0
-
-    eye = torch.eye(N, device=device, dtype=adj_abs.dtype).unsqueeze(0)
-    adj_signed = adj_signed + eye
-    adj_abs = adj_abs + eye
-
-    # degree 用绝对值版计算，保证非负
-    deg = adj_abs.sum(dim=-1)
-    deg_inv_sqrt = deg.pow(-0.5)
-    deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.0
-
-    D_inv_sqrt = torch.diag_embed(deg_inv_sqrt)
-    # 用符号矩阵参与归一化，GCN 可感知正/负相关
-    adj_norm = D_inv_sqrt @ adj_signed @ D_inv_sqrt
-
-    return adj_norm
-
 
 class TimeLLMConfig(BaseConfig):
     def __init__(self, node_size,
@@ -343,8 +293,7 @@ class Model(nn.Module):
         # ── 改动1: 共享 GCN 逐窗口编码 ──
         # (B, T, C, C) → (B*T, C, C)，每个窗口独立过同一个 GCN
         DFC_flat = DFC.reshape(B * T, C, C)
-        adj_norm = normalize_adjacency(DFC_flat, threshold=0.0)
-        adj_norm = adj_norm.to(dtype=self.node_projection[0].weight.dtype)
+        adj_norm = DFC_flat
 
         eye = torch.eye(C, device=device, dtype=self.channel_embed_projection.weight.dtype)
         node_init = self.channel_embed_projection(eye)  # (C, gcn_hidden)

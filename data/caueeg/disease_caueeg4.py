@@ -49,9 +49,11 @@ class DiseaseCAUEEG4Dataset(BaseDataset):
         labels = torch.from_numpy(self.all_data['labels'][idx[item]]).to(torch.int64)
 
         SFC = self.connectivity(time_series)
+        SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
         window_size = 6 * self.hz
         step_size = (60 * self.hz - window_size) // 9
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
+        DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
 
         return {'time_series': time_series,
                 'DFC': DFC,
