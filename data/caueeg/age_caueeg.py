@@ -67,8 +67,15 @@ class AgeCAUEEGDataset(BaseDataset):
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        # ── 传原始连续标签，由 _create_splits 内部自动分箱 ──
-        self._create_splits(labels, self.all_data['subject_id'])
+        # ── 使用预处理阶段预计算的划分（随机，无分层）──
+        if 'split_train_index' in data:
+            self.train_index = data['split_train_index']
+            self.val_index = data['split_val_index']
+            self.test_index = data['split_test_index']
+        else:
+            # 向后兼容：旧 .npz 无预计算划分时回退到分层划分
+            print("  [WARN] 未找到预计算划分，回退到 _create_splits 分层划分")
+            self._create_splits(labels, self.all_data['subject_id'])
         shuffle(self.train_index)
 
     def __getitem__(self, item):
@@ -135,20 +142,10 @@ def _process_one_sample_age(args):
 # Preprocessing — main entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _resolve_param(val, pos):
-    """Resolve a per-class parameter that may be an int (both classes) or
-    tuple ``(pos_val, neg_val)``.
-    """
-    if val is None:
-        return None
-    if isinstance(val, (int, np.integer)):
-        return val
-    return val[0] if pos else val[1]
-
 
 def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
                          max_windows_per_subject=None,
-                         max_subjects=None):
+                         train_split=0.7, val_split=0.15):
     """Preprocess the CAUEEG dataset for age regression.
 
     Uses all subjects from annotation.json regardless of disease label.
@@ -196,66 +193,56 @@ def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
     subject_ids = np.concatenate(subj_list, axis=0)
     print(f"Concatenated: time_series={time_series.shape}, labels={labels.shape}")
 
-    # ── Per-subject window cap (evenly spaced sampling along time axis) ──
+    # ── Per-subject window cap (uniform across all subjects, evenly spaced) ──
     if max_windows_per_subject is not None:
         unique_subjs = np.unique(subject_ids)
         keep_mask = np.ones(len(subject_ids), dtype=bool)
         n_capped = 0
         for subj in unique_subjs:
             idx = np.where(subject_ids == subj)[0]
-            subj_label = labels[idx[0]]
-            cap = _resolve_param(max_windows_per_subject, pos=(subj_label == 1))
-            if cap is not None and len(idx) > cap:
-                sample_idx = np.linspace(0, len(idx) - 1, cap, dtype=int)
+            if len(idx) > max_windows_per_subject:
+                sample_idx = np.linspace(0, len(idx) - 1, max_windows_per_subject, dtype=int)
                 keep_mask[idx] = False
                 keep_mask[idx[sample_idx]] = True
                 n_capped += 1
         time_series = time_series[keep_mask]
         labels = labels[keep_mask]
         subject_ids = subject_ids[keep_mask]
-        print(f"Capped {n_capped} subjects (evenly spaced)")
+        print(f"Capped {n_capped} subjects (evenly spaced, max {max_windows_per_subject}/subj)")
 
-    # ── Per-class stratified subject sampling (deterministic: keep first N) ──
-    if max_subjects is not None:
-        unique_subjs = np.unique(subject_ids)
-        subj_labels = np.array([
-            np.bincount(labels[subject_ids == s].astype(int)).argmax()
-            for s in unique_subjs
-        ])
-        pos_subjs = unique_subjs[subj_labels == 1]
-        neg_subjs = unique_subjs[subj_labels == 0]
+    # ── Per-subject random split (no stratification, reproducible) ──
+    unique_subjs = np.unique(subject_ids)
+    rng = np.random.RandomState(42)
+    rng.shuffle(unique_subjs)
 
-        n_pos_limit = _resolve_param(max_subjects, pos=True)
-        n_neg_limit = _resolve_param(max_subjects, pos=False)
+    n_total = len(unique_subjs)
+    n_train = int(n_total * train_split)
+    n_val = int(n_total * val_split)
 
-        if isinstance(max_subjects, (int, np.integer)):
-            n_pos_limit = max_subjects // 2
-            n_neg_limit = max_subjects // 2
+    train_subjs = unique_subjs[:n_train]
+    val_subjs = unique_subjs[n_train:n_train + n_val]
+    test_subjs = unique_subjs[n_train + n_val:]
 
-        n_pos = len(pos_subjs) if n_pos_limit is None else min(n_pos_limit, len(pos_subjs))
-        n_neg = len(neg_subjs) if n_neg_limit is None else min(n_neg_limit, len(neg_subjs))
-        kept_pos = pos_subjs[:n_pos]
-        kept_neg = neg_subjs[:n_neg]
-        kept_subjs = np.concatenate([kept_pos, kept_neg])
+    split_train_index = np.where(np.isin(subject_ids, train_subjs))[0]
+    split_val_index = np.where(np.isin(subject_ids, val_subjs))[0]
+    split_test_index = np.where(np.isin(subject_ids, test_subjs))[0]
 
-        keep_mask = np.isin(subject_ids, kept_subjs)
-        time_series = time_series[keep_mask]
-        labels = labels[keep_mask]
-        subject_ids = subject_ids[keep_mask]
-
-        _, subject_ids = np.unique(subject_ids, return_inverse=True)
-        subject_ids = subject_ids + 1
-        print(f"Sampled {n_pos} + {n_neg} = "
-              f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
-
+    print(f"\nSplit: train={n_train} subj ({len(split_train_index)} samples), "
+          f"val={n_val} subj ({len(split_val_index)} samples), "
+          f"test={n_total - n_train - n_val} subj ({len(split_test_index)} samples)")
 
     print(f"\nTotal samples: {len(labels)}")
+    print(f"  Subjects: {len(np.unique(subject_ids))}")
     print(f"  Age range: {labels.min():.0f}–{labels.max():.0f} "
-          f"(mean={labels.mean():.1f})")
+          f"(mean={labels.mean():.1f}, median={np.median(labels):.0f})")
     print(f"  Shape: {time_series.shape}")
 
-    np.savez(output_path, timeseries=time_series,
-             labels=labels, subject_id=subject_ids, hz=hz)
+    np.savez(output_path,
+             timeseries=time_series,
+             labels=labels, subject_id=subject_ids, hz=hz,
+             split_train_index=split_train_index,
+             split_val_index=split_val_index,
+             split_test_index=split_test_index)
     print(f"Saved to {output_path}")
 
 

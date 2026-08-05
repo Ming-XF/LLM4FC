@@ -72,7 +72,14 @@ class FutureFCCAUEEGDataset(BaseDataset):
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        self._create_splits(labels, self.all_data['subject_id'])
+        # ── 使用预处理阶段预计算的划分（随机，无分层）──
+        if 'split_train_index' in data:
+            self.train_index = data['split_train_index']
+            self.val_index = data['split_val_index']
+            self.test_index = data['split_test_index']
+        else:
+            print("  [WARN] 未找到预计算划分，回退到 _create_splits")
+            self._create_splits(labels, self.all_data['subject_id'])
         shuffle(self.train_index)
 
     def __getitem__(self, item):
@@ -130,7 +137,7 @@ def _process_one_sample_futurefc(args):
 
 def futurefc_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
                                max_windows_per_subject=None,
-                               max_subjects=None):
+                               train_split=0.7, val_split=0.15):
     """Preprocess the CAUEEG dataset for future FC prediction.
 
     Uses all subjects from annotation.json.  Saves dummy labels; the actual
@@ -191,29 +198,38 @@ def futurefc_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
         subject_ids = subject_ids[keep_mask]
         print(f"Capped {n_capped} subjects (evenly spaced)")
 
-    # ── Subject sampling (single-class: all labels are dummy) ──
-    if max_subjects is not None:
-        unique_subjs = np.unique(subject_ids)
-        n_keep = min(max_subjects, len(unique_subjs))
-        kept_subjs = unique_subjs[:n_keep]
+    # ── Per-subject random split (no stratification, reproducible) ──
+    unique_subjs = np.unique(subject_ids)
+    rng = np.random.RandomState(42)
+    rng.shuffle(unique_subjs)
 
-        keep_mask = np.isin(subject_ids, kept_subjs)
-        time_series = time_series[keep_mask]
-        labels = labels[keep_mask]
-        subject_ids = subject_ids[keep_mask]
+    n_total = len(unique_subjs)
+    n_train = int(n_total * train_split)
+    n_val = int(n_total * val_split)
 
-        _, subject_ids = np.unique(subject_ids, return_inverse=True)
-        subject_ids = subject_ids + 1
-        print(f"Sampled {n_keep} subjects from {len(unique_subjs)} total")
+    train_subjs = unique_subjs[:n_train]
+    val_subjs = unique_subjs[n_train:n_train + n_val]
+    test_subjs = unique_subjs[n_train + n_val:]
 
+    split_train_index = np.where(np.isin(subject_ids, train_subjs))[0]
+    split_val_index = np.where(np.isin(subject_ids, val_subjs))[0]
+    split_test_index = np.where(np.isin(subject_ids, test_subjs))[0]
+
+    print(f"\nSplit: train={n_train} subj ({len(split_train_index)} samples), "
+          f"val={n_val} subj ({len(split_val_index)} samples), "
+          f"test={n_total - n_train - n_val} subj ({len(split_test_index)} samples)")
 
     labels = labels.astype(np.int8)
 
     print(f"\nTotal samples: {len(labels)}")
     print(f"  Shape: {time_series.shape}")
 
-    np.savez(output_path, timeseries=time_series,
-             labels=labels, subject_id=subject_ids, hz=hz)
+    np.savez(output_path,
+             timeseries=time_series,
+             labels=labels, subject_id=subject_ids, hz=hz,
+             split_train_index=split_train_index,
+             split_val_index=split_val_index,
+             split_test_index=split_test_index)
     print(f"Saved to {output_path}")
 
 

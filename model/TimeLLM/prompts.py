@@ -99,21 +99,12 @@ class PromptConfig:
 # ── 数据集配置字典 ──────────────────────────────────
 
 DATASET_PROMPTS: Dict[str, dict] = {
-    'CAUEEG2': {
+    'CAUEEG': {
         'channel_names': _EEG_19_CHANNELS,
         'channel_groups': _EEG_CHANNEL_GROUPS,
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_CAUEEG,
         'prompt_task': _PROMPT_TASK_BINARY,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
-    'CAUEEG4': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
-        'prompt_task': _PROMPT_TASK_4CLASS,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
 
@@ -158,7 +149,7 @@ DATASET_PROMPTS: Dict[str, dict] = {
 def get_prompt_config(dataset_name: str) -> PromptConfig:
     """Return the prompt configuration for *dataset_name*.
 
-    Falls back to ``'CAUEEG2'`` if the dataset is not in the registry.
+    Falls back to ``'CAUEEG'`` if the dataset is not in the registry.
     """
-    cfg = DATASET_PROMPTS.get(dataset_name, DATASET_PROMPTS['CAUEEG2'])
+    cfg = DATASET_PROMPTS.get(dataset_name, DATASET_PROMPTS['CAUEEG'])
     return PromptConfig(**cfg)

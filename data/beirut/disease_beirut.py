@@ -8,6 +8,8 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
+from sklearn.model_selection import train_test_split
+
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
 from ..preprocess import *
@@ -118,9 +120,14 @@ class DiseaseBeirutDataset(BaseDataset):
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        # ── Split via parent _create_splits (K‑Fold or train/val/test) ──
-        groups = np.arange(len(self.all_data['labels']))
-        self._create_splits(self.all_data['labels'], groups)
+        if 'split_train_index' in data:
+            self.train_index = data['split_train_index']
+            self.val_index = data['split_val_index']
+            self.test_index = data['split_test_index']
+        else:
+            print("  [WARN] 未找到预计算划分，回退到 _create_splits")
+            groups = np.arange(len(self.all_data['labels']))
+            self._create_splits(self.all_data['labels'], groups)
 
         self.all_data['labels'] = F.one_hot(
             torch.from_numpy(self.all_data['labels']).to(torch.int64)).numpy()
@@ -164,7 +171,8 @@ def disease_beirut_preprocess(path_beirut="../data/Beirut", hz=200,
                       window_sec=60, stride_sec=30,
                       predict_sec=600, buffer_sec=600,
                       max_windows_per_subject=None,
-                      max_subjects=None):
+                      max_subjects=None,
+                      train_split=0.7, val_split=0.15):
     """Preprocess the Beirut epilepsy dataset for seizure‑prediction.
 
     Parameters
@@ -359,11 +367,43 @@ def disease_beirut_preprocess(path_beirut="../data/Beirut", hz=200,
           f"Pre-ictal: {int(labels_all.sum())}, "
           f"Inter-ictal: {int((1 - labels_all).sum())}")
 
+    # ── Per-subject stratified random split ──
+    unique_subjs = np.unique(subject_ids_all)
+    subj_labels = np.array([
+        np.bincount(labels_all[subject_ids_all == s].astype(int)).argmax()
+        for s in unique_subjs
+    ])
+    train_subjs, rest_subjs = train_test_split(
+        unique_subjs, test_size=1.0 - train_split,
+        stratify=subj_labels, random_state=42)
+    rest_mask = np.isin(unique_subjs, rest_subjs)
+    val_frac = val_split / (1.0 - train_split)
+    val_subjs, test_subjs = train_test_split(
+        rest_subjs, test_size=1.0 - val_frac,
+        stratify=subj_labels[rest_mask], random_state=42)
+
+    split_train_index = np.where(np.isin(subject_ids_all, train_subjs))[0]
+    split_val_index = np.where(np.isin(subject_ids_all, val_subjs))[0]
+    split_test_index = np.where(np.isin(subject_ids_all, test_subjs))[0]
+
+    train_pre = int(sum(subj_labels[np.isin(unique_subjs, train_subjs)] == 1))
+    train_int = len(train_subjs) - train_pre
+    val_pre = int(sum(subj_labels[np.isin(unique_subjs, val_subjs)] == 1))
+    val_int = len(val_subjs) - val_pre
+    test_pre = int(sum(subj_labels[np.isin(unique_subjs, test_subjs)] == 1))
+    test_int = len(test_subjs) - test_pre
+    print(f"\nSplit: train={len(train_subjs)} subj ({train_int}inter/{train_pre}pre, {len(split_train_index)} samples)")
+    print(f"  val={len(val_subjs)} subj ({val_int}inter/{val_pre}pre, {len(split_val_index)} samples)")
+    print(f"  test={len(test_subjs)} subj ({test_int}inter/{test_pre}pre, {len(split_test_index)} samples)")
+
     np.save(output_path, {
         "timeseries": time_series_all,
         "labels": labels_all,
         "subject_id": subject_ids_all,
         "hz": hz,
+        "split_train_index": split_train_index,
+        "split_val_index": split_val_index,
+        "split_test_index": split_test_index,
     })
     print(f"Saved to {output_path}")
 

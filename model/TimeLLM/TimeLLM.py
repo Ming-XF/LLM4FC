@@ -37,7 +37,7 @@ class TimeLLMConfig(BaseConfig):
                  num_windows=10,
                  task_type='classification',
                  output_dim=2,
-                 dataset_name='CAUEEG2',
+                 dataset_name='CAUEEG',
                  llm_type='chatglm',
                  llm_path='./model/chatglm-6b'):
         super().__init__(node_size=node_size, output_dim=output_dim)

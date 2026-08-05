@@ -18,6 +18,8 @@ def _init_worker():
     os.environ['NUMEXPR_NUM_THREADS'] = '1'
 
 
+from sklearn.model_selection import train_test_split
+
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
 from ..preprocess import *
@@ -93,7 +95,14 @@ class GenderTUABDataset(BaseDataset):
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        self._create_splits(labels, self.all_data['subject_id'])
+        # ── 使用预处理阶段预计算的分层划分 ──
+        if 'split_train_index' in data:
+            self.train_index = data['split_train_index']
+            self.val_index = data['split_val_index']
+            self.test_index = data['split_test_index']
+        else:
+            print("  [WARN] 未找到预计算划分，回退到 _create_splits")
+            self._create_splits(labels, self.all_data['subject_id'])
         self.all_data['labels'] = F.one_hot(
             torch.from_numpy(self.all_data['labels']).to(torch.int64)).numpy()
         shuffle(self.train_index)
@@ -215,7 +224,8 @@ def _resolve_param(val, pos):
 
 def gender_tuab_preprocess(path="../data/TUAB", hz=200,
                            max_windows_per_subject=None,
-                           max_subjects=None):
+                           max_subjects=None,
+                           train_split=0.7, val_split=0.15):
     """Preprocess the TUH Abnormal EEG Corpus for gender (M/F) classification.
 
     Reads all EDF files under ``edf/train/`` and ``edf/eval/``, extracts the
@@ -349,6 +359,35 @@ def gender_tuab_preprocess(path="../data/TUAB", hz=200,
         print(f"Sampled {n_pos} Male + {n_neg} Female = "
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
+    # ── Per-subject stratified random split ──
+    unique_subjs = np.unique(subject_ids)
+    subj_labels = np.array([
+        np.bincount(labels[subject_ids == s].astype(int)).argmax()
+        for s in unique_subjs
+    ])
+    train_subjs, rest_subjs = train_test_split(
+        unique_subjs, test_size=1.0 - train_split,
+        stratify=subj_labels, random_state=42)
+    rest_mask = np.isin(unique_subjs, rest_subjs)
+    val_frac = val_split / (1.0 - train_split)
+    val_subjs, test_subjs = train_test_split(
+        rest_subjs, test_size=1.0 - val_frac,
+        stratify=subj_labels[rest_mask], random_state=42)
+
+    split_train_index = np.where(np.isin(subject_ids, train_subjs))[0]
+    split_val_index = np.where(np.isin(subject_ids, val_subjs))[0]
+    split_test_index = np.where(np.isin(subject_ids, test_subjs))[0]
+
+    train_m = int(sum(subj_labels[np.isin(unique_subjs, train_subjs)] == 1))
+    train_f = len(train_subjs) - train_m
+    val_m = int(sum(subj_labels[np.isin(unique_subjs, val_subjs)] == 1))
+    val_f = len(val_subjs) - val_m
+    test_m = int(sum(subj_labels[np.isin(unique_subjs, test_subjs)] == 1))
+    test_f = len(test_subjs) - test_m
+    print(f"\nSplit: train={len(train_subjs)} subj ({train_f}F/{train_m}M, {len(split_train_index)} samples)")
+    print(f"  val={len(val_subjs)} subj ({val_f}F/{val_m}M, {len(split_val_index)} samples)")
+    print(f"  test={len(test_subjs)} subj ({test_f}F/{test_m}M, {len(split_test_index)} samples)")
+
     # ── Normalize ──
 
     labels = labels.astype(np.int8)
@@ -361,12 +400,18 @@ def gender_tuab_preprocess(path="../data/TUAB", hz=200,
     print(f"  Male   (label=1): {n_m}")
     print(f"  Shape: {time_series.shape}")
 
-    np.savez(output_path, timeseries=time_series,
-             labels=labels, subject_id=subject_ids, hz=hz)
+    np.savez(output_path,
+             timeseries=time_series,
+             labels=labels, subject_id=subject_ids, hz=hz,
+             split_train_index=split_train_index,
+             split_val_index=split_val_index,
+             split_test_index=split_test_index)
     print(f"Saved to {output_path}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    gender_tuab_preprocess("../data/TUAB", hz=200)
+    gender_tuab_preprocess("../data/TUAB", hz=200,
+                           max_windows_per_subject=8,
+                           max_subjects=None)

@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from sklearn.model_selection import train_test_split
+
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
 from ..preprocess import *
@@ -24,10 +26,10 @@ def _init_worker():
     os.environ['NUMEXPR_NUM_THREADS'] = '1'
 
 
-class DiseaseCAUEEG2Dataset(BaseDataset):
+class DiseaseCAUEEGDataset(BaseDataset):
     def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
                  episode_seed=None):
-        super(DiseaseCAUEEG2Dataset, self).__init__(data_config, k, train, one_hot=one_hot,
+        super(DiseaseCAUEEGDataset, self).__init__(data_config, k, train, one_hot=one_hot,
                                                     episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
@@ -48,7 +50,13 @@ class DiseaseCAUEEG2Dataset(BaseDataset):
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        self._create_splits(labels, self.all_data['subject_id'])
+        if 'split_train_index' in data:
+            self.train_index = data['split_train_index']
+            self.val_index = data['split_val_index']
+            self.test_index = data['split_test_index']
+        else:
+            print("  [WARN] 未找到预计算划分，回退到 _create_splits")
+            self._create_splits(labels, self.all_data['subject_id'])
         self.all_data['labels'] = F.one_hot(torch.from_numpy(self.all_data['labels']).to(torch.int64)).numpy()
         shuffle(self.train_index)
 
@@ -107,13 +115,14 @@ def _resolve_param(val, pos):
     return val[0] if pos else val[1]
 
 
-def disease_caueeg2_preprocess(path="../data/CAUEEG/", hz=200,
+def disease_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
                                max_windows_per_subject=None,
-                               max_subjects=None):
+                               max_subjects=None,
+                               train_split=0.7, val_split=0.15):
     # 配置路径
     annotation_file = os.path.join(path, "caueeg-dataset/annotation.json")
     signal_folder = os.path.join(path, os.path.join('caueeg-dataset/signal', "edf"))
-    output_path = os.path.join(path, "caueeg2_disease.npz")
+    output_path = os.path.join(path, "caueeg_disease.npz")
 
     # 读取标注文件
     with open(annotation_file, 'r') as f:
@@ -198,11 +207,43 @@ def disease_caueeg2_preprocess(path="../data/CAUEEG/", hz=200,
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
 
+    # ── Per-subject stratified random split ──
+    unique_subjs = np.unique(subject_ids)
+    subj_labels = np.array([
+        np.bincount(labels[subject_ids == s].astype(int)).argmax()
+        for s in unique_subjs
+    ])
+    train_subjs, rest_subjs = train_test_split(
+        unique_subjs, test_size=1.0 - train_split,
+        stratify=subj_labels, random_state=42)
+    rest_mask = np.isin(unique_subjs, rest_subjs)
+    val_frac = val_split / (1.0 - train_split)
+    val_subjs, test_subjs = train_test_split(
+        rest_subjs, test_size=1.0 - val_frac,
+        stratify=subj_labels[rest_mask], random_state=42)
+
+    split_train_index = np.where(np.isin(subject_ids, train_subjs))[0]
+    split_val_index = np.where(np.isin(subject_ids, val_subjs))[0]
+    split_test_index = np.where(np.isin(subject_ids, test_subjs))[0]
+
     labels = labels.astype(np.int8)
 
+    train_ad = int(sum(subj_labels[np.isin(unique_subjs, train_subjs)] == 1))
+    train_nc = len(train_subjs) - train_ad
+    val_ad = int(sum(subj_labels[np.isin(unique_subjs, val_subjs)] == 1))
+    val_nc = len(val_subjs) - val_ad
+    test_ad = int(sum(subj_labels[np.isin(unique_subjs, test_subjs)] == 1))
+    test_nc = len(test_subjs) - test_ad
+    print(f"\nSplit: train={len(train_subjs)} subj ({train_nc}NC/{train_ad}AD, {len(split_train_index)} samples)")
+    print(f"  val={len(val_subjs)} subj ({val_nc}NC/{val_ad}AD, {len(split_val_index)} samples)")
+    print(f"  test={len(test_subjs)} subj ({test_nc}NC/{test_ad}AD, {len(split_test_index)} samples)")
+
     print(time_series.shape)
-    np.savez(output_path, timeseries=time_series, labels=labels, subject_id=subject_ids, hz=hz)
+    np.savez(output_path, timeseries=time_series, labels=labels, subject_id=subject_ids, hz=hz,
+             split_train_index=split_train_index,
+             split_val_index=split_val_index,
+             split_test_index=split_test_index)
 
 
 if __name__ == '__main__':
-    disease_caueeg2_preprocess("../data/CAUEEG", hz=200)
+    disease_caueeg_preprocess("../data/CAUEEG", hz=200)

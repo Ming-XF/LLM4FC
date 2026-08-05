@@ -8,6 +8,8 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
+from sklearn.model_selection import train_test_split
+
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
 from ..preprocess import *
@@ -20,7 +22,7 @@ warnings.filterwarnings("ignore")
 # ═══════════════════════════════════════════════════════════════════════════════
 # CAUEEG-compatible channel order (19 EEG, 10-20 system)
 # DS raw .set may have a different order; we reorder to this for cross-dataset
-# compatibility with CAUEEG2.
+# compatibility with CAUEEG.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _DS_CHANNEL_ORDER = [
@@ -72,7 +74,13 @@ class DiseaseDSDataset(BaseDataset):
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        self._create_splits(labels, self.all_data['subject_id'])
+        if 'split_train_index' in data:
+            self.train_index = data['split_train_index']
+            self.val_index = data['split_val_index']
+            self.test_index = data['split_test_index']
+        else:
+            print("  [WARN] 未找到预计算划分，回退到 _create_splits")
+            self._create_splits(labels, self.all_data['subject_id'])
         self.all_data['labels'] = F.one_hot(
             torch.from_numpy(self.all_data['labels']).to(torch.int64)).numpy()
         shuffle(self.train_index)
@@ -115,7 +123,8 @@ def _resolve_param(val, pos):
 
 def disease_ds_preprocess(path="../data/DS", hz=200,
                           max_windows_per_subject=None,
-                          max_subjects=None):
+                          max_subjects=None,
+                          train_split=0.7, val_split=0.15):
     """Preprocess the DS dementia dataset for AD-vs-CN classification.
 
     Reads preprocessed .set files from ``derivatives/``, selects the first
@@ -128,7 +137,7 @@ def disease_ds_preprocess(path="../data/DS", hz=200,
         Path to the DS dataset root directory (contains participants.tsv
         and derivatives/ subfolder).
     hz : int
-        Resampling rate in Hz.  Default 200 (matches CAUEEG2).
+        Resampling rate in Hz.  Default 200 (matches CAUEEG).
     """
     participants_path = os.path.join(path, "participants.tsv")
     derivatives_dir = os.path.join(path, "derivatives")
@@ -254,10 +263,39 @@ def disease_ds_preprocess(path="../data/DS", hz=200,
         print(f"Sampled {n_pos} AD + {n_neg} CN = "
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
+    # ── Per-subject stratified random split ──
+    unique_subjs = np.unique(subject_ids)
+    subj_labels = np.array([
+        np.bincount(labels[subject_ids == s].astype(int)).argmax()
+        for s in unique_subjs
+    ])
+    train_subjs, rest_subjs = train_test_split(
+        unique_subjs, test_size=1.0 - train_split,
+        stratify=subj_labels, random_state=42)
+    rest_mask = np.isin(unique_subjs, rest_subjs)
+    val_frac = val_split / (1.0 - train_split)
+    val_subjs, test_subjs = train_test_split(
+        rest_subjs, test_size=1.0 - val_frac,
+        stratify=subj_labels[rest_mask], random_state=42)
+
+    split_train_index = np.where(np.isin(subject_ids, train_subjs))[0]
+    split_val_index = np.where(np.isin(subject_ids, val_subjs))[0]
+    split_test_index = np.where(np.isin(subject_ids, test_subjs))[0]
+
     # ── Normalize ──
 
     time_series = time_series.astype(np.float32)
     labels = labels.astype(np.int8)
+
+    train_ad = int(sum(subj_labels[np.isin(unique_subjs, train_subjs)] == 1))
+    train_cn = len(train_subjs) - train_ad
+    val_ad = int(sum(subj_labels[np.isin(unique_subjs, val_subjs)] == 1))
+    val_cn = len(val_subjs) - val_ad
+    test_ad = int(sum(subj_labels[np.isin(unique_subjs, test_subjs)] == 1))
+    test_cn = len(test_subjs) - test_ad
+    print(f"\nSplit: train={len(train_subjs)} subj ({train_cn}CN/{train_ad}AD, {len(split_train_index)} samples)")
+    print(f"  val={len(val_subjs)} subj ({val_cn}CN/{val_ad}AD, {len(split_val_index)} samples)")
+    print(f"  test={len(test_subjs)} subj ({test_cn}CN/{test_ad}AD, {len(split_test_index)} samples)")
 
     print(f"\nTotal samples: {len(labels)}")
     print(f"  AD (label=1): {int(labels.sum())}")
@@ -265,7 +303,10 @@ def disease_ds_preprocess(path="../data/DS", hz=200,
     print(f"  Shape: {time_series.shape}")
 
     np.savez(output_path, timeseries=time_series,
-             labels=labels, subject_id=subject_ids, hz=hz)
+             labels=labels, subject_id=subject_ids, hz=hz,
+             split_train_index=split_train_index,
+             split_val_index=split_val_index,
+             split_test_index=split_test_index)
     print(f"Saved to {output_path}")
 
 
