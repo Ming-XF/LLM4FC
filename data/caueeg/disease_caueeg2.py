@@ -15,6 +15,15 @@ from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
 
+def _init_worker():
+    """Set BLAS threads to 1 so each worker is single-threaded."""
+    import os
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['OPENBLAS_NUM_THREADS'] = '1'
+    os.environ['MKL_NUM_THREADS'] = '1'
+    os.environ['NUMEXPR_NUM_THREADS'] = '1'
+
+
 class DiseaseCAUEEG2Dataset(BaseDataset):
     def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
                  episode_seed=None):
@@ -84,7 +93,7 @@ def _process_one_sample(args):
 
     subj_ids = np.full(data.shape[0], subject_id)
 
-    return data, label, subj_ids
+    return data.astype(np.float32), label, subj_ids
 
 
 def _resolve_param(val, pos):
@@ -114,7 +123,7 @@ def disease_caueeg2_preprocess(path="../data/CAUEEG/", hz=200,
     target_samples = [s for s in annotation['data']
                       if 'ad' in s['symptom'] or 'cb_normal' in s['symptom']]
 
-    n_workers = min(cpu_count(), len(target_samples), 16)
+    n_workers = min(cpu_count(), len(target_samples), 48)
 
     print(f"并行处理 {len(target_samples)} 个样本，使用 {n_workers} 个进程...")
 
@@ -123,17 +132,18 @@ def disease_caueeg2_preprocess(path="../data/CAUEEG/", hz=200,
 
     # 多进程并行处理
     ts_list, lbl_list, subj_list = [], [], []
-    with Pool(processes=n_workers) as pool:
+    with Pool(processes=n_workers, initializer=_init_worker) as pool:
         for data, label, subj_ids in tqdm(pool.imap_unordered(_process_one_sample, task_args),
                                           total=len(task_args), desc="加载EDF"):
             ts_list.append(data)
             lbl_list.append(label)
             subj_list.append(subj_ids)
 
-    # 一次性拼接，避免循环中 np.append 的 O(n²) 开销
+    print("Concatenating arrays...")
     time_series = np.concatenate(ts_list, axis=0)
     labels = np.concatenate(lbl_list, axis=0)
     subject_ids = np.concatenate(subj_list, axis=0)
+    print(f"Concatenated: time_series={time_series.shape}, labels={labels.shape}")
 
     # ── Per-subject window cap (evenly spaced sampling along time axis) ──
     if max_windows_per_subject is not None:
@@ -188,7 +198,6 @@ def disease_caueeg2_preprocess(path="../data/CAUEEG/", hz=200,
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
 
-    time_series = time_series.astype(np.float32)
     labels = labels.astype(np.int8)
 
     print(time_series.shape)

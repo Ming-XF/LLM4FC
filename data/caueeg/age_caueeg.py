@@ -7,6 +7,16 @@ import torch
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
+
+def _init_worker():
+    """Set BLAS threads to 1 so each worker is single-threaded."""
+    import os
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['OPENBLAS_NUM_THREADS'] = '1'
+    os.environ['MKL_NUM_THREADS'] = '1'
+    os.environ['NUMEXPR_NUM_THREADS'] = '1'
+
+
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
 from ..preprocess import *
@@ -118,7 +128,7 @@ def _process_one_sample_age(args):
     label = np.full(data.shape[0], age, dtype=np.float32)
     subj_ids = np.full(data.shape[0], subject_id)
 
-    return data, label, subj_ids
+    return data.astype(np.float32), label, subj_ids
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -166,13 +176,13 @@ def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
     print(f"Total subjects: {len(target_samples)}")
     print(f"Age range: {min(ages)}–{max(ages)} (mean={np.mean(ages):.1f})")
 
-    n_workers = min(cpu_count(), len(target_samples), 16)
+    n_workers = min(cpu_count(), len(target_samples), 48)
     print(f"Processing {len(target_samples)} samples with {n_workers} workers...")
 
     task_args = [(sample, signal_folder, hz) for sample in target_samples]
 
     ts_list, lbl_list, subj_list = [], [], []
-    with Pool(processes=n_workers) as pool:
+    with Pool(processes=n_workers, initializer=_init_worker) as pool:
         for data, label, subj_ids in tqdm(
                 pool.imap_unordered(_process_one_sample_age, task_args),
                 total=len(task_args), desc="Loading EDF"):
@@ -180,9 +190,11 @@ def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
             lbl_list.append(label)
             subj_list.append(subj_ids)
 
+    print("Concatenating arrays...")
     time_series = np.concatenate(ts_list, axis=0)
     labels = np.concatenate(lbl_list, axis=0)
     subject_ids = np.concatenate(subj_list, axis=0)
+    print(f"Concatenated: time_series={time_series.shape}, labels={labels.shape}")
 
     # ── Per-subject window cap (evenly spaced sampling along time axis) ──
     if max_windows_per_subject is not None:
@@ -236,9 +248,6 @@ def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
         print(f"Sampled {n_pos} + {n_neg} = "
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
-
-    time_series = time_series.astype(np.float32)
-    labels = labels.astype(np.float32)
 
     print(f"\nTotal samples: {len(labels)}")
     print(f"  Age range: {labels.min():.0f}–{labels.max():.0f} "

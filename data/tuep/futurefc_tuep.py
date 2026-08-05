@@ -7,6 +7,16 @@ import torch
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
+
+def _init_worker():
+    """Set BLAS threads to 1 so each worker is single-threaded."""
+    import os
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['OPENBLAS_NUM_THREADS'] = '1'
+    os.environ['MKL_NUM_THREADS'] = '1'
+    os.environ['NUMEXPR_NUM_THREADS'] = '1'
+
+
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
 from ..preprocess import *
@@ -154,7 +164,7 @@ def _process_tuep_file_futurefc(args):
     labels_arr = np.zeros(data.shape[0], dtype=np.int8)  # dummy
     subj_arr = np.full(data.shape[0], subject_id, dtype=np.int32)
 
-    return data, labels_arr, subj_arr
+    return data.astype(np.float32), labels_arr, subj_arr
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -222,12 +232,12 @@ def futurefc_tuep_preprocess(path="../data/TUEP", hz=200,
         for edf_path, subj_str in file_list
     ]
 
-    n_workers = min(cpu_count(), len(task_args), 16)
+    n_workers = min(cpu_count(), len(task_args), 48)
     print(f"Processing {len(task_args)} files with {n_workers} workers...")
 
     ts_list, lbl_list, subj_list = [], [], []
     skipped = 0
-    with Pool(processes=n_workers) as pool:
+    with Pool(processes=n_workers, initializer=_init_worker) as pool:
         for data, labels_arr, subj_arr in tqdm(
                 pool.imap_unordered(_process_tuep_file_futurefc, task_args),
                 total=len(task_args),
@@ -245,9 +255,11 @@ def futurefc_tuep_preprocess(path="../data/TUEP", hz=200,
     if not ts_list:
         raise RuntimeError("No valid EDF files processed — check dataset path.")
 
+    print("Concatenating arrays...")
     time_series = np.concatenate(ts_list, axis=0)
     labels = np.concatenate(lbl_list, axis=0)
     subject_ids = np.concatenate(subj_list, axis=0)
+    print(f"Concatenated: time_series={time_series.shape}, labels={labels.shape}")
 
     # ── Per-subject window cap (evenly spaced sampling along time axis) ──
     if max_windows_per_subject is not None:
@@ -283,7 +295,6 @@ def futurefc_tuep_preprocess(path="../data/TUEP", hz=200,
         print(f"Sampled {n_keep} subjects from {len(unique_subjs)} total")
 
 
-    time_series = time_series.astype(np.float32)
     labels = labels.astype(np.int8)
 
     print(f"\nTotal samples: {len(labels)}")
