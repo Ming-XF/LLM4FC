@@ -219,6 +219,7 @@ class Model(nn.Module):
             fc: (B, C, C) — 预测的功能连接矩阵，值域 [-1, 1]
         """
         B, C, d = node_embeddings.shape
+        node_embeddings = node_embeddings.float()
         centered = node_embeddings - node_embeddings.mean(dim=-1, keepdim=True)
         # 协方差分子: (B, C, C)
         cov = torch.einsum('bic,bjc->bij', centered, centered) / (d - 1)
@@ -303,13 +304,11 @@ class Model(nn.Module):
             gcn_out = layer(gcn_out, adj_norm)
             gcn_out = F.gelu(gcn_out)
 
-        # ── 改动2: 重组为通道优先序列 ──
-        # (B*T, C, gcn_hidden) → (B, T, C, gcn_hidden) → (B, C, T, gcn_hidden)
-        # → (B, C*T, gcn_hidden)
-        # token order: C0T0, C0T1, ..., C0T9, C1T0, ..., C18T9
+        # ── 改动2: 重组为时间优先序列 ──
+        # (B*T, C, gcn_hidden) → (B, T, C, gcn_hidden) → (B, T*C, gcn_hidden)
+        # token order: C0T0, C1T0, ..., C18T0, C0T1, ..., C18T9
         gcn_out = gcn_out.reshape(B, T, C, -1)
-        gcn_out = gcn_out.transpose(1, 2).contiguous()
-        gcn_out = gcn_out.reshape(B, C * T, -1)
+        gcn_out = gcn_out.reshape(B, T * C, -1)
 
         node_embeddings = self.node_projection(gcn_out)
 
@@ -416,14 +415,14 @@ class Model(nn.Module):
             C = self.config.node_size          # 节点数 (19)
             T_out = labels.shape[1]            # 未来窗口数 (2)，由 labels 形状动态推导
 
-            # token 顺序为 channel-first: C0T0, C0T1, ..., C0T9, C1T0, ..., C18T9
+            # token 顺序为 time-first: C0T0, C1T0, ..., C18T0, C0T1, ..., C18T9
             # 未来窗口索引: T-T_out 到 T-1（即第 8, 9 个窗口）
             future_windows = torch.arange(T - T_out, T, device=HL_patches.device)
 
             fc_preds = []
             for w in future_windows:
-                # 窗口 w 的 C 个节点 token 索引: w, w+T, w+2T, ..., w+(C-1)*T
-                indices = w + torch.arange(C, device=HL_patches.device) * T
+                # 窗口 w 的 C 个节点 token 索引: w*C, w*C+1, ..., w*C+(C-1)
+                indices = w * C + torch.arange(C, device=HL_patches.device)
                 node_tokens = HL_patches[:, indices, :]               # (B, C, d_ff)
                 fc_window = self._pearson_fc_head(node_tokens)        # (B, C, C)
                 fc_preds.append(fc_window)
@@ -431,7 +430,7 @@ class Model(nn.Module):
             logits = torch.stack(fc_preds, dim=1)    # (B, T_out, C, C) = (B, 2, 19, 19)
 
             # labels 即 DFC_target，形状 (B, T_out, C, C)，直接逐元素 MSE
-            loss = F.mse_loss(logits, labels.float())
+            loss = F.mse_loss(logits, labels.to(logits.dtype))
         else:
             # ── 分类 / 回归：沿用原有 Linear 头 ──
             HL_patches = HL[:, P_skip:, :self.config.d_ff].to(

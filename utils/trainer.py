@@ -498,7 +498,7 @@ class Trainer(object):
             labels = [l for sub in all_labels_list for l in sub]
 
             loss_avg = sum(loss_list) / len(loss_list) if len(loss_list) > 0 else 0.0
-            local_losses = torch.tensor([loss_avg, float(local_count)], device=self.device)
+            local_losses = torch.tensor([loss_avg, float(local_count)], device=self.device, dtype=torch.float32)
             all_losses = [torch.zeros(2, device=self.device) for _ in range(world_size)]
             dist.all_gather(all_losses, local_losses)
 
@@ -632,7 +632,7 @@ class Trainer(object):
             labels = [l for sub in all_labels_list for l in sub]
 
             loss_avg = sum(loss_list) / len(loss_list) if len(loss_list) > 0 else 0.0
-            local_losses = torch.tensor([loss_avg, float(local_count)], device=self.device)
+            local_losses = torch.tensor([loss_avg, float(local_count)], device=self.device, dtype=torch.float32)
             all_losses = [torch.zeros(2, device=self.device) for _ in range(world_size)]
             dist.all_gather(all_losses, local_losses)
 
@@ -770,7 +770,7 @@ class Trainer(object):
                 [labels_list[i][:counts[i]].cpu().numpy() for i in range(world_size)])
 
             loss_avg = np.mean(loss_list) if loss_list else 0.0
-            local_losses = torch.tensor([loss_avg, float(local_count)], device=self.device)
+            local_losses = torch.tensor([loss_avg, float(local_count)], device=self.device, dtype=torch.float32)
             all_losses = [torch.zeros(2, device=self.device) for _ in range(world_size)]
             dist.all_gather(all_losses, local_losses)
 

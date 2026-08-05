@@ -110,15 +110,15 @@ def main(args):
                 if args.deepspeed:
                     ds_path = args.deepspeed_config
                     finetune_ds_path = "deepspeed/finetune.json"
-                        if os.path.exists(finetune_ds_path):
-                            args.deepspeed_config = finetune_ds_path
-                            with open(finetune_ds_path) as _f:
-                                _ds_cfg = _json.load(_f)
-                            args.learning_rate = _ds_cfg['optimizer']['params']['lr']
-                        else:
-                            logger.warning(
-                                f"Finetune DeepSpeed config not found: "
-                                f"{finetune_ds_path}, using original: {ds_path}")
+                    if os.path.exists(finetune_ds_path):
+                        args.deepspeed_config = finetune_ds_path
+                        with open(finetune_ds_path) as _f:
+                            _ds_cfg = _json.load(_f)
+                        args.learning_rate = _ds_cfg['optimizer']['params']['lr']
+                    else:
+                        logger.warning(
+                            f"Finetune DeepSpeed config not found: "
+                            f"{finetune_ds_path}, using original: {ds_path}")
                 else:
                     args.learning_rate = 1e-5
                 trainer = eval(args.model + 'Trainer')(
@@ -159,7 +159,6 @@ def main(args):
                              f"_{args.batch_size}" \
                              f"{f'sparsity-{args.sparsity}' if 'DFaST' in args.model else ''}" \
                              f'F{args.frequency}D{args.D}F{args.num_kernels}P{args.p1}={args.p2}_dp{args.dropout}' \
-
                              f"-cross"
 
                 # run = wandb.init(project=args.project, entity=args.wandb_entity, reinit=True, group=f"{group_name}", tags=[args.dataset])

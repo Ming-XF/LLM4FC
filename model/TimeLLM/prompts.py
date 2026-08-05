@@ -36,8 +36,8 @@ _PROMPT_DATASET_CAUEEG = (
     "windows, and Pearson correlation "
     "is computed between each of the 19 EEG channels within each window to "
     "produce DFC matrices. The following "
-    "data are presented as a sequence of 190 tokens: for each of the 19 channels, "
-    "10 time-window representations (T0 to T9) are provided in order (channel-first "
+    "data are presented as a sequence of 190 tokens: for each of the 10 time windows, "
+    "19 channel representations are provided in order (time-first "
     "ordering). The 19 channels (international 10-20 system) are: Fp1, F3, C3, P3, "
     "O1, Fp2, F4, C4, P4, O2, F7, T3, T5, F8, T4, T6, FZ, CZ, PZ."
 )
@@ -53,9 +53,9 @@ _PROMPT_DATASET_BEIRUT = (
     "sliding window (30-second stride) of 19-channel EEG is converted into "
     "dynamic functional connectivity (DFC) matrices via Pearson correlation "
     "within 10 consecutive 3-second sub-windows. The following data are "
-    "presented as a sequence of 190 tokens: for each of the 19 channels, "
-    "10 time-window representations (T0 to T9) are provided in order "
-    "(channel-first ordering). The 19 channels (international 10-20 system) "
+    "presented as a sequence of 190 tokens: for each of the 10 time windows, "
+    "19 channel representations are provided in order "
+    "(time-first ordering). The 19 channels (international 10-20 system) "
     "are: Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, F7, T3, T5, F8, T4, "
     "T6, FZ, CZ, PZ."
 )
@@ -70,6 +70,23 @@ _PROMPT_TASK_4CLASS = (
     "Given 19-channel brain functional connectivity, classify the subject "
     "as AD, MCI, "
     "SCD (subjective cognitive decline), or NC."
+)
+
+_PROMPT_DATASET_FUTUREFC = (
+    "This dataset is used for brain functional connectivity forecasting, "
+    "based on EEG data. Each subject's 60-second recording is divided into "
+    "10 consecutive time windows, and Pearson correlation is computed between "
+    "19 EEG channels within each window to produce DFC matrices. "
+    "The data are presented as a sequence of 190 tokens: for each of the 10 "
+    "time windows, 19 channel representations are provided in order "
+    "(time-first ordering). The 19 channels (international 10-20 system) are: "
+    "Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, F7, T3, T5, F8, T4, T6, "
+    "FZ, CZ, PZ."
+)
+
+_PROMPT_TASK_FUTUREFC = (
+    "Given the first 6 DFC time windows (T0-T5), predict the future FC "
+    "matrices for the next 4 time windows (T6, T7, T8, T9)."
 )
 
 _PROMPT_STATS_EEG = (
@@ -141,6 +158,42 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_CAUEEG,
         'prompt_task': _PROMPT_TASK_BINARY,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+
+    'FutureFCCAUEEG': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_FUTUREFC,
+        'prompt_task': _PROMPT_TASK_FUTUREFC,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+
+    'FutureFCDS': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_FUTUREFC,
+        'prompt_task': _PROMPT_TASK_FUTUREFC,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+
+    'FutureFCTUAB': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_FUTUREFC,
+        'prompt_task': _PROMPT_TASK_FUTUREFC,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+
+    'FutureFCTUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_FUTUREFC,
+        'prompt_task': _PROMPT_TASK_FUTUREFC,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
 }
