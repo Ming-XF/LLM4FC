@@ -363,9 +363,10 @@ def disease_beirut_preprocess(path_beirut="../data/Beirut", hz=200,
               f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
 
 
-    print(f"Total samples: {len(labels_all)}, "
-          f"Pre-ictal: {int(labels_all.sum())}, "
-          f"Inter-ictal: {int((1 - labels_all).sum())}")
+    print(f"\nTotal samples: {len(labels_all)}")
+    print(f"  Pre-ictal   (label=1): {int(labels_all.sum())}")
+    print(f"  Inter-ictal (label=0): {int((1 - labels_all).sum())}")
+    print(f"  Shape: {time_series_all.shape}")
 
     # ── Per-subject stratified random split ──
     unique_subjs = np.unique(subject_ids_all)
