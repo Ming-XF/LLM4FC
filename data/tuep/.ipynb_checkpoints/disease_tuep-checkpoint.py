@@ -1,10 +1,10 @@
 import os
-import re
 from random import shuffle
 
 import mne
 import numpy as np
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
@@ -17,6 +17,8 @@ def _init_worker():
     os.environ['MKL_NUM_THREADS'] = '1'
     os.environ['NUMEXPR_NUM_THREADS'] = '1'
 
+
+from sklearn.model_selection import train_test_split
 
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
@@ -32,13 +34,14 @@ warnings.filterwarnings("ignore")
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _TUEP_CHANNEL_ORDER = [
-    'Fp1', 'F3', 'C3', 'P3', 'O1',
-    'Fp2', 'F4', 'C4', 'P4', 'O2',
-    'F7', 'T3', 'T5',
-    'F8', 'T4', 'T6',
-    'Fz', 'Cz', 'Pz',
+    'Fp1', 'F3', 'C3', 'P3', 'O1',          # left hemisphere
+    'Fp2', 'F4', 'C4', 'P4', 'O2',          # right hemisphere
+    'F7', 'T3', 'T5',                         # left temporal
+    'F8', 'T4', 'T6',                         # right temporal
+    'Fz', 'Cz', 'Pz',                         # midline
 ]
 
+# Mapping from EDF channel-name variants to standard 10-20 short names.
 _CHANNEL_NORM_MAP = {
     'FP1': 'Fp1', 'FP2': 'Fp2',
     'FZ': 'Fz', 'CZ': 'Cz', 'PZ': 'Pz',
@@ -46,7 +49,10 @@ _CHANNEL_NORM_MAP = {
 
 
 def _normalize_channel(name):
-    """Normalize an EDF channel name to the 10-20 short form."""
+    """Normalize an EDF channel name to the 10-20 short form.
+
+    ``EEG FP1-REF`` → ``Fp1``, ``EEG C3-LE`` → ``C3``.
+    """
     for prefix in ['EEG ']:
         if name.startswith(prefix):
             name = name[len(prefix):]
@@ -56,80 +62,81 @@ def _normalize_channel(name):
     return _CHANNEL_NORM_MAP.get(name, name)
 
 
-def _parse_age_from_edf_header(edf_path):
-    """Extract age from EDF file header (Patient ID field).
+def _resolve_param(val, pos):
+    """Resolve a per-class parameter that may be an int (both classes) or
+    tuple ``(pos_val, neg_val)``.
 
-    The TUH EDF Patient ID field has format:
-    ``{subject_id} {M|F} 01-JAN-0000 {subject_id} Age:{NN}``
+    Parameters
+    ----------
+    val : int, tuple, or None
+    pos : bool
+        ``True`` for positive class, ``False`` for negative.
 
-    Returns age as float, or None if not parseable.
+    Returns
+    -------
+    int or None
     """
-    try:
-        with open(edf_path, 'rb') as f:
-            header = f.read(256)
-            patient_id = header[8:88].decode('ascii', errors='replace').strip()
-        match = re.search(r'Age:(\d+)', patient_id)
-        if match:
-            age = float(match.group(1))
-            return age
+    if val is None:
         return None
-    except Exception:
-        return None
+    if isinstance(val, (int, np.integer)):
+        return val
+    return val[0] if pos else val[1]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Dataset
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class AgeTUEPDataset(BaseDataset):
-    """TUEP age regression dataset — predict chronological age from EEG.
+class DiseaseTUEPDataset(BaseDataset):
+    """TUH EEG Epilepsy Corpus — epilepsy vs no-epilepsy binary classification.
 
     Task: given a 1‑minute window of 19‑channel EEG time series,
-    predict the subject's age (continuous value in years).
+    classify the subject as having epilepsy (1) or not (0).
 
-    Uses all subjects from the TUH EEG Epilepsy Corpus.  Age is extracted
-    from the EDF file header (``Age:NN`` field in Patient ID).
+    The dataset is preprocessed by ``disease_tuep_preprocess()`` and stored as a
+    single ``.npz`` file.
     """
 
     def __init__(self, data_config: DataConfig, k=0, train=True, one_hot=True,
                  episode_seed=None):
-        super(AgeTUEPDataset, self).__init__(data_config, k, train, one_hot=one_hot,
-                                             episode_seed=episode_seed)
+        super(DiseaseTUEPDataset, self).__init__(data_config, k, train, one_hot=one_hot,
+                                                 episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
         raw = np.load(self.data_config.data_dir, allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
-        labels = data["labels"].astype(np.float32)
+        labels = data["labels"]
         subject_id = data["subject_id"]
         self.hz = data["hz"]
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
-        self.data_config.output_dim = 1  # regression
-        self.data_config.task_type = DataConfig.TASK_REGRESSION
+        self.data_config.output_dim = 2
+        self.data_config.task_type = DataConfig.TASK_CLASSIFICATION
 
+        self.data_config.class_weight = [1, 1]
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
 
-        # ── 使用预处理阶段预计算的划分（随机，无分层）──
         if 'split_train_index' in data:
             self.train_index = data['split_train_index']
             self.val_index = data['split_val_index']
             self.test_index = data['split_test_index']
         else:
-            # 向后兼容：旧 .npz 无预计算划分时回退到分层划分
-            print("  [WARN] 未找到预计算划分，回退到 _create_splits 分层划分")
+            print("  [WARN] 未找到预计算划分，回退到 _create_splits")
             self._create_splits(labels, self.all_data['subject_id'])
+        self.all_data['labels'] = F.one_hot(
+            torch.from_numpy(self.all_data['labels']).to(torch.int64)).numpy()
         shuffle(self.train_index)
 
     def __getitem__(self, item):
         idx = self._active_index
         time_series = torch.from_numpy(
             self.all_data['time_series'][idx[item]]).float()
-        labels = torch.tensor(
-            self.all_data['labels'][idx[item]], dtype=torch.float32)
+        labels = torch.from_numpy(
+            self.all_data['labels'][idx[item]]).to(torch.int64)
 
         SFC = self.connectivity(time_series)
         SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
@@ -149,31 +156,21 @@ class AgeTUEPDataset(BaseDataset):
 # Preprocessing — worker (module-level for multiprocessing)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _process_tuep_file_age(args):
-    """Process a single TUEP EDF file for age regression.
-
-    Age is extracted from the EDF header bytes (Patient ID ``Age:NN`` field).
+def _process_tuep_file(args):
+    """Process a single TUEP EDF file into 1-minute windows.
 
     Parameters
     ----------
     args : tuple
-        (edf_path, hz, subject_id)
+        (edf_path, label, hz, subject_id)
 
     Returns
     -------
     data : ndarray (n_windows, 19, hz*60) or None
-    labels : ndarray (n_windows,) or None — float age
+    labels : ndarray (n_windows,) or None
     subj_ids : ndarray (n_windows,) or None
     """
-    edf_path, hz, subject_id = args
-
-    # ── Extract age from EDF header BEFORE loading full file ──
-    age = _parse_age_from_edf_header(edf_path)
-    if age is None:
-        return None, None, None
-    # Exclude placeholder age=999 (unknown)
-    if age >= 999:
-        return None, None, None
+    edf_path, label, hz, subject_id = args
 
     try:
         raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
@@ -199,7 +196,7 @@ def _process_tuep_file_age(args):
     # ── Average reference, resample ──
     raw.set_eeg_reference('average', verbose=False)
     raw = raw.copy().resample(sfreq=hz, verbose=False)
-    data = raw.get_data()
+    data = raw.get_data()  # (19, n_samples)
 
     # ── Truncate to whole minutes, reshape to 1‑minute windows ──
     n_total = data.shape[1]
@@ -210,9 +207,9 @@ def _process_tuep_file_age(args):
 
     data = data[:, :n_windows * window_samples]
     data = data.reshape(data.shape[0], n_windows, window_samples)
-    data = np.transpose(data, (1, 0, 2))
+    data = np.transpose(data, (1, 0, 2))  # (n_windows, 19, hz*60)
 
-    labels_arr = np.full(data.shape[0], age, dtype=np.float32)
+    labels_arr = np.full(data.shape[0], label, dtype=np.int8)
     subj_arr = np.full(data.shape[0], subject_id, dtype=np.int32)
 
     return data.astype(np.float32), labels_arr, subj_arr
@@ -222,32 +219,42 @@ def _process_tuep_file_age(args):
 # Preprocessing — main entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject=60,
+                            max_subjects=None,
+                            train_split=0.7, val_split=0.15):
+    """Preprocess the TUH EEG Epilepsy Corpus for epilepsy classification.
 
-def age_tuep_preprocess(path="../data/TUEP", hz=200,
-                       max_windows_per_subject=56,
-                       train_split=0.7, val_split=0.15):
-    """Preprocess the TUH EEG Epilepsy Corpus for age regression.
+    Reads EDF files from ``00_epilepsy/`` (label=1) and ``01_no_epilepsy/``
+    (label=0).  For each session the ``01_tcp_ar`` montage is preferred;
+    sessions without it are skipped.
 
-    Reads EDF files from ``00_epilepsy/`` and ``01_no_epilepsy/`` using the
-    ``01_tcp_ar`` montage.  Extracts the standard 19‑channel 10-20 EEG,
-    resamples to ``hz`` Hz, and segments into non‑overlapping 1‑minute windows.
-
-    Age labels are extracted from the EDF file header (``Age:NN`` field).
+    Each file is resampled to ``hz`` Hz, reduced to the standard 19-channel
+    10-20 EEG, and segmented into non‑overlapping 1‑minute windows.
 
     Parameters
     ----------
     path : str
-        Path to the TUEP dataset root.
+        Path to the TUEP dataset root (contains ``00_epilepsy/`` and
+        ``01_no_epilepsy/`` subdirectories).
     hz : int
         Resampling rate in Hz.  Default 200.
+    max_windows_per_subject : int, tuple, or None
+        Max windows retained per subject.  ``int`` → same for both classes.
+        ``(pos, neg)`` → label=1 / label=0 separately.
+        ``None`` to disable.  Default 60.
+    max_subjects : int, tuple, or None
+        Max subjects retained (stratified by class, deterministically).
+        ``int`` → ``max_subjects // 2`` per class.
+        ``(pos, neg)`` → explicit limits per class.  Default ``None``.
     """
-    output_path = os.path.join(path, "tuep_age.npz")
+    output_path = os.path.join(path, "tuep_disease.npz")
 
     # ── Collect EDF files ──
-    file_list = []
-    subject_map = {}
+    # For each (class_dir, label) pair, walk subject/session/montage
+    file_list = []       # list of (edf_path, label, subject_str)
+    subject_map = {}     # subject_str → sequential int ID
 
-    for cls_dir_name in ['00_epilepsy', '01_no_epilepsy']:
+    for cls_dir_name, label in [('00_epilepsy', 1), ('01_no_epilepsy', 0)]:
         cls_dir = os.path.join(path, cls_dir_name)
         if not os.path.isdir(cls_dir):
             print(f"  [SKIP] directory not found: {cls_dir}")
@@ -263,29 +270,32 @@ def age_tuep_preprocess(path="../data/TUEP", hz=200,
                 if not os.path.isdir(sess_dir):
                     continue
 
+                # ── Prefer 01_tcp_ar montage ──
                 montage_dir = os.path.join(sess_dir, '01_tcp_ar')
                 if not os.path.isdir(montage_dir):
-                    continue
+                    continue  # skip sessions without AR montage
 
                 for fname in sorted(os.listdir(montage_dir)):
                     if not fname.endswith('.edf'):
                         continue
                     edf_path = os.path.join(montage_dir, fname)
-                    file_list.append((edf_path, subj_name))
+                    file_list.append((edf_path, label, subj_name))
 
     print(f"Found {len(file_list)} EDF files")
+    print(f"  Epilepsy:     {sum(1 for _, l, _ in file_list if l == 1)}")
+    print(f"  No epilepsy:  {sum(1 for _, l, _ in file_list if l == 0)}")
 
     # ── Assign sequential integer subject IDs ──
-    for _, subj_str in file_list:
+    for _, _, subj_str in file_list:
         if subj_str not in subject_map:
-            subject_map[subj_str] = len(subject_map) + 1
+            subject_map[subj_str] = len(subject_map) + 1  # 1-indexed
 
     print(f"Unique subjects: {len(subject_map)}")
 
     # ── Build multiprocessing task args ──
     task_args = [
-        (edf_path, hz, subject_map[subj_str])
-        for edf_path, subj_str in file_list
+        (edf_path, label, hz, subject_map[subj_str])
+        for edf_path, label, subj_str in file_list
     ]
 
     n_workers = min(cpu_count(), len(task_args), 48)
@@ -295,9 +305,9 @@ def age_tuep_preprocess(path="../data/TUEP", hz=200,
     skipped = 0
     with Pool(processes=n_workers, initializer=_init_worker) as pool:
         for data, labels_arr, subj_arr in tqdm(
-                pool.imap_unordered(_process_tuep_file_age, task_args),
+                pool.imap_unordered(_process_tuep_file, task_args),
                 total=len(task_args),
-                desc="Processing TUEP age"):
+                desc="Processing TUEP"):
             if data is None:
                 skipped += 1
                 continue
@@ -305,8 +315,8 @@ def age_tuep_preprocess(path="../data/TUEP", hz=200,
             lbl_list.append(labels_arr)
             subj_list.append(subj_arr)
 
-    print(f"Skipped {skipped} files (missing channels, too short, "
-          f"or unparseable age)")
+    if skipped:
+        print(f"Skipped {skipped} files (missing channels or too short)")
 
     if not ts_list:
         raise RuntimeError("No valid EDF files processed — check dataset path.")
@@ -318,52 +328,106 @@ def age_tuep_preprocess(path="../data/TUEP", hz=200,
     subject_ids = np.concatenate(subj_list, axis=0)
     print(f"Concatenated: time_series={time_series.shape}, labels={labels.shape}")
 
-    # ── Per-subject window cap (uniform across all subjects, evenly spaced) ──
+    # ── Per-subject window cap (evenly spaced sampling along time axis) ──
     if max_windows_per_subject is not None:
         unique_subjs = np.unique(subject_ids)
         keep_mask = np.ones(len(subject_ids), dtype=bool)
         n_capped = 0
         for subj in unique_subjs:
             idx = np.where(subject_ids == subj)[0]
-            if len(idx) > max_windows_per_subject:
-                sample_idx = np.linspace(0, len(idx) - 1, max_windows_per_subject, dtype=int)
+            # Determine this subject's label (all windows share the same label)
+            subj_label = labels[idx[0]]
+            cap = _resolve_param(max_windows_per_subject, pos=(subj_label == 1))
+            if cap is not None and len(idx) > cap:
+                sample_idx = np.linspace(0, len(idx) - 1, cap, dtype=int)
                 keep_mask[idx] = False
                 keep_mask[idx[sample_idx]] = True
                 n_capped += 1
         time_series = time_series[keep_mask]
         labels = labels[keep_mask]
         subject_ids = subject_ids[keep_mask]
-        print(f"Capped {n_capped} subjects (evenly spaced, max {max_windows_per_subject}/subj)")
+        print(f"Capped {n_capped} subjects (evenly spaced)")
 
-    # ── Per-subject random split (no stratification, reproducible) ──
+    # ── Per-class stratified subject sampling (deterministic: keep first N) ──
+    if max_subjects is not None:
+        unique_subjs = np.unique(subject_ids)
+        # Determine dominant label per subject
+        subj_labels = np.array([
+            np.bincount(labels[subject_ids == s].astype(int)).argmax()
+            for s in unique_subjs
+        ])
+        pos_subjs = unique_subjs[subj_labels == 1]
+        neg_subjs = unique_subjs[subj_labels == 0]
+
+        # Resolve per-class limits
+        n_pos_limit = _resolve_param(max_subjects, pos=True)
+        n_neg_limit = _resolve_param(max_subjects, pos=False)
+
+        # If an int was passed, split evenly
+        if isinstance(max_subjects, (int, np.integer)):
+            n_pos_limit = max_subjects // 2
+            n_neg_limit = max_subjects // 2
+
+        # Apply limits (None = keep all in that class)
+        n_pos = len(pos_subjs) if n_pos_limit is None else min(n_pos_limit, len(pos_subjs))
+        n_neg = len(neg_subjs) if n_neg_limit is None else min(n_neg_limit, len(neg_subjs))
+        kept_pos = pos_subjs[:n_pos]
+        kept_neg = neg_subjs[:n_neg]
+        kept_subjs = np.concatenate([kept_pos, kept_neg])
+
+        keep_mask = np.isin(subject_ids, kept_subjs)
+        time_series = time_series[keep_mask]
+        labels = labels[keep_mask]
+        subject_ids = subject_ids[keep_mask]
+
+        # Re-assign sequential IDs (1-indexed)
+        _, subject_ids = np.unique(subject_ids, return_inverse=True)
+        subject_ids = subject_ids + 1
+        print(f"Sampled {n_pos} epilepsy + {n_neg} no-epilepsy = "
+              f"{n_pos + n_neg} subjects from {len(unique_subjs)} total")
+
+    # ── Per-subject stratified random split ──
     unique_subjs = np.unique(subject_ids)
-    rng = np.random.RandomState(42)
-    rng.shuffle(unique_subjs)
-
-    n_total = len(unique_subjs)
-    n_train = int(n_total * train_split)
-    n_val = int(n_total * val_split)
-
-    train_subjs = unique_subjs[:n_train]
-    val_subjs = unique_subjs[n_train:n_train + n_val]
-    test_subjs = unique_subjs[n_train + n_val:]
+    subj_labels = np.array([
+        np.bincount(labels[subject_ids == s].astype(int)).argmax()
+        for s in unique_subjs
+    ])
+    train_subjs, rest_subjs = train_test_split(
+        unique_subjs, test_size=1.0 - train_split,
+        stratify=subj_labels, random_state=42)
+    rest_mask = np.isin(unique_subjs, rest_subjs)
+    val_frac = val_split / (1.0 - train_split)
+    val_subjs, test_subjs = train_test_split(
+        rest_subjs, test_size=1.0 - val_frac,
+        stratify=subj_labels[rest_mask], random_state=42)
 
     split_train_index = np.where(np.isin(subject_ids, train_subjs))[0]
     split_val_index = np.where(np.isin(subject_ids, val_subjs))[0]
     split_test_index = np.where(np.isin(subject_ids, test_subjs))[0]
 
-    print(f"\nSplit: train={n_train} subj ({len(split_train_index)} samples), "
-          f"val={n_val} subj ({len(split_val_index)} samples), "
-          f"test={n_total - n_train - n_val} subj ({len(split_test_index)} samples)")
+    # ── Normalize ──
 
+    labels = labels.astype(np.int8)
+
+    train_ep = int(sum(subj_labels[np.isin(unique_subjs, train_subjs)] == 1))
+    train_no = len(train_subjs) - train_ep
+    val_ep = int(sum(subj_labels[np.isin(unique_subjs, val_subjs)] == 1))
+    val_no = len(val_subjs) - val_ep
+    test_ep = int(sum(subj_labels[np.isin(unique_subjs, test_subjs)] == 1))
+    test_no = len(test_subjs) - test_ep
+    print(f"\nSplit: train={len(train_subjs)} subj ({train_no}no-epi/{train_ep}epi, {len(split_train_index)} samples)")
+    print(f"  val={len(val_subjs)} subj ({val_no}no-epi/{val_ep}epi, {len(split_val_index)} samples)")
+    print(f"  test={len(test_subjs)} subj ({test_no}no-epi/{test_ep}epi, {len(split_test_index)} samples)")
+
+    # ── Report ──
+    n_epi = int(labels.sum())
+    n_no_epi = int(len(labels) - n_epi)
     print(f"\nTotal samples: {len(labels)}")
-    print(f"  Subjects: {len(np.unique(subject_ids))}")
-    print(f"  Age range: {labels.min():.1f}–{labels.max():.1f} "
-          f"(mean={labels.mean():.1f}, median={np.median(labels):.0f})")
+    print(f"  Epilepsy     (label=1): {n_epi}")
+    print(f"  No epilepsy  (label=0): {n_no_epi}")
     print(f"  Shape: {time_series.shape}")
 
-    np.savez(output_path,
-             timeseries=time_series,
+    np.savez(output_path, timeseries=time_series,
              labels=labels, subject_id=subject_ids, hz=hz,
              split_train_index=split_train_index,
              split_val_index=split_val_index,
@@ -374,4 +438,4 @@ def age_tuep_preprocess(path="../data/TUEP", hz=200,
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    age_tuep_preprocess("../data/TUEP", hz=200)
+    disease_tuep_preprocess("../data/TUEP", hz=200, max_windows_per_subject=(80, None), max_subjects=None)

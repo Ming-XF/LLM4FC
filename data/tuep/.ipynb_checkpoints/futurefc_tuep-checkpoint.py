@@ -55,7 +55,7 @@ def _normalize_channel(name):
     return _CHANNEL_NORM_MAP.get(name, name)
 
 
-_N_INPUT_WINDOWS = 8
+_N_INPUT_WINDOWS = 6
 _N_TOTAL_WINDOWS = 10
 
 
@@ -74,10 +74,10 @@ class FutureFCTUEPDataset(BaseDataset):
                  episode_seed=None,
                  n_input_windows=_N_INPUT_WINDOWS,
                  n_total_windows=_N_TOTAL_WINDOWS):
-        super(FutureFCTUEPDataset, self).__init__(data_config, k, train, one_hot=one_hot,
-                                                  episode_seed=episode_seed)
         self.n_input_windows = n_input_windows
         self.n_total_windows = n_total_windows
+        super(FutureFCTUEPDataset, self).__init__(data_config, k, train, one_hot=one_hot,
+                                                  episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
         raw = np.load(self.data_config.data_dir, allow_pickle=True)
@@ -181,7 +181,7 @@ def _process_tuep_file_futurefc(args):
 
 
 def futurefc_tuep_preprocess(path="../data/TUEP", hz=200,
-                             max_windows_per_subject=None,
+                             max_windows_per_subject=120,
                              train_split=0.7, val_split=0.15):
     """Preprocess the TUH EEG Epilepsy Corpus for future FC prediction.
 

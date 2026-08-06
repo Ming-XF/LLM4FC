@@ -27,6 +27,14 @@ class BaseDataset(Dataset):
         self.test_index = None
         self.load_data(one_hot=one_hot)
 
+        # ── few-shot 采样：load_data 完成后独立调用，与是否使用预计算划分无关 ──
+        if self.episode_seed is not None and self.data_config.few_shot > 0:
+            labels = self.all_data['labels']
+            if labels.ndim > 1 and labels.shape[1] > 1:
+                labels = labels.argmax(axis=1)
+            self._apply_few_shot_sampling(
+                labels, self.all_data['subject_id'], self.episode_seed)
+
     # ── mode 属性 — 取代旧的 train boolean ────────────────────────────
     @property
     def mode(self):
@@ -191,13 +199,14 @@ class BaseDataset(Dataset):
             self.val_index = np.where(np.isin(groups, val_subjs))[0]
             self.test_index = np.where(np.isin(groups, test_subjs))[0]
 
-        # ── few-shot：由外部 episode_seed 控制采样时机 ──
-        if self.episode_seed is not None and self.data_config.few_shot > 0:
-            self._apply_few_shot_sampling(labels, groups, self.episode_seed)
-
-    # ── Few-shot 被试采样（独立方法，外部按 episode 调用）──────────────
+    # ── Few-shot 被试采样（独立方法，由 __init__ 调用）──────────────
     def _apply_few_shot_sampling(self, labels, groups, episode_seed):
         """从训练集中每类采样 N 个被试，保留其全部窗口样本。
+
+        按任务类型自适应：
+        - 分类（二类/多类）：每类采样 n_subj_per_class 个被试
+        - 回归：随机采样 n_subj_per_class 个被试
+        - 多值回归（FutureFC）：随机采样 n_subj_per_class 个被试
 
         Parameters
         ----------
@@ -211,24 +220,29 @@ class BaseDataset(Dataset):
 
         train_groups = groups[self.train_index]
         train_lbls = labels[self.train_index]
-
-        # 每个受试者的主标签
         unique_subjs = np.unique(train_groups)
-        subj_lbls = np.array([
-            np.bincount(train_lbls[train_groups == s].astype(int)).argmax()
-            for s in unique_subjs
-        ])
-
-        # 正/负类受试者分别随机采样
-        pos_subjs = unique_subjs[subj_lbls == 1]
-        neg_subjs = unique_subjs[subj_lbls == 0]
-
         rng = np.random.RandomState(episode_seed)
-        n = min(n_subj_per_class, len(pos_subjs), len(neg_subjs))
 
-        keep_pos = rng.choice(pos_subjs, size=n, replace=False)
-        keep_neg = rng.choice(neg_subjs, size=n, replace=False)
-        keep_subjs = np.concatenate([keep_pos, keep_neg])
+        task_type = self.data_config.task_type
+
+        if task_type in (DataConfig.TASK_REGRESSION,
+                         DataConfig.TASK_MULTI_OUTPUT_REGRESSION):
+            # 回归 / 多值回归：随机采样
+            n = min(n_subj_per_class, len(unique_subjs))
+            keep_subjs = rng.choice(unique_subjs, size=n, replace=False)
+
+        else:
+            # 分类（二类/多类）：每类采样
+            subj_lbls = np.array([
+                np.bincount(train_lbls[train_groups == s].astype(int)).argmax()
+                for s in unique_subjs
+            ])
+            keep_subjs = []
+            for c in np.unique(subj_lbls):
+                pool = unique_subjs[subj_lbls == c]
+                n = min(n_subj_per_class, len(pool))
+                keep_subjs.append(rng.choice(pool, size=n, replace=False))
+            keep_subjs = np.concatenate(keep_subjs)
 
         keep_mask = np.isin(train_groups, keep_subjs)
         self.train_index = self.train_index[keep_mask]

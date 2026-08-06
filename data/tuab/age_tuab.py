@@ -227,7 +227,7 @@ def _process_tuab_file_age(args):
 
 
 def age_tuab_preprocess(path="../data/TUAB", hz=200,
-                       max_windows_per_subject=None,
+                       max_windows_per_subject=4,
                        train_split=0.7, val_split=0.15):
     """Preprocess the TUH Abnormal EEG Corpus for age regression.
 
@@ -366,4 +366,4 @@ def age_tuab_preprocess(path="../data/TUAB", hz=200,
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    age_tuab_preprocess("../data/TUAB", hz=200, max_windows_per_subject=8)
+    age_tuab_preprocess("../data/TUAB", hz=200)

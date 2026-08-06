@@ -193,7 +193,7 @@ def _process_tuab_file_futurefc(args):
 
 
 def futurefc_tuab_preprocess(path="../data/TUAB", hz=200,
-                             max_windows_per_subject=None,
+                             max_windows_per_subject=9,
                              train_split=0.7, val_split=0.15):
     """Preprocess the TUH Abnormal EEG Corpus for future FC prediction.
 
@@ -324,4 +324,4 @@ def futurefc_tuab_preprocess(path="../data/TUAB", hz=200,
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    futurefc_tuab_preprocess("../data/TUAB", hz=200, max_windows_per_subject=17)
+    futurefc_tuab_preprocess("../data/TUAB", hz=200)

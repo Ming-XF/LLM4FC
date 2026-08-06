@@ -81,22 +81,30 @@ def main(args):
             src_name = (args.pretrain_path.rstrip('/').split('/')[-1]
                         if '/' in args.pretrain_path else pretrain_dir)
 
+            if args.few_shot == -1:
+                shot_label = "fulldata"
+            else:
+                shot_label = f"{args.few_shot}shot"
+
             if args.abla_channel >= 0:
                 log_file = (f'{args.log_dir}/fewshot_{args.model}{args.append}'
                             f'_wo_C{args.abla_channel}_{src_name}pretrain'
-                            f'_{args.few_shot}shot_{args.dataset}.log')
+                            f'_{shot_label}_{args.dataset}.log')
             elif args.abla_vae != "n":
                 log_file = (f'{args.log_dir}/fewshot_{args.model}{args.append}'
                             f'_wo_{args.abla_vae}_{src_name}pretrain'
-                            f'_{args.few_shot}shot_{args.dataset}.log')
+                            f'_{shot_label}_{args.dataset}.log')
             else:
                 log_file = (f'{args.log_dir}/fewshot_{args.model}{args.append}'
-                            f'_{src_name}pretrain_{args.few_shot}shot'
+                            f'_{src_name}pretrain_{shot_label}'
                             f'_{args.dataset}.log')
             init_logger(log_file)
 
             if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
-                logger.info(f"{'#'*10} few-shot seed={episode_seed} {'#'*10}")
+                if args.few_shot == -1:
+                    logger.info(f"{'#'*10} full-data finetune {'#'*10}")
+                else:
+                    logger.info(f"{'#'*10} few-shot seed={episode_seed} {'#'*10}")
 
             if is_zero_shot:
                 # Zero-shot: 不加 few-shot 采样，直接加载预训练模型评估
@@ -131,9 +139,12 @@ def main(args):
             is_rank_0 = (not torch.distributed.is_initialized()
                          or torch.distributed.get_rank() == 0)
             if is_rank_0 and result is not None:
-                mode_label = (f"Zero-shot ({src_name} → {args.dataset})"
-                              if is_zero_shot else
-                              f"{args.few_shot}-shot ({src_name} → {args.dataset})")
+                if is_zero_shot:
+                    mode_label = f"Zero-shot ({src_name} → {args.dataset})"
+                elif args.few_shot == -1:
+                    mode_label = f"Full-data finetune ({src_name} → {args.dataset})"
+                else:
+                    mode_label = f"{args.few_shot}-shot ({src_name} → {args.dataset})"
                 header = f"\n{'='*60}\n  {mode_label}  seed={episode_seed}\n{'='*60}"
                 print(header)
                 logger.info(header)

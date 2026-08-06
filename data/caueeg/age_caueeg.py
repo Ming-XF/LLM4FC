@@ -144,7 +144,7 @@ def _process_one_sample_age(args):
 
 
 def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
-                         max_windows_per_subject=None,
+                         max_windows_per_subject=7,
                          train_split=0.7, val_split=0.15):
     """Preprocess the CAUEEG dataset for age regression.
 

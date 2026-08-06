@@ -66,6 +66,9 @@ def init_model_config(args, data_config: DataConfig):
             dataset_name=args.dataset,
             llm_type=args.llm_type,
             llm_path=args.llm_path,
+            use_dataset_prompt=args.use_dataset_prompt,
+            use_task_prompt=args.use_task_prompt,
+            use_stats_prompt=args.use_stats_prompt,
         )
         model = Model(model_config)
     else:
@@ -105,7 +108,7 @@ def init_config():
     data_group.add_argument("--data_processors", default=0, type=int, help="")
     data_group.add_argument("--train_set", default=0.6, type=float, help="")
     data_group.add_argument("--val_set", default=0.2, type=float, help="")
-    data_group.add_argument("--few_shot", default=0, type=int, help="few-shot: number of subjects per class (0 = use all)")
+    data_group.add_argument("--few_shot", default=0, type=int, help="few-shot: subjects per class (>0), -1=full-data finetune, 0=use all")
     data_group.add_argument("--few_shot_seed", default=42, type=int,
                              help="Random seed for few-shot subject sampling "
                                   "(different seeds select different subjects)")
@@ -156,6 +159,12 @@ def init_config():
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
     model_group.add_argument("--gcn_hidden", default=128, type=int, help="GCN hidden dimension (TimeLLM v2)")
     model_group.add_argument("--num_gcn_layers", default=1, type=int, help="Number of GCN layers (TimeLLM)")
+    model_group.add_argument("--use_dataset_prompt", action="store_true",
+                             help="TimeLLM: include dataset description prompt")
+    model_group.add_argument("--use_task_prompt", action="store_true",
+                             help="TimeLLM: include task description prompt")
+    model_group.add_argument("--use_stats_prompt", action="store_true",
+                             help="TimeLLM: include per-sample FC statistics prompt")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
 
     train_group = parser.add_argument_group(title="train", description="")

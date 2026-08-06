@@ -29,64 +29,70 @@ _EEG_HOMOLOGOUS_PAIRS = [
 
 # ── Prompt 模板 ──────────────────────────────────────
 
-_PROMPT_DATASET_CAUEEG = (
-    "This dataset is used for AD dementia diagnosis, "
-    "based on resting-state EEG data. Each "
-    "subject's 60-second recording is divided into 10 consecutive time "
-    "windows, and Pearson correlation "
-    "is computed between each of the 19 EEG channels within each window to "
-    "produce DFC matrices. The following "
-    "data are presented as a sequence of 190 tokens: for each of the 10 time windows, "
-    "19 channel representations are provided in order (time-first "
-    "ordering). The 19 channels (international 10-20 system) are: Fp1, F3, C3, P3, "
-    "O1, Fp2, F4, C4, P4, O2, F7, T3, T5, F8, T4, T6, FZ, CZ, PZ."
+_PROMPT_DATASET_DS = (
+    "Dynamic functional connectivity matrices computed from EEG, "
+    "with subjects being AD patients and healthy controls. "
+    "Matrices are encoded by GCN then mapped to 190 LLM tokens "
+    "via cross-attention (10 windows x 19 channels, time-first order). "
+    "Channel order (10-20 system): Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, "
+    "F7, T3, T5, F8, T4, T6, Fz, Cz, Pz."
 )
 
-_PROMPT_TASK_BINARY = (
-    "Given 19-channel brain functional connectivity, classify the subject "
-    "as AD or NC."
+_PROMPT_DATASET_CAUEEG = (
+    "Dynamic functional connectivity matrices computed from EEG, "
+    "with subjects being AD, MCI, SCD patients and normal controls. "
+    "Matrices are encoded by GCN then mapped to 190 LLM tokens "
+    "via cross-attention (10 windows x 19 channels, time-first order). "
+    "Channel order (10-20 system): Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, "
+    "F7, T3, T5, F8, T4, T6, Fz, Cz, Pz."
+)
+
+_PROMPT_DATASET_TUAB = (
+    "Dynamic functional connectivity matrices computed from EEG, "
+    "data from the TUH Abnormal EEG Corpus, labeled as normal or abnormal. "
+    "Matrices are encoded by GCN then mapped to 190 LLM tokens "
+    "via cross-attention (10 windows x 19 channels, time-first order). "
+    "Channel order (10-20 system): Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, "
+    "F7, T3, T5, F8, T4, T6, Fz, Cz, Pz."
+)
+
+_PROMPT_DATASET_TUEP = (
+    "Dynamic functional connectivity matrices computed from EEG, "
+    "data from the TUH Epilepsy EEG Corpus, including epilepsy patients "
+    "and non-epilepsy controls. "
+    "Matrices are encoded by GCN then mapped to 190 LLM tokens "
+    "via cross-attention (10 windows x 19 channels, time-first order). "
+    "Channel order (10-20 system): Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, "
+    "F7, T3, T5, F8, T4, T6, Fz, Cz, Pz."
 )
 
 _PROMPT_DATASET_BEIRUT = (
-    "This dataset is used for epileptic seizure prediction, based on "
-    "long-term intracranial EEG recordings from 5 patients. Each 60-second "
-    "sliding window (30-second stride) of 19-channel EEG is converted into "
-    "dynamic functional connectivity (DFC) matrices via Pearson correlation "
-    "within 10 consecutive 3-second sub-windows. The following data are "
-    "presented as a sequence of 190 tokens: for each of the 10 time windows, "
-    "19 channel representations are provided in order "
-    "(time-first ordering). The 19 channels (international 10-20 system) "
-    "are: Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, F7, T3, T5, F8, T4, "
-    "T6, FZ, CZ, PZ."
+    "Dynamic functional connectivity matrices computed from EEG, "
+    "data from 5 epilepsy patients, for seizure prediction. "
+    "Matrices are encoded by GCN then mapped to 190 LLM tokens "
+    "via cross-attention (10 windows x 19 channels, time-first order). "
+    "Channel order (10-20 system): Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, "
+    "F7, T3, T5, F8, T4, T6, Fz, Cz, Pz."
 )
 
-_PROMPT_TASK_BEIRUT = (
-    "Given 19-channel brain functional connectivity, predict whether an "
-    "epileptic seizure will occur within the next 10 minutes (pre-ictal) "
-    "or not (inter-ictal)."
+_PROMPT_TASK_DISEASE = (
+    "Given 19-channel dynamic functional connectivity matrices "
+    "(10 time windows), classify whether the subject has the target condition."
 )
 
-_PROMPT_TASK_4CLASS = (
-    "Given 19-channel brain functional connectivity, classify the subject "
-    "as AD, MCI, "
-    "SCD (subjective cognitive decline), or NC."
+_PROMPT_TASK_AGE = (
+    "Given 19-channel dynamic functional connectivity matrices "
+    "(10 time windows), predict the subject's age."
 )
 
-_PROMPT_DATASET_FUTUREFC = (
-    "This dataset is used for brain functional connectivity forecasting, "
-    "based on EEG data. Each subject's 60-second recording is divided into "
-    "10 consecutive time windows, and Pearson correlation is computed between "
-    "19 EEG channels within each window to produce DFC matrices. "
-    "The data are presented as a sequence of 190 tokens: for each of the 10 "
-    "time windows, 19 channel representations are provided in order "
-    "(time-first ordering). The 19 channels (international 10-20 system) are: "
-    "Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, F7, T3, T5, F8, T4, T6, "
-    "FZ, CZ, PZ."
+_PROMPT_TASK_GENDER = (
+    "Given 19-channel dynamic functional connectivity matrices "
+    "(10 time windows), classify the subject's gender as male or female."
 )
 
 _PROMPT_TASK_FUTUREFC = (
-    "Given the first 6 DFC time windows (T0-T5), predict the future FC "
-    "matrices for the next 4 time windows (T6, T7, T8, T9)."
+    "Given historical dynamic functional connectivity matrices, "
+    "predict the next dynamic functional connectivity matrix."
 )
 
 _PROMPT_STATS_EEG = (
@@ -116,84 +122,181 @@ class PromptConfig:
 # ── 数据集配置字典 ──────────────────────────────────
 
 DATASET_PROMPTS: Dict[str, dict] = {
+    # ── DS ──
+    'DS': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_DS,
+        'prompt_task': _PROMPT_TASK_DISEASE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'DiseaseDS': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_DS,
+        'prompt_task': _PROMPT_TASK_DISEASE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'GenderDS': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_DS,
+        'prompt_task': _PROMPT_TASK_GENDER,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'AgeDS': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_DS,
+        'prompt_task': _PROMPT_TASK_AGE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'FutureFCDS': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_DS,
+        'prompt_task': _PROMPT_TASK_FUTUREFC,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+
+    # ── CAUEEG ──
     'CAUEEG': {
         'channel_names': _EEG_19_CHANNELS,
         'channel_groups': _EEG_CHANNEL_GROUPS,
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_CAUEEG,
-        'prompt_task': _PROMPT_TASK_BINARY,
+        'prompt_task': _PROMPT_TASK_DISEASE,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
-
-    'DS': {
+    'DiseaseCAUEEG': {
         'channel_names': _EEG_19_CHANNELS,
         'channel_groups': _EEG_CHANNEL_GROUPS,
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_CAUEEG,
-        'prompt_task': _PROMPT_TASK_BINARY,
+        'prompt_task': _PROMPT_TASK_DISEASE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'AgeCAUEEG': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
+        'prompt_task': _PROMPT_TASK_AGE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'FutureFCCAUEEG': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
+        'prompt_task': _PROMPT_TASK_FUTUREFC,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
 
+    # ── TUAB ──
+    'TUAB': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_TUAB,
+        'prompt_task': _PROMPT_TASK_DISEASE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'DiseaseTUAB': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_TUAB,
+        'prompt_task': _PROMPT_TASK_DISEASE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'GenderTUAB': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_TUAB,
+        'prompt_task': _PROMPT_TASK_GENDER,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'AgeTUAB': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_TUAB,
+        'prompt_task': _PROMPT_TASK_AGE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'FutureFCTUAB': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_TUAB,
+        'prompt_task': _PROMPT_TASK_FUTUREFC,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+
+    # ── TUEP ──
+    'TUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_TUEP,
+        'prompt_task': _PROMPT_TASK_DISEASE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'DiseaseTUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_TUEP,
+        'prompt_task': _PROMPT_TASK_DISEASE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'GenderTUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_TUEP,
+        'prompt_task': _PROMPT_TASK_GENDER,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'AgeTUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_TUEP,
+        'prompt_task': _PROMPT_TASK_AGE,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    'FutureFCTUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_TUEP,
+        'prompt_task': _PROMPT_TASK_FUTUREFC,
+        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+
+    # ── Beirut ──
     'Beirut': {
         'channel_names': _EEG_19_CHANNELS,
         'channel_groups': _EEG_CHANNEL_GROUPS,
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_BEIRUT,
-        'prompt_task': _PROMPT_TASK_BEIRUT,
+        'prompt_task': _PROMPT_TASK_DISEASE,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
-
-    'TUAB': {
+    'DiseaseBeirut': {
         'channel_names': _EEG_19_CHANNELS,
         'channel_groups': _EEG_CHANNEL_GROUPS,
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
-        'prompt_task': _PROMPT_TASK_BINARY,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
-    'TUEP': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
-        'prompt_task': _PROMPT_TASK_BINARY,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
-    'FutureFCCAUEEG': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_FUTUREFC,
-        'prompt_task': _PROMPT_TASK_FUTUREFC,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
-    'FutureFCDS': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_FUTUREFC,
-        'prompt_task': _PROMPT_TASK_FUTUREFC,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
-    'FutureFCTUAB': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_FUTUREFC,
-        'prompt_task': _PROMPT_TASK_FUTUREFC,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
-    'FutureFCTUEP': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_FUTUREFC,
-        'prompt_task': _PROMPT_TASK_FUTUREFC,
+        'prompt_dataset': _PROMPT_DATASET_BEIRUT,
+        'prompt_task': _PROMPT_TASK_DISEASE,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
 }

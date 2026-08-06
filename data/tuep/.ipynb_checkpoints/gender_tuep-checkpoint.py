@@ -423,5 +423,5 @@ def gender_tuep_preprocess(path="../data/TUEP", hz=200,
 
 if __name__ == '__main__':
     gender_tuep_preprocess("../data/TUEP", hz=200,
-                           max_windows_per_subject=(100, 50),
+                           max_windows_per_subject=(50, 25),
                            max_subjects=None)

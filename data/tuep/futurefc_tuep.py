@@ -181,7 +181,7 @@ def _process_tuep_file_futurefc(args):
 
 
 def futurefc_tuep_preprocess(path="../data/TUEP", hz=200,
-                             max_windows_per_subject=None,
+                             max_windows_per_subject=120,
                              train_split=0.7, val_split=0.15):
     """Preprocess the TUH EEG Epilepsy Corpus for future FC prediction.
 

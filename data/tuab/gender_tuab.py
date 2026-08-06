@@ -223,7 +223,7 @@ def _resolve_param(val, pos):
 
 
 def gender_tuab_preprocess(path="../data/TUAB", hz=200,
-                           max_windows_per_subject=None,
+                           max_windows_per_subject=4,
                            max_subjects=None,
                            train_split=0.7, val_split=0.15):
     """Preprocess the TUH Abnormal EEG Corpus for gender (M/F) classification.
@@ -413,5 +413,4 @@ def gender_tuab_preprocess(path="../data/TUAB", hz=200,
 
 if __name__ == '__main__':
     gender_tuab_preprocess("../data/TUAB", hz=200,
-                           max_windows_per_subject=8,
                            max_subjects=None)

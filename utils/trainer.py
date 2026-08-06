@@ -69,7 +69,9 @@ class Trainer(object):
         """构建保存目录名: {model}_{dataset}_{mode}"""
         if self.args.pretrain_path:
             # 迁移学习模式
-            if self.args.few_shot > 0:
+            if self.args.few_shot == -1:
+                mode = "fulldata"
+            elif self.args.few_shot > 0:
                 mode = "fewshot"
             else:
                 mode = "zeroshot"
@@ -284,8 +286,9 @@ class Trainer(object):
         """Fine-tune for few-shot transfer learning with val-based early stopping.
 
         Evaluates on the (untouched, full-subject) validation set each epoch.
-        Keeps the checkpoint with the best val AUC, stops early when AUC stops
-        improving, then evaluates once on the test set.
+        Keeps the checkpoint with the best val metric (taken from
+        ``--early_stop_metric``; defaults to Loss), stops early when the
+        metric stops improving, then evaluates on the test set.
         """
         epochs = self.args.num_epochs
         is_rank_0 = (not torch.distributed.is_initialized()
@@ -309,12 +312,24 @@ class Trainer(object):
             self.optimizer = init_optimizer(self.model, self.args)
             self.scheduler = None
 
-        # ── Early stopping (AUC: higher is better) ──
+        # ── 早停指标：动态推断（与 train() 保持一致）──
         from utils.early_stopping import EarlyStopping
+        metric_name = self.args.early_stop_metric
+        LOWER_IS_BETTER = {'Loss', 'MSE', 'MAE', 'RMSE'}
+        HIGHER_IS_BETTER = {'Accuracy', 'AUC', 'Precision', 'Sensitivity',
+                           'Specificity', 'Recall', 'F_score', 'R2', 'PearsonR',
+                           'PearsonR_mean'}
+        if metric_name in LOWER_IS_BETTER:
+            mode = 'min'
+        elif metric_name in HIGHER_IS_BETTER:
+            mode = 'max'
+        else:
+            mode = 'min'
+
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
             min_delta=self.args.early_stop_min_delta,
-            mode='max',
+            mode=mode,
         )
         best_model_dir = os.path.join(self.args.model_dir,
                                       self._get_save_dir_name() + '_best')
@@ -336,20 +351,25 @@ class Trainer(object):
             val_result = self.evaluate(dataloader_key='val')
 
             if is_rank_0 and val_result is not None:
-                val_auc = val_result.get('AUC', 0.0)
+                val_metric = val_result.get(metric_name)
+                if val_metric is None:
+                    logger.warning(
+                        f"Metric '{metric_name}' not in eval result; "
+                        f"falling back to 'Loss'")
+                    val_metric = val_result.get('Loss', float('inf'))
                 val_loss = val_result.get('Loss', float('inf'))
-                improved = early_stopper.step(val_auc)
+                improved = early_stopper.step(val_metric)
 
                 if improved:
                     self.save_model(path=best_model_dir)
-                    logger.info("Best model saved (val AUC=%.4f, epoch=%d)",
-                                early_stopper.best_score, epoch)
+                    logger.info("Best model saved (val %s=%.4f, epoch=%d)",
+                                metric_name, early_stopper.best_score, epoch)
 
                 msg = (f"FT Epoch: {epoch}/{epochs}, "
                        f"Train Loss: {train_loss:.5f}, "
                        f"Val Loss: {val_loss:.5f}, "
-                       f"Val AUC: {val_auc:.4f}, "
-                       f"Best AUC: {early_stopper.best_score:.4f}, "
+                       f"Val {metric_name}: {val_metric:.4f}, "
+                       f"Best {metric_name}: {early_stopper.best_score:.4f}, "
                        f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                        f"Time: {(end_time - start_time):.1f}s")
                 tqdm.write(msg)
@@ -954,6 +974,9 @@ class Trainer(object):
             json.dump(args_dict, f, indent=2)
         logger.info("Model saved to %s", path)
 
+    # 跨数据集加载时不应覆盖目标数据集的 prompt
+    _PROMPT_BUFFER_KEYS = {'dataset_prompt_embeddings', 'task_prompt_embeddings'}
+
     def load_model(self, path=None):
         if path is None:
             path = os.path.join(self.args.model_dir, self._get_save_dir_name())
@@ -969,6 +992,8 @@ class Trainer(object):
         saved_state = torch.load(bin_path, map_location=self.device,
                                 weights_only=False)
 
+        n_skipped_prompt = 0
+
         if self.args.deepspeed:
             import deepspeed
             trainable = [p for p in model.parameters() if p.requires_grad]
@@ -976,6 +1001,9 @@ class Trainer(object):
                 current_state = model.state_dict()
                 missing, unexpected = [], []
                 for k, v in saved_state.items():
+                    if k in self._PROMPT_BUFFER_KEYS:
+                        n_skipped_prompt += 1
+                        continue
                     if k in current_state:
                         if current_state[k].shape == v.shape:
                             current_state[k].copy_(v)
@@ -991,6 +1019,9 @@ class Trainer(object):
             current_state = model.state_dict()
             missing, unexpected = [], []
             for k, v in saved_state.items():
+                if k in self._PROMPT_BUFFER_KEYS:
+                    n_skipped_prompt += 1
+                    continue
                 if k in current_state:
                     if current_state[k].shape == v.shape:
                         current_state[k].copy_(v)
@@ -1003,7 +1034,9 @@ class Trainer(object):
                 if k not in saved_state:
                     missing.append(k)
 
-        n_loaded = len(saved_state) - len(unexpected)
+        if n_skipped_prompt:
+            logger.info("  %d prompt-buffer key(s) skipped (kept target-dataset prompt)", n_skipped_prompt)
+        n_loaded = len(saved_state) - len(unexpected) - n_skipped_prompt
         if missing:
             logger.info("  %d keys not in checkpoint (kept from init)", len(missing))
         if unexpected:

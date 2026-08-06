@@ -39,7 +39,10 @@ class TimeLLMConfig(BaseConfig):
                  output_dim=2,
                  dataset_name='CAUEEG',
                  llm_type='chatglm',
-                 llm_path='./model/chatglm-6b'):
+                 llm_path='./model/chatglm-6b',
+                 use_dataset_prompt=False,
+                 use_task_prompt=False,
+                 use_stats_prompt=False):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -54,6 +57,9 @@ class TimeLLMConfig(BaseConfig):
         self.dataset_name = dataset_name
         self.llm_type = llm_type
         self.llm_path = llm_path
+        self.use_dataset_prompt = use_dataset_prompt
+        self.use_task_prompt = use_task_prompt
+        self.use_stats_prompt = use_stats_prompt
 
 
 class ReprogrammingLayer(nn.Module):
@@ -149,13 +155,20 @@ class Model(nn.Module):
             raise ValueError(f"Unsupported llm_type: {self.llm_type}")
 
         self._pc = get_prompt_config(config.dataset_name)
-        prefix_ids = self.tokenizer.encode(self._pc.system_prompt)
+
+        # ── Dataset prompt embedding ──
+        ds_ids = self.tokenizer.encode(self._pc.prompt_dataset)
         with torch.no_grad():
-            prefix_embeds = self._word_embeddings(
-                torch.tensor(prefix_ids)
-            )
-        self.register_buffer("prompt_prefix_embeddings", prefix_embeds)
-        self.P_prefix: int = prefix_embeds.shape[0]
+            ds_embeds = self._word_embeddings(torch.tensor(ds_ids))
+        self.register_buffer("dataset_prompt_embeddings", ds_embeds)
+        self.P_dataset: int = ds_embeds.shape[0]
+
+        # ── Task prompt embedding ──
+        task_ids = self.tokenizer.encode(self._pc.prompt_task)
+        with torch.no_grad():
+            task_embeds = self._word_embeddings(torch.tensor(task_ids))
+        self.register_buffer("task_prompt_embeddings", task_embeds)
+        self.P_task: int = task_embeds.shape[0]
 
         start_tag_ids = self.tokenizer.encode("<start_prompt>\n")
         with torch.no_grad():
@@ -327,28 +340,41 @@ class Model(nn.Module):
 
         reprogrammed = reprogrammed.to(dtype=torch.bfloat16)
 
-        stats_texts = self._build_stats_prompts(SFC)
-        stats_ids = self.tokenizer(
-            stats_texts, return_tensors="pt",
-            padding=True, truncation=True, max_length=256
-        ).input_ids.to(device)
-        stats_embeddings = self._word_embeddings(stats_ids)
+        stats_texts = self._build_stats_prompts(SFC) if self.config.use_stats_prompt else None
+        if self.config.use_stats_prompt:
+            stats_ids = self.tokenizer(
+                stats_texts, return_tensors="pt",
+                padding=True, truncation=True, max_length=256
+            ).input_ids.to(device)
+            stats_embeddings = self._word_embeddings(stats_ids)
+            P_stats = stats_embeddings.shape[1]
+        else:
+            stats_embeddings = torch.empty(
+                B, 0, self.d_llm, device=device, dtype=torch.bfloat16)
+            P_stats = 0
 
         start_tag = self.start_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
         end_tag = self.end_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
-        prompt_prefix = self.prompt_prefix_embeddings.unsqueeze(0).expand(B, -1, -1)
+        ds_prompt = self.dataset_prompt_embeddings.unsqueeze(0).expand(B, -1, -1)
+        task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(B, -1, -1)
 
-        inputs_embeds = torch.cat(
-            [start_tag,
-             prompt_prefix,
-             stats_embeddings.to(dtype=prompt_prefix.dtype),
-             end_tag,
-             reprogrammed.to(dtype=prompt_prefix.dtype)],
-            dim=1,
-        )
+        prompt_parts = [start_tag]
+        P_skip = self.P_start
+        if self.config.use_dataset_prompt:
+            prompt_parts.append(ds_prompt)
+            P_skip += self.P_dataset
+        if self.config.use_task_prompt:
+            prompt_parts.append(task_prompt)
+            P_skip += self.P_task
+        if self.config.use_stats_prompt:
+            prompt_parts.append(stats_embeddings.to(dtype=ds_prompt.dtype))
+            P_skip += P_stats
+        prompt_parts.append(end_tag)
+        P_skip += self.P_end
+        prompt_parts.append(reprogrammed.to(dtype=ds_prompt.dtype))
+
+        inputs_embeds = torch.cat(prompt_parts, dim=1)
         S = inputs_embeds.shape[1]
-        P_skip = (self.P_start + self.P_prefix +
-                  stats_embeddings.shape[1] + self.P_end)
 
         # ── 构造 position_ids 与 attention_mask（分支）────
         if self.llm_type == 'chatglm':

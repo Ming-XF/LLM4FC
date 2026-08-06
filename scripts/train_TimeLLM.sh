@@ -18,9 +18,9 @@ deepspeed --num_gpus=6 main.py \
     --model "TimeLLM" \
     --num_repeat 1 \
     --dataset "$DATASET" \
-    --few_shot 0 \
+    --few_shot -1 \
     --few_shot_seed 42 \
-    --pretrain_path "" \
+    --pretrain_path "./output_dir/TimeLLM_FutureFCCAUEEG_train" \
     --data_dir "$DATA_DIR" \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
@@ -45,3 +45,9 @@ deepspeed --num_gpus=6 main.py \
     --do_train \
     --do_evaluate \
     --do_test
+
+
+
+    --use_dataset_prompt \
+    --use_task_prompt \
+    --use_stats_prompt \

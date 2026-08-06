@@ -221,7 +221,7 @@ def _process_tuab_file(args):
 # Preprocessing — main entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def disease_tuab_preprocess(path="../data/TUAB", hz=200, max_windows_per_subject=None,
+def disease_tuab_preprocess(path="../data/TUAB", hz=200, max_windows_per_subject=(5, 4),
                             max_subjects=None,
                             train_split=0.7, val_split=0.15):
     """Preprocess the TUH Abnormal EEG Corpus for normal/abnormal classification.
@@ -423,4 +423,4 @@ def disease_tuab_preprocess(path="../data/TUAB", hz=200, max_windows_per_subject
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    disease_tuab_preprocess("../data/TUAB", hz=200, max_windows_per_subject=(10, 8), max_subjects=None)
+    disease_tuab_preprocess("../data/TUAB", hz=200)
