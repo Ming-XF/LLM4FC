@@ -86,7 +86,7 @@ class AgeDSDataset(BaseDataset):
         labels = torch.tensor(
             self.all_data['labels'][idx[item]], dtype=torch.float32)
 
-        window_size = 6 * self.hz
+        window_size = 12 * self.hz
         step_size = (60 * self.hz - window_size) // 9
         SFC = self.connectivity(time_series)
         SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)

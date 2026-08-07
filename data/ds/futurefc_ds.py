@@ -96,7 +96,7 @@ class FutureFCDSDataset(BaseDataset):
         idx = self._active_index
         time_series = torch.from_numpy(
             self.all_data['time_series'][idx[item]]).float()
-        window_size = 6 * self.hz
+        window_size = 12 * self.hz
         step_size = (60 * self.hz - window_size) // (self.n_total_windows - 1)
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
         DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)

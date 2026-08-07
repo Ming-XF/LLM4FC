@@ -29,7 +29,7 @@ deepspeed --num_gpus=6 main.py \
     --drop_last False \
     --schedule 'cos' \
     --early_stop_patience 25 \
-    --early_stop_min_delta 0.001 \
+    --early_stop_min_delta 0.0001 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --deepspeed \
     --do_train \
