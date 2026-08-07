@@ -133,6 +133,8 @@ def main(args):
                     args, local_rank=local_rank, task_id=0,
                     episode_seed=episode_seed)
                 trainer.load_model(path=args.pretrain_path)
+                model = trainer.model.module if hasattr(trainer.model, 'module') else trainer.model
+                # model.freeze_for_finetune()
                 result = trainer.finetune()
 
             # ── 单次结果输出 ──

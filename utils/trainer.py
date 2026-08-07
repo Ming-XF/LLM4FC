@@ -401,12 +401,6 @@ class Trainer(object):
                 logger.info("No best checkpoint found at %s, "
                             "using current weights", best_path)
 
-        # ── Save fine-tuned model ──
-        save_dir = os.path.join(self.args.model_dir, self._get_save_dir_name())
-        self.save_model(path=save_dir)
-        if is_rank_0:
-            logger.info("Fine-tuned model saved to %s", save_dir)
-
         # ── Final test evaluation on best model ──
         result = self.evaluate(dataloader_key='test')
         self.test_result = result

@@ -242,6 +242,20 @@ class Model(nn.Module):
         fc = cov / (std.unsqueeze(1) * std.unsqueeze(2) + 1e-8)
         return fc
 
+    def freeze_for_finetune(self):
+        """冻结 GCN 与 reprogram 层，仅保留预测头可训练。"""
+        for param in self.gcn_layers.parameters():
+            param.requires_grad = False
+        for param in self.channel_embed_projection.parameters():
+            param.requires_grad = False
+        for param in self.node_projection.parameters():
+            param.requires_grad = False
+
+        for param in self.mapping_layer.parameters():
+            param.requires_grad = False
+        for param in self.reprogramming_layer.parameters():
+            param.requires_grad = False
+
     def _build_stats_prompts(self, SFC):
         pc = self._pc
         B, N, _ = SFC.shape

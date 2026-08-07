@@ -20,7 +20,7 @@ deepspeed --num_gpus=6 main.py \
     --dataset "$DATASET" \
     --few_shot 0 \
     --few_shot_seed 42 \
-    --pretrain_path "" \
+    --pretrain_path "TimeLLM_DiseaseCAUEEG_fulldata_best" \
     --data_dir "$DATA_DIR" \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
@@ -38,8 +38,8 @@ deepspeed --num_gpus=6 main.py \
     --num_epochs 200 \
     --drop_last False \
     --schedule 'cos' \
-    --early_stop_patience 25 \
-    --early_stop_min_delta 0.0001 \
+    --early_stop_patience 10 \
+    --early_stop_min_delta 0.001 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --use_dataset_prompt \
     --use_task_prompt \
