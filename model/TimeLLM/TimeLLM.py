@@ -42,7 +42,8 @@ class TimeLLMConfig(BaseConfig):
                  llm_path='./model/chatglm-6b',
                  use_dataset_prompt=False,
                  use_task_prompt=False,
-                 use_stats_prompt=False):
+                 use_stats_prompt=False,
+                 futurefc_aux_weight=0.0):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -60,6 +61,7 @@ class TimeLLMConfig(BaseConfig):
         self.use_dataset_prompt = use_dataset_prompt
         self.use_task_prompt = use_task_prompt
         self.use_stats_prompt = use_stats_prompt
+        self.futurefc_aux_weight = futurefc_aux_weight
 
 
 class ReprogrammingLayer(nn.Module):
@@ -486,6 +488,26 @@ class Model(nn.Module):
                 if labels.dim() > 1 and labels.shape[-1] > 1:
                     labels = labels.argmax(dim=-1)
                 loss = F.cross_entropy(logits, labels)
+
+        # ── FutureFC 辅助任务损失 ──
+        if self.config.futurefc_aux_weight > 0 and self.task_type != 'multi_output_regression':
+            T = self.config.num_windows
+            C = self.config.node_size
+            T_half = T // 2  # 后一半窗口
+
+            HL_aux = HL[:, P_skip:, :self.config.d_ff]
+
+            fc_preds = []
+            for w in range(T_half, T):
+                indices = w * C + torch.arange(C, device=HL_aux.device)
+                node_tokens = HL_aux[:, indices, :]           # (B, C, d_ff)
+                fc_window = self._pearson_fc_head(node_tokens)  # (B, C, C)
+                fc_preds.append(fc_window)
+
+            pred_fc = torch.stack(fc_preds, dim=1)            # (B, T_half, C, C)
+            target_fc = DFC[:, T_half:, :, :].to(dtype=pred_fc.dtype)
+            aux_loss = F.mse_loss(pred_fc, target_fc)
+            loss = loss + self.config.futurefc_aux_weight * aux_loss
 
         return ModelOutputs(
             logits=logits,

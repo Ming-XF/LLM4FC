@@ -69,6 +69,7 @@ def init_model_config(args, data_config: DataConfig):
             use_dataset_prompt=args.use_dataset_prompt,
             use_task_prompt=args.use_task_prompt,
             use_stats_prompt=args.use_stats_prompt,
+            futurefc_aux_weight=args.futurefc_aux_weight,
         )
         model = Model(model_config)
     else:
@@ -166,6 +167,8 @@ def init_config():
     model_group.add_argument("--use_stats_prompt", action="store_true",
                              help="TimeLLM: include per-sample FC statistics prompt")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
+    model_group.add_argument("--futurefc_aux_weight", default=0.0, type=float,
+                             help="Weight for FutureFC auxiliary loss (0=disabled)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

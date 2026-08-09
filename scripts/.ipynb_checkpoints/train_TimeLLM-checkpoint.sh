@@ -18,10 +18,11 @@ deepspeed --num_gpus=6 main.py \
     --model "TimeLLM" \
     --num_repeat 1 \
     --dataset "$DATASET" \
+    --data_dir "$DATA_DIR" \
     --few_shot 0 \
     --few_shot_seed 42 \
     --pretrain_path "" \
-    --data_dir "$DATA_DIR" \
+    --futurefc_aux_weight 1 \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
     --d_model 64 \
@@ -47,7 +48,6 @@ deepspeed --num_gpus=6 main.py \
     --do_train \
     --do_evaluate \
     --do_test
-    # --use_stats_prompt \
     
 
 
