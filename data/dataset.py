@@ -206,7 +206,7 @@ class BaseDataset(Dataset):
         按任务类型自适应：
         - 分类（二类/多类）：每类采样 n_subj_per_class 个被试
         - 回归：随机采样 n_subj_per_class 个被试
-        - 多值回归（FutureFC）：随机采样 n_subj_per_class 个被试
+        - 多值回归：随机采样 n_subj_per_class 个被试
 
         Parameters
         ----------

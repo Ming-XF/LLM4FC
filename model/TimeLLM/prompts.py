@@ -155,15 +155,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'prompt_task': _PROMPT_TASK_AGE,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
-    'FutureFCDS': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_DS,
-        'prompt_task': _PROMPT_TASK_FUTUREFC,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
     # ── CAUEEG ──
     'CAUEEG': {
         'channel_names': _EEG_19_CHANNELS,
@@ -189,15 +180,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'prompt_task': _PROMPT_TASK_AGE,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
-    'FutureFCCAUEEG': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_CAUEEG,
-        'prompt_task': _PROMPT_TASK_FUTUREFC,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
     # ── TUAB ──
     'TUAB': {
         'channel_names': _EEG_19_CHANNELS,
@@ -231,15 +213,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'prompt_task': _PROMPT_TASK_AGE,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
-    'FutureFCTUAB': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_TUAB,
-        'prompt_task': _PROMPT_TASK_FUTUREFC,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
     # ── TUEP ──
     'TUEP': {
         'channel_names': _EEG_19_CHANNELS,
@@ -273,15 +246,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'prompt_task': _PROMPT_TASK_AGE,
         'prompt_stats_template': _PROMPT_STATS_EEG,
     },
-    'FutureFCTUEP': {
-        'channel_names': _EEG_19_CHANNELS,
-        'channel_groups': _EEG_CHANNEL_GROUPS,
-        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
-        'prompt_dataset': _PROMPT_DATASET_TUEP,
-        'prompt_task': _PROMPT_TASK_FUTUREFC,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
-    },
-
     # ── Beirut ──
     'Beirut': {
         'channel_names': _EEG_19_CHANNELS,
