@@ -43,10 +43,10 @@ deepspeed --num_gpus=6 main.py \
     --use_task_prompt \
     --use_lora \
     --use_gc_lora \
-    --lora_rank 16 \
+    --lora_rank 8 \
     --lora_alpha 32 \
     --lora_dropout 0.1 \
-    --lora_target_modules "q_proj,v_proj" \
+    --lora_target_modules "v_proj" \
     --early_stop_patience 10 \
     --early_stop_min_delta 0.001 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
