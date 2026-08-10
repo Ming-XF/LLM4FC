@@ -39,15 +39,29 @@ deepspeed --num_gpus=6 main.py \
     --num_epochs 200 \
     --drop_last False \
     --schedule 'cos' \
+    --use_dataset_prompt \
+    --use_task_prompt \
+    --use_lora \
+    --use_gc_lora \
+    --lora_rank 16 \
+    --lora_alpha 32 \
+    --lora_dropout 0.1 \
+    --lora_target_modules "q_proj,v_proj" \
     --early_stop_patience 10 \
     --early_stop_min_delta 0.001 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
-    --use_dataset_prompt \
-    --use_task_prompt \
     --deepspeed \
     --do_train \
     --do_evaluate \
     --do_test
+
+# ── LoRA / GC-LoRA ──
+# To enable fine-tuning, add the following flags to the deepspeed command above
+# (insert them after --lora_target_modules):
+#
+#   --use_lora \              # enable standard LoRA
+#   --use_gc_lora \           # enable graph-conditioned LoRA (requires --use_lora)
+
     
 
 

@@ -2,120 +2,106 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project overview
+## Project Overview
 
-LLM4FC applies frozen LLMs (ChatGLM-6B, DeepSeek-R1-Distill-Llama-8B) to EEG-based functional connectivity analysis. Dynamic functional connectivity (DFC) matrices are encoded via GCN, "reprogrammed" into language-token embeddings, and fed through the LLM for prediction. Tasks: disease classification, age regression, gender classification, and future FC prediction across five EEG datasets (CAUEEG, DS, TUAB, TUEP, Beirut).
+LLM4FC is a research codebase for EEG-based brain disorder classification using LLM-augmented functional connectivity (FC) analysis. The core idea: compute dynamic FC matrices from EEG time series via sliding-window Pearson correlation → encode each window with a shared GCN → use a cross-attention **reprogramming layer** to map GCN outputs into a frozen LLM's embedding space → feed prompt embeddings + reprogrammed patches through the frozen LLM → task-specific head (classification/regression/future-FC prediction).
 
 ## Commands
 
-### Training
-
-Training uses DeepSpeed shell wrappers in `scripts/`. All require 6 GPUs:
+Training (all via shell scripts with DeepSpeed ZeRO-2, 6 GPUs):
 
 ```bash
-# TimeLLM (transfer learning from a CAUEEG disease pretrain)
+# TimeLLM (main model)
 ./scripts/train_TimeLLM.sh <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>
-# e.g. ./scripts/train_TimeLLM.sh DiseaseTUAB ../data/TUAB/tuab_disease.npz AUC
+# Example: ./scripts/train_TimeLLM.sh DiseaseBeirut ../data/Beirut/beirut_disease.npy AUC
 
-# Baseline models
-./scripts/train_BNT.sh <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>
-./scripts/train_BrainNetCNN.sh <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>
-./scripts/train_ALTER.sh <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>
-./scripts/train_GCDGCN.sh <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>
+# Other models (BNT, BrainNetCNN, GCDGCN, ALTER)
+./scripts/train_BNT.sh DiseaseBeirut ../data/Beirut/beirut_disease.npy AUC
 ```
 
-The `DATASET` argument follows the pattern `{Task}{Source}Dataset`, e.g. `DiseaseCAUEEGDataset`, `AgeTUABDataset`, `FutureFCTUEPDataset`. These are class names in `data/__init__.py`.
+Key arguments: `--model TimeLLM`, `--dataset`, `--llm_type chatglm|llama`, `--deepspeed`, `--do_train`, `--pretrain_path` (for transfer learning), `--few_shot N` (-1=full finetune, 0=zero-shot, >0=N-shot per class), `--futurefc_aux_weight` (auxiliary loss weight), `--fc_threshold`/`--fc_keep_ratio` (FC sparsification), `--use_dataset_prompt`/`--use_task_prompt`/`--use_stats_prompt` (prompt toggles).
 
-Direct `deepspeed` invocation for custom runs:
-
-```bash
-deepspeed --num_gpus=6 main.py \
-    --model TimeLLM --dataset DiseaseCAUEEGDataset --data_dir ../data/CAUEEG/caueeg_disease.npz \
-    --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B \
-    --use_dataset_prompt --use_task_prompt --use_stats_prompt \
-    --batch_size 2 --num_epochs 200 --deepspeed --do_train --do_evaluate --do_test
-```
-
-### Preprocessing
-
-Each dataset module runs directly to produce the `.npz` file consumed by training:
-
-```bash
-python data/caueeg/disease_caueeg.py
-python data/caueeg/futurefc_caueeg.py
-# etc.
-```
-
-Preprocessing reads raw EDF files, computes window caps per subject, and writes a `.npz` with precomputed subject split indices. Parameters like `max_windows_per_subject` and `max_subjects` are set in the `__main__` block of each preprocessing file — see `.claude/skills/find-preprocess-params.md` for the workflow to find optimal values.
-
-### No test suite
-
-There is no test suite, linter config, or CI in this repository.
+The DeepSpeed config at `deepspeed/train.json` (ZeRO-2, batch size 12, 2 per GPU) is auto-detected; `deepspeed/finetune.json` is used for transfer-learning finetune.
 
 ## Architecture
 
-### Reflection-based dispatch
+```
+main.py          — Entry point: training / transfer learning / testing
+config.py        — CLI argument parser + model-config factory (init_model_config)
+trainers.py      — Per-model Trainer subclasses (TimeLLMTrainer, BNTTrainer, etc.)
+utils/trainer.py — Base Trainer: training loop, early stopping, eval (binary/multi/regression/multi-output), save/load
+utils/           — early_stopping, optimizer, schedule, recorder, logger
+model/base/      — BaseConfig (hyperparams), ModelOutputs dataclass (logits + loss + hidden_state)
+model/TimeLLM/   — TimeLLM model + prompts.py (per-dataset prompt configs)
+model/<other>/   — BNT, BrainNetCNN, ALTER, GCDGCN (legacy models)
+data/            — BaseDataset + per-dataset implementations
+data/dataset.py  — DFC computation (sliding-window Pearson), FC sparsification, per-subject data splits, few-shot sampling
+data/preprocess.py — EEG preprocessing (EDF → .npy with time series, labels, subject IDs)
+scripts/          — Shell launch scripts (all use deepspeed --num_gpus=6)
+deepspeed/        — DeepSpeed ZeRO-2 configs (train.json, finetune.json)
+```
 
-Models, datasets, and trainers are wired by string names. `main.py` instantiates the trainer with `eval(args.model + 'Trainer')` and datasets via `eval(f"{args.dataset}Dataset")`. This means:
+### TimeLLM Forward Pipeline
 
-- Each model needs a `{ModelName}Trainer` class in `trainers.py`
-- Each dataset needs a `{Task}{Source}Dataset` class imported in `data/__init__.py`
-- Early stop metric must match an evaluation metric name (AUC, Accuracy, Sensitivity, Specificity, Loss for regression)
+1. **Dynamic FC**: `BaseDataset.__getitem__` computes DFC via `dynamic_connectivity()` — sliding-window Pearson → (T, C, C) tensor, sparsified by threshold/top-K
+2. **GCN encoding**: DFC (B, T, C, C) → shared GCN per window → (B, T*C, gcn_hidden). Node init: one-hot channel identity via `channel_embed_projection`. Token order: **time-first** (C0T0, C1T0, ..., C18T0, C0T1, ..., C18T9)
+3. **Node projection**: (B, T*C, gcn_hidden) → (B, T*C, d_model) via Linear+LayerNorm+GELU
+4. **Reprogramming**: Cross-attention from node embeddings (Q) to learned text prototypes (K,V) — maps d_model→4096 (LLM dim)
+5. **LLM forward**: `[start_tag | dataset_prompt? | task_prompt? | stats_prompt? | end_tag | reprogrammed_patches]` → frozen LLM. Prompt parts are optional (toggled by CLI flags). Uses causal attention so future windows cannot attend past ones.
+6. **Task head**:
+   - Classification/Regression: Flatten all patch tokens → Linear(output_dim)
+   - Multi-output regression (FutureFC): Select future-window node tokens → differentiable Pearson correlation head → (B, T_out, C, C), MSE loss against ground-truth future FC
+7. **FutureFC auxiliary loss** (for non-FutureFC tasks): predicts the second half of DFC windows from LLM outputs, MSE-weighted and added to main loss
 
-### Three compute backends
+### Data Pipeline
 
-The `Trainer` base class (`utils/trainer.py`) isolates three backends selected by CLI flags:
+`BaseDataset` supports three task types via `data_config.task_type`:
+- `classification` — binary or multi-class disease/gender labels
+- `regression` — scalar age prediction
+- `multi_output_regression` — FutureFC prediction (matrix output)
 
-| Flag | Backend | Loader |
-|---|---|---|
-| `--deepspeed` | DeepSpeed ZeRO-2 | `init_deepspeed_dataloader` |
-| `--do_parallel` | PyTorch DDP | `init_distributed_dataloader` |
-| (neither) | Single-GPU AMP | `init_StratifiedKFold_dataloader` |
+Data splitting: when `--num_repeat >= 2`, uses GroupKFold; when `--num_repeat == 1`, uses a fixed 60/20/20 per-subject stratified split (the standard mode). Few-shot sampling selects N subjects per class from the training set.
 
-The backend affects `__init__` (engine setup), `_forward`, `_backward_and_step`, dataloader selection, and model save/load (DeepSpeed requires gathering ZeRO-sharded params before save).
+### Dual LLM Backend Support
 
-### Data flow
+The model supports two LLM backends with different position encoding and output shapes:
 
-1. `BaseDataset` (`data/dataset.py`) computes static FC (Pearson correlation across all channels) and dynamic FC (sliding windows) from preprocessed `.npz` files, applies optional sparsification (`--fc_threshold`, `--fc_keep_ratio`), and handles train/val/test splits. Splits are **by subject** (60/20/20) to prevent data leakage, or via `GroupKFold` when `num_repeat > 1`.
-2. `DataConfig` (`data/data_config.py`) holds metadata (node_size, output_dim, task_type). `task_type` is set by each dataset's `load_data` and determines which evaluation function runs (classification → AUC/Accuracy, regression → MSE/MAE/RMSE/R², multi-output regression → per-element PearsonR).
-3. `Trainer.prepare_inputs_kwargs` (in `trainers.py`) maps dataset batch dict → model inputs. `TimeLLMTrainer` handles all three task types with different label formats.
+- **ChatGLM** (`--llm_type chatglm`): Uses 2D position encoding, custom causal mask (True=masked), output shape (S, B, H) requiring `.transpose(0,1)`. Module path: `transformer.layers[i].attention.<name>` / `transformer.layers[i].mlp.<name>`.
+- **LLaMA** (`--llm_type llama`): Uses RoPE 1D position encoding, no explicit attention mask needed, output shape (B, S, H) directly. Module path: `model.layers[i].self_attn.<name>` / `model.layers[i].mlp.<name>`.
 
-### TimeLLM model (`model/TimeLLM/TimeLLM.py`)
+### GC-LoRA (Graph-Conditioned LoRA)
 
-Key components in order of data flow:
-- **GCNLayer**: projects DFC matrices to node embeddings via `torch.bmm` with normalized adjacency
-- **ReprogrammingLayer**: cross-attention that maps GCN embeddings into LLM token-embedding space using a learned "source embedding"
-- **Prompt construction**: pre-tokenized dataset/task/stats prompt embeddings are registered as buffers and concatenated with reprogrammed tokens before the LLM forward pass. Per-sample FC statistics prompts are built dynamically from the static FC matrix.
-- **Frozen LLM**: ChatGLM or Llama backbone (`requires_grad=False`, bf16). Position IDs and causal masks branch by `llm_type` (ChatGLM uses 2D positional encoding, Llama uses RoPE).
-- **Output head**: linear over flattened LLM output for classification/regression; a differentiable Pearson FC head (`_pearson_fc_head`) for FutureFC multi-output regression.
+`model/TimeLLM/gc_lora.py` — Extends standard LoRA by inserting a one-hop GCN aggregation between the low-rank matrices A and B:
 
-Prompts per dataset are defined in `model/TimeLLM/prompts.py` — hand-written descriptions of dataset, task, and stats templates for every combination of dataset × task.
+```
+h = A(x)           # d_in → r
+h_agg = FC_adj · h # intra-window graph convolution along channel dim
+Δ = B(h_agg)       # r → d_out
+```
 
-### Baseline models
+Key details:
+- The GCN sits in the low-rank bottleneck (dimension r), so FLOPs are negligible
+- `fc_adj` (B, T, C, C) is set as runtime context via `set_gc_lora_context()` before each LLM forward and cleared via `clear_gc_lora_context()` after
+- When `use_graph_cond=False`, falls back to standard LoRA (shares code path for ablation)
+- Enabled with `--use_lora --use_gc_lora`; `--use_gc_lora` requires `--use_lora`
+- Target modules specified via `--lora_target_modules` (default: `q_proj,v_proj`)
 
-- **BNT** (`model/BrainNetworkTransformer/`): transformer with deep-clustering auxiliary decoder
-- **BrainNetCNN** (`model/BrainNetCNN/`): edge-to-edge CNN over ROI adjacency
-- **ALTER** (`model/ALTER/`): transformer-encoder with RRWP positional encodings and clustering
-- **GCDGCN** (`model/GCDGCN/`): multi-layer GCN with spectral pooling. Has a two-phase training: pretrain (first 100 epochs) then finetune.
+### Token Budget in LLM Forward
 
-### Transfer learning
+The LLM input sequence length = `P_start + P_dataset + P_task + P_stats + P_end + (T * C)`. With 10 windows × 19 channels = 190 patch tokens plus prompt overhead (~30–80 tokens), total is ~220–300 tokens.
 
-When `--pretrain_path` is set, `main.py` enters transfer mode: loads a pretrained checkpoint, optionally samples K subjects per class (`--few_shot`, `--few_shot_seed`), fine-tunes with `Trainer.finetune()`, then tests. Prompt-buffer keys are **skipped during checkpoint load** so the target dataset's prompts are preserved — this is intentional for cross-dataset transfer.
+### Key Design Choices
 
-### Bundled LLM weights
+- LLM is **frozen** (no fine-tuning). Only the GCN, node projection, reprogramming layer, mapping layer, and output head are trained.
+- `load_model` skips `dataset_prompt_embeddings` and `task_prompt_embeddings` buffers (keeps target-dataset prompts when transferring).
+- DeepSpeed ZeRO-2 is the primary distributed training strategy.
+- The `num_repeat` argument doubles as the K-Fold split count; set to 1 for train/val/test mode.
+- `early_stop_metric` chooses the monitored metric; `<trainer>.train()` infers direction (min for Loss, max for Accuracy/AUC).
 
-`model/chatglm-6b/` (8 shards) and `model/deepseek-r1-distill-llama-8B/` (2 shards) contain the full pretrained LLM weights (~360 GB total). These are loaded by the `Model` constructor and kept frozen.
+### Adding a New Dataset
 
-### Key CLI flags
-
-| Flag | Purpose |
-|---|---|
-| `--model` | Model name string (TimeLLM, BNT, BrainNetCNN, ALTER, GCDGCN) |
-| `--dataset` | Dataset class name (e.g. `DiseaseCAUEEGDataset`) |
-| `--llm_type` | `chatglm` or `llama` |
-| `--llm_path` | Path to bundled LLM weights |
-| `--pretrain_path` | Path to pretrained checkpoint for transfer learning |
-| `--few_shot` | K subjects per class (0 = zero-shot) |
-| `--use_dataset_prompt` / `--use_task_prompt` / `--use_stats_prompt` | Toggle prompt components |
-| `--fc_threshold` / `--fc_keep_ratio` | FC matrix sparsification |
-| `--deepspeed` / `--do_parallel` | Distributed backend selection |
+1. Create `data/<name>/` with a dataset class inheriting `BaseDataset`
+2. Implement `load_data()` — loads .npy/.npz, sets `data_config.node_size`, `output_dim`, `task_type`, and populates `all_data` with time_series/labels/subject_id
+3. Implement `__getitem__` — returns `{'correlation': static_FC, 'DFC': dynamic_FC, 'labels': label}`
+4. Register in `data/__init__.py`
+5. Add prompt config to `model/TimeLLM/prompts.py` if using TimeLLM

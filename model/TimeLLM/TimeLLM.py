@@ -5,6 +5,10 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModel
 from ..base import BaseConfig, ModelOutputs
 from .prompts import get_prompt_config
+from .gc_lora import (
+    GCLoRALinear, inject_lora_to_llm,
+    set_gc_lora_context, clear_gc_lora_context,
+)
 
 import logging
 
@@ -43,7 +47,13 @@ class TimeLLMConfig(BaseConfig):
                  use_dataset_prompt=False,
                  use_task_prompt=False,
                  use_stats_prompt=False,
-                 futurefc_aux_weight=0.0):
+                 futurefc_aux_weight=0.0,
+                 use_lora=False,
+                 lora_rank=16,
+                 lora_alpha=32.0,
+                 lora_dropout=0.1,
+                 lora_target_modules="q_proj,v_proj",
+                 use_gc_lora=False):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -62,6 +72,12 @@ class TimeLLMConfig(BaseConfig):
         self.use_task_prompt = use_task_prompt
         self.use_stats_prompt = use_stats_prompt
         self.futurefc_aux_weight = futurefc_aux_weight
+        self.use_lora = use_lora
+        self.lora_rank = lora_rank
+        self.lora_alpha = lora_alpha
+        self.lora_dropout = lora_dropout
+        self.lora_target_modules = lora_target_modules
+        self.use_gc_lora = use_gc_lora
 
 
 class ReprogrammingLayer(nn.Module):
@@ -220,6 +236,27 @@ class Model(nn.Module):
         for param in self.llm.parameters():
             param.requires_grad = False
 
+        # ── LoRA / GC-LoRA injection ──
+        if config.use_lora:
+            target_modules = [m.strip() for m in config.lora_target_modules.split(',')]
+            n_injected = inject_lora_to_llm(
+                self._transformer,
+                llm_type=self.llm_type,
+                target_modules=target_modules,
+                rank=config.lora_rank,
+                alpha=config.lora_alpha,
+                dropout=config.lora_dropout,
+                num_nodes=config.node_size,
+                num_windows=config.num_windows,
+                use_graph_cond=config.use_gc_lora,
+            )
+            _log.info(
+                "Injected %s-LoRA into %d modules (%s), rank=%d, alpha=%.1f",
+                'GC' if config.use_gc_lora else '',
+                n_injected, config.lora_target_modules,
+                config.lora_rank, config.lora_alpha,
+            )
+
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -244,8 +281,13 @@ class Model(nn.Module):
         fc = cov / (std.unsqueeze(1) * std.unsqueeze(2) + 1e-8)
         return fc
 
-    def freeze_for_finetune(self):
-        """冻结 GCN 与 reprogram 层，仅保留预测头可训练。"""
+    def freeze_for_finetune(self, freeze_lora: bool = True):
+        """冻结 GCN 与 reprogram 层，仅保留预测头可训练。
+
+        Args:
+            freeze_lora: 同时冻结 LoRA / GC-LoRA 权重（默认 True，
+                用于 few-shot transfer）。
+        """
         for param in self.gcn_layers.parameters():
             param.requires_grad = False
         for param in self.channel_embed_projection.parameters():
@@ -257,6 +299,12 @@ class Model(nn.Module):
             param.requires_grad = False
         for param in self.reprogramming_layer.parameters():
             param.requires_grad = False
+
+        if freeze_lora and self.config.use_lora:
+            for module in self.modules():
+                if isinstance(module, GCLoRALinear):
+                    module.lora_A.requires_grad_(False)
+                    module.lora_B.requires_grad_(False)
 
     def _build_stats_prompts(self, SFC):
         pc = self._pc
@@ -411,6 +459,9 @@ class Model(nn.Module):
             else:
                 position_ids = global_pos
 
+            if self.config.use_lora:
+                set_gc_lora_context(self, fc_adj=DFC, prompt_len=P_skip)
+
             transformer_outputs = self._transformer(
                 input_ids=None,
                 position_ids=position_ids,
@@ -425,10 +476,16 @@ class Model(nn.Module):
             # ChatGLM: (S, B, H) → (B, S, H)
             HL = transformer_outputs[0].transpose(0, 1)
 
+            if self.config.use_lora:
+                clear_gc_lora_context(self)
+
         elif self.llm_type == 'llama':
             # RoPE 1D position_ids: (B, S)
             position_ids = torch.arange(S, dtype=torch.long,
                                         device=device).unsqueeze(0).expand(B, -1)
+
+            if self.config.use_lora:
+                set_gc_lora_context(self, fc_adj=DFC, prompt_len=P_skip)
 
             # 不传 attention_mask，LLaMA 内部自动构造因果 mask
             transformer_outputs = self._transformer(
@@ -443,6 +500,9 @@ class Model(nn.Module):
             )
             # LLaMA: 输出已是 (B, S, H)，无需转置
             HL = transformer_outputs[0]
+
+            if self.config.use_lora:
+                clear_gc_lora_context(self)
 
         else:
             raise ValueError(f"Unsupported llm_type: {self.llm_type}")

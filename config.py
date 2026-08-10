@@ -70,6 +70,12 @@ def init_model_config(args, data_config: DataConfig):
             use_task_prompt=args.use_task_prompt,
             use_stats_prompt=args.use_stats_prompt,
             futurefc_aux_weight=args.futurefc_aux_weight,
+            use_lora=args.use_lora,
+            lora_rank=args.lora_rank,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            lora_target_modules=args.lora_target_modules,
+            use_gc_lora=args.use_gc_lora,
         )
         model = Model(model_config)
     else:
@@ -170,6 +176,20 @@ def init_config():
     model_group.add_argument("--futurefc_aux_weight", default=0.0, type=float,
                              help="Weight for FutureFC auxiliary loss (0=disabled)")
 
+    # ── LoRA / GC-LoRA ──
+    model_group.add_argument("--use_lora", action="store_true",
+                             help="Enable LoRA fine-tuning on the LLM backbone")
+    model_group.add_argument("--lora_rank", default=16, type=int,
+                             help="LoRA rank r (default: 16)")
+    model_group.add_argument("--lora_alpha", default=32.0, type=float,
+                             help="LoRA scaling alpha (default: 32.0)")
+    model_group.add_argument("--lora_dropout", default=0.1, type=float,
+                             help="LoRA dropout rate (default: 0.1)")
+    model_group.add_argument("--lora_target_modules", default="q_proj,v_proj", type=str,
+                             help="Comma-separated target module names (default: q_proj,v_proj)")
+    model_group.add_argument("--use_gc_lora", action="store_true",
+                             help="Enable GC-LoRA (graph-conditioned LoRA; requires --use_lora)")
+
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
     train_group.add_argument("--pretrain_path", default="", type=str,
@@ -217,4 +237,13 @@ def init_config():
     evaluate_group.add_argument("--do_test", action="store_true", help="")
 
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    # GC-LoRA requires LoRA; silently correct misuse
+    if args.use_gc_lora and not args.use_lora:
+        import logging
+        logging.getLogger(__name__).warning(
+            "--use_gc_lora requires --use_lora; disabling GC-LoRA")
+        args.use_gc_lora = False
+
+    return args
