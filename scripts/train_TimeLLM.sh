@@ -1,24 +1,22 @@
 #!/bin/bash
 #
 # TimeLLM training script
-# Usage: ./scripts/train_TimeLLM.sh <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>
+# Usage: ./scripts/train_TimeLLM.sh <DATASET> <EARLY_STOP_METRIC>
 #
 # Examples:
-#   ./scripts/train_TimeLLM.sh DiseaseBeirut   ../data/Beirut/beirut_disease.npy     AUC
-#   ./scripts/train_TimeLLM.sh GenderDS        ../data/DS/ds_gender.npz              AUC
-#   ./scripts/train_TimeLLM.sh AgeTUAB         ../data/TUAB/tuab_age.npz             Loss
-#   ./scripts/train_TimeLLM.sh FutureFCTUEP    ../data/TUEP/tuep_futurefc.npz        Loss
+#   ./scripts/train_TimeLLM.sh DiseaseBeirut   AUC
+#   ./scripts/train_TimeLLM.sh GenderDS        AUC
+#   ./scripts/train_TimeLLM.sh AgeTUAB         Loss
 #
 
-DATASET=${1:?"Usage: $0 <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>"}
-DATA_DIR=${2:?"Usage: $0 <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>"}
-EARLY_STOP_METRIC=${3:?"Usage: $0 <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>"}
+DATASET=${1:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC>"}
+EARLY_STOP_METRIC=${2:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC>"}
 
 deepspeed --num_gpus=6 main.py \
     --model "TimeLLM" \
     --num_repeat 1 \
     --save_steps 25 \
-    --batch_size 2 \
+    --batch_size 4 \
     --num_epochs 200 \
     --drop_last False \
     --schedule 'cos' \
@@ -26,9 +24,6 @@ deepspeed --num_gpus=6 main.py \
     --early_stop_min_delta 0.001 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
-    --data_dir "$DATA_DIR" \
-    --futurefc_aux_weight 1 \
-    --sfc_recon_weight 1 \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
     --d_model 64 \
@@ -49,7 +44,6 @@ deepspeed --num_gpus=6 main.py \
     --lora_alpha 32 \
     --lora_dropout 0.1 \
     --lora_target_modules "q_proj,v_proj" \
-    --block_causal_mask \
     --deepspeed \
     --do_train \
     --do_evaluate \

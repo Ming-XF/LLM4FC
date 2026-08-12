@@ -129,13 +129,10 @@ class GCDGCN(nn.Module):
         elif stage == 'finetune':
             if self.task_type == 'classification':
                 loss = self._classification_loss(final_output, labels)
-            elif self.task_type == 'regression':
+            else:
                 pred = final_output.squeeze(-1) if final_output.dim() > 1 and final_output.shape[-1] == 1 else final_output
                 lbl = labels.float().view(-1) if labels.dim() > 1 else labels.float()
                 loss = F.mse_loss(pred, lbl)
-            else:  # multi_output_regression
-                target_flat = labels.reshape(labels.shape[0], -1).float()
-                loss = F.mse_loss(final_output, target_flat)
             return ModelOutputs(logits=final_output, loss=loss)
         else:
             raise ValueError(f"Invalid stage: {stage}")

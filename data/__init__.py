@@ -14,3 +14,10 @@ from .tuep.disease_tuep import DiseaseTUEPDataset
 from .tuep.gender_tuep import GenderTUEPDataset
 from .tuep.age_tuep import AgeTUEPDataset
 
+from .multidomain.dis_caueeg_tuab import DisCAUEEGTUABDataset
+from .multidomain.dis_caueeg_tuep import DisCAUEEGTUEPDataset
+from .multidomain.dis_tuab_tuep import DisTUABTUEPDataset
+from .multidomain.age_caueeg_tuab import AgeCAUEEGTUABDataset
+from .multidomain.age_caueeg_tuep import AgeCAUEEGTUEPDataset
+from .multidomain.age_tuab_tuep import AgeTUABTUEPDataset
+

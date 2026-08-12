@@ -102,7 +102,7 @@ class DiseaseBeirutDataset(BaseDataset):
                                                    episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
-        data = np.load(self.data_config.data_dir, allow_pickle=True).item()
+        data = np.load("../data/Beirut/beirut_disease.npy", allow_pickle=True).item()
 
         time_series = data["timeseries"]
         labels = data["labels"]

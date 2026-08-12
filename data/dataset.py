@@ -121,10 +121,7 @@ class BaseDataset(Dataset):
         subj_labels_raw = self._make_subject_labels(labels, groups, unique_subjs)
 
         # ── 决定是否分层 + 分层用标签 ──
-        if task_type == DC.TASK_MULTI_OUTPUT_REGRESSION:
-            do_stratify = False
-            stratify_labels = None
-        elif task_type == DC.TASK_REGRESSION:
+        if task_type == DC.TASK_REGRESSION:
             do_stratify = True
             stratify_labels = self._bin_continuous_labels(subj_labels_raw)
         else:
@@ -151,8 +148,6 @@ class BaseDataset(Dataset):
                     labels[self.train_index], train_groups, unique_train_subjs)
                 if task_type == DC.TASK_REGRESSION:
                     train_strat = self._bin_continuous_labels(train_subj_lbls)
-                elif task_type == DC.TASK_MULTI_OUTPUT_REGRESSION:
-                    train_strat = None
                 else:
                     train_strat = train_subj_lbls.astype(int)
                 val_ratio = self.data_config.val_set / self.data_config.train_set
@@ -225,8 +220,7 @@ class BaseDataset(Dataset):
 
         task_type = self.data_config.task_type
 
-        if task_type in (DataConfig.TASK_REGRESSION,
-                         DataConfig.TASK_MULTI_OUTPUT_REGRESSION):
+        if task_type == DataConfig.TASK_REGRESSION:
             # 回归 / 多值回归：随机采样
             n = min(n_subj_per_class, len(unique_subjs))
             keep_subjs = rng.choice(unique_subjs, size=n, replace=False)

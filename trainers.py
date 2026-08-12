@@ -111,11 +111,6 @@ class TimeLLMTrainer(Trainer):
             labels = labels.long()
         elif self.data_config.is_regression:
             labels = labels.float()
-        elif self.data_config.is_multi_output_regression:
-            # Next-FC prediction: 使用完整 10 窗口 DFC 作为输入
-            # LLM 因果注意力自动实现 next-token prediction —
-            # 未来窗口 token 只能 attend 历史窗口，无法看到真实未来
-            labels = labels.float()
         return {
             "DFC": inputs['DFC'].float().to(self.device),
             "SFC": inputs['correlation'].float().to(self.device),

@@ -68,9 +68,6 @@ def init_model_config(args, data_config: DataConfig):
             llm_path=args.llm_path,
             use_dataset_prompt=args.use_dataset_prompt,
             use_task_prompt=args.use_task_prompt,
-            use_stats_prompt=args.use_stats_prompt,
-            futurefc_aux_weight=args.futurefc_aux_weight,
-            sfc_recon_weight=args.sfc_recon_weight,
             use_lora=args.use_lora,
             lora_rank=args.lora_rank,
             lora_alpha=args.lora_alpha,
@@ -112,8 +109,6 @@ def init_config():
 
     data_group = parser.add_argument_group(title="data", description="")
     data_group.add_argument("--dataset", default='DiseaseBeirut', type=str, help="")
-    data_group.add_argument("--data_dir", default="", type=str, help="")
-    data_group.add_argument("--data2_dir", default="", type=str, help="")
     data_group.add_argument("--data_processors", default=0, type=int, help="")
     data_group.add_argument("--train_set", default=0.6, type=float, help="")
     data_group.add_argument("--val_set", default=0.2, type=float, help="")
@@ -172,14 +167,7 @@ def init_config():
                              help="TimeLLM: include dataset description prompt")
     model_group.add_argument("--use_task_prompt", action="store_true",
                              help="TimeLLM: include task description prompt")
-    model_group.add_argument("--use_stats_prompt", action="store_true",
-                             help="TimeLLM: include per-sample FC statistics prompt")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
-    model_group.add_argument("--futurefc_aux_weight", default=0.0, type=float,
-                             help="Weight for FutureFC auxiliary loss (0=disabled)")
-    model_group.add_argument("--sfc_recon_weight", default=0.0, type=float,
-                             help="Weight for SFC reconstruction auxiliary loss (0=disabled)")
-
     # ── LoRA / GC-LoRA ──
     model_group.add_argument("--use_lora", action="store_true",
                              help="Enable LoRA fine-tuning on the LLM backbone")

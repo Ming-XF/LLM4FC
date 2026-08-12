@@ -425,8 +425,6 @@ class Trainer(object):
                 result = self.multiple_evaluate(dataloader_key)
         elif self.data_config.is_regression:
             result = self.regression_evaluate(dataloader_key)
-        elif self.data_config.is_multi_output_regression:
-            result = self.multi_output_regression_evaluate(dataloader_key)
         else:
             result = {}
         return result
@@ -836,86 +834,6 @@ class Trainer(object):
                     logger.info(f"{k}: {v:.5f}")
         else:
             result = {'MSE': 0.0}
-
-        return result
-
-    # ── 多值回归评估（未来FC预测等）───────────────────────────
-    def multi_output_regression_evaluate(self, dataloader_key='test'):
-        """多输出回归评估：整体 MSE, MAE, 逐元素 Pearson r（均值）。
-
-        适用于 FutureFC 预测等矩阵输出的任务。
-        labels 是形状为 (B, T_out, N, N) 的 DFC 矩阵。
-        """
-        import torch.distributed as dist
-        is_dist = dist.is_initialized()
-        rank = dist.get_rank() if is_dist else 0
-        world_size = dist.get_world_size() if is_dist else 1
-
-        if rank == 0:
-            logger.info(f"***** Running multi-output regression evaluation on "
-                        f"{dataloader_key}{self.task_id} dataset *****")
-        self.model.eval()
-        evaluate_dataloader = self.data_loaders[dataloader_key]
-        losses = 0
-        loss_list = []
-        preds_local = []
-        labels_local = []
-        result = {}
-
-        iterator = tqdm(evaluate_dataloader,
-                        desc=f"{dataloader_key}-eval-R{rank}", ncols=0)
-
-        with torch.no_grad():
-            for inputs in iterator:
-                input_kwargs = self.prepare_inputs_kwargs(inputs)
-                outputs = self._forward(input_kwargs)
-                loss = outputs.loss
-                losses += loss.item()
-                loss_list.append(loss.item())
-
-                batch_preds = outputs.logits.float().detach().cpu().numpy()
-                preds_local.append(batch_preds)
-
-                lbl = input_kwargs['labels']
-                labels_local.append(lbl.float().cpu().numpy())
-
-        preds = np.concatenate(preds_local, axis=0)
-        labels = np.concatenate(labels_local, axis=0)
-        # 确保是二维：(N_samples, dim)
-        if preds.ndim > 2:
-            preds = preds.reshape(preds.shape[0], -1)
-        if labels.ndim > 2:
-            labels = labels.reshape(labels.shape[0], -1)
-
-        result['Loss'] = losses / len(loss_list) if loss_list else 0.0
-
-        # ── 多值回归指标（rank 0 only，暂不处理分布式）──
-        if rank == 0 and len(preds) > 1:
-            mse = np.mean((preds - labels) ** 2)
-            mae = np.mean(np.abs(preds - labels))
-            rmse = np.sqrt(mse)
-            # 逐特征 Pearson r 均值
-            pearson_vals = []
-            for j in range(preds.shape[1]):
-                if np.std(preds[:, j]) > 1e-8 and np.std(labels[:, j]) > 1e-8:
-                    r, _ = pearsonr(preds[:, j], labels[:, j])
-                    pearson_vals.append(r)
-            mean_pearson = float(np.mean(pearson_vals)) if pearson_vals else 0.0
-
-            result['MSE'] = float(mse)
-            result['MAE'] = float(mae)
-            result['RMSE'] = float(rmse)
-            result['PearsonR_mean'] = mean_pearson
-
-            print()
-            print(f'{dataloader_key}{self.task_id} : Loss:{result["Loss"]:.5f}, '
-                  f'MSE:{result["MSE"]:.5f}, MAE:{result["MAE"]:.5f}, '
-                  f'RMSE:{result["RMSE"]:.5f}, PearsonR(mean):{result["PearsonR_mean"]:.5f}')
-            for k, v in result.items():
-                if v is not None and isinstance(v, (int, float, np.floating, np.integer)):
-                    logger.info(f"{k}: {v:.5f}")
-        elif rank != 0:
-            result = {}
 
         return result
 

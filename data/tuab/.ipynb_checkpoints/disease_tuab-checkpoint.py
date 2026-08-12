@@ -105,7 +105,7 @@ class DiseaseTUABDataset(BaseDataset):
                                                  episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
-        raw = np.load(self.data_config.data_dir, allow_pickle=True)
+        raw = np.load("../data/TUAB/tuab_disease.npz", allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
         labels = data["labels"]
@@ -142,7 +142,7 @@ class DiseaseTUABDataset(BaseDataset):
 
         SFC = self.connectivity(time_series)
         SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
-        window_size = 6 * self.hz
+        window_size = 12 * self.hz
         step_size = (60 * self.hz - window_size) // 9
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
         DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
@@ -221,7 +221,7 @@ def _process_tuab_file(args):
 # Preprocessing — main entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def disease_tuab_preprocess(path="../data/TUAB", hz=200, max_windows_per_subject=(5, 4),
+def disease_tuab_preprocess(path="../data/TUAB", hz=200, max_windows_per_subject=(3, 2),
                             max_subjects=None,
                             train_split=0.7, val_split=0.15):
     """Preprocess the TUH Abnormal EEG Corpus for normal/abnormal classification.

@@ -173,13 +173,10 @@ class BNT(nn.Module):
 
         if self.task_type == 'classification':
             loss = self.loss_fn(logits, labels)
-        elif self.task_type == 'regression':
+        else:
             pred = logits.squeeze(-1) if logits.dim() > 1 and logits.shape[-1] == 1 else logits
             loss = self.loss_fn(pred, labels.float().view(-1)
                                 if labels.dim() > 1 else labels.float())
-        else:  # multi_output_regression
-            target_flat = labels.reshape(labels.shape[0], -1).float()
-            loss = self.loss_fn(logits, target_flat)
         return ModelOutputs(logits=logits,
                             loss=loss)
 

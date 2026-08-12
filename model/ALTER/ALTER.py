@@ -250,13 +250,10 @@ class ALTER(nn.Module):
 
         if self.task_type == 'classification':
             loss = self.loss_fn(out, labels)
-        elif self.task_type == 'regression':
+        else:
             pred = out.squeeze(-1) if out.dim() > 1 and out.shape[-1] == 1 else out
             loss = self.loss_fn(pred, labels.float().view(-1)
                                 if labels.dim() > 1 else labels.float())
-        else:  # multi_output_regression
-            target_flat = labels.reshape(labels.shape[0], -1).float()
-            loss = self.loss_fn(out, target_flat)
 
         return ModelOutputs(logits=out,
                             loss=loss)

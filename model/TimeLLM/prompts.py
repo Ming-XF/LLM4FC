@@ -1,7 +1,7 @@
 """Per-dataset prompt configuration for TimeLLM."""
 
 from dataclasses import dataclass
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 
 
 # ── 通用 EEG 19 通道 10-20 配置（CAUEEG / DS 共用）──────
@@ -33,27 +33,21 @@ _PROMPT_DATASET_DS = (
     "Dynamic functional connectivity matrices computed from EEG, "
     "with subjects being AD patients and healthy controls. "
     "Matrices are encoded by GCN then mapped to 190 LLM tokens "
-    "via cross-attention (10 windows x 19 channels, time-first order). "
-    "Channel order (10-20 system): Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, "
-    "F7, T3, T5, F8, T4, T6, Fz, Cz, Pz."
+    "via cross-attention (10 windows x 19 channels, time-first order)."
 )
 
 _PROMPT_DATASET_CAUEEG = (
     "Dynamic functional connectivity matrices computed from EEG, "
     "with subjects being AD, MCI, SCD patients and normal controls. "
     "Matrices are encoded by GCN then mapped to 190 LLM tokens "
-    "via cross-attention (10 windows x 19 channels, time-first order). "
-    "Channel order (10-20 system): Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, "
-    "F7, T3, T5, F8, T4, T6, Fz, Cz, Pz."
+    "via cross-attention (10 windows x 19 channels, time-first order)."
 )
 
 _PROMPT_DATASET_TUAB = (
     "Dynamic functional connectivity matrices computed from EEG, "
     "data from the TUH Abnormal EEG Corpus, labeled as normal or abnormal. "
     "Matrices are encoded by GCN then mapped to 190 LLM tokens "
-    "via cross-attention (10 windows x 19 channels, time-first order). "
-    "Channel order (10-20 system): Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, "
-    "F7, T3, T5, F8, T4, T6, Fz, Cz, Pz."
+    "via cross-attention (10 windows x 19 channels, time-first order)."
 )
 
 _PROMPT_DATASET_TUEP = (
@@ -61,18 +55,30 @@ _PROMPT_DATASET_TUEP = (
     "data from the TUH Epilepsy EEG Corpus, including epilepsy patients "
     "and non-epilepsy controls. "
     "Matrices are encoded by GCN then mapped to 190 LLM tokens "
-    "via cross-attention (10 windows x 19 channels, time-first order). "
-    "Channel order (10-20 system): Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, "
-    "F7, T3, T5, F8, T4, T6, Fz, Cz, Pz."
+    "via cross-attention (10 windows x 19 channels, time-first order)."
 )
 
 _PROMPT_DATASET_BEIRUT = (
     "Dynamic functional connectivity matrices computed from EEG, "
     "data from 5 epilepsy patients, for seizure prediction. "
     "Matrices are encoded by GCN then mapped to 190 LLM tokens "
-    "via cross-attention (10 windows x 19 channels, time-first order). "
-    "Channel order (10-20 system): Fp1, F3, C3, P3, O1, Fp2, F4, C4, P4, O2, "
-    "F7, T3, T5, F8, T4, T6, Fz, Cz, Pz."
+    "via cross-attention (10 windows x 19 channels, time-first order)."
+)
+
+_PROMPT_DATASET_MULTIDOMAIN_DISEASE = (
+    "Dynamic functional connectivity matrices computed from EEG, "
+    "with data pooled from multiple datasets and recording sites, "
+    "labeled as control/normal versus pathological (disease). "
+    "Matrices are encoded by GCN then mapped to 190 LLM tokens "
+    "via cross-attention (10 windows x 19 channels, time-first order)."
+)
+
+_PROMPT_DATASET_MULTIDOMAIN_AGE = (
+    "Dynamic functional connectivity matrices computed from EEG, "
+    "with data pooled from multiple datasets and recording sites, "
+    "for continuous age prediction. "
+    "Matrices are encoded by GCN then mapped to 190 LLM tokens "
+    "via cross-attention (10 windows x 19 channels, time-first order)."
 )
 
 _PROMPT_TASK_DISEASE = (
@@ -95,16 +101,6 @@ _PROMPT_TASK_FUTUREFC = (
     "predict the next dynamic functional connectivity matrix."
 )
 
-_PROMPT_STATS_EEG = (
-    "Maximum connection: {max_pair} (r={max_val:.3f}). "
-    "Minimum positive connection: {min_pos_pair} (r={min_pos_val:.3f}). "
-    "Strongest negative connection: {max_neg_pair} (r={max_neg_val:.3f}). "
-    "Mean intra-frontal FC: {fc_frontal:.3f}. "
-    "Mean inter-hemispheric homologous FC: {fc_homologous:.3f}. "
-    "Global mean FC: {mean_fc:.3f} (std: {std_fc:.3f})."
-)
-
-
 @dataclass
 class PromptConfig:
     channel_names: List[str]
@@ -112,7 +108,6 @@ class PromptConfig:
     homologous_pairs: List[Tuple[int, int]]
     prompt_dataset: str
     prompt_task: str
-    prompt_stats_template: Optional[str]
 
     @property
     def system_prompt(self) -> str:
@@ -129,7 +124,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_DS,
         'prompt_task': _PROMPT_TASK_DISEASE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'DiseaseDS': {
         'channel_names': _EEG_19_CHANNELS,
@@ -137,7 +131,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_DS,
         'prompt_task': _PROMPT_TASK_DISEASE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'GenderDS': {
         'channel_names': _EEG_19_CHANNELS,
@@ -145,7 +138,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_DS,
         'prompt_task': _PROMPT_TASK_GENDER,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'AgeDS': {
         'channel_names': _EEG_19_CHANNELS,
@@ -153,7 +145,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_DS,
         'prompt_task': _PROMPT_TASK_AGE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     # ── CAUEEG ──
     'CAUEEG': {
@@ -162,7 +153,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_CAUEEG,
         'prompt_task': _PROMPT_TASK_DISEASE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'DiseaseCAUEEG': {
         'channel_names': _EEG_19_CHANNELS,
@@ -170,7 +160,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_CAUEEG,
         'prompt_task': _PROMPT_TASK_DISEASE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'AgeCAUEEG': {
         'channel_names': _EEG_19_CHANNELS,
@@ -178,7 +167,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_CAUEEG,
         'prompt_task': _PROMPT_TASK_AGE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     # ── TUAB ──
     'TUAB': {
@@ -187,7 +175,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_TUAB,
         'prompt_task': _PROMPT_TASK_DISEASE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'DiseaseTUAB': {
         'channel_names': _EEG_19_CHANNELS,
@@ -195,7 +182,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_TUAB,
         'prompt_task': _PROMPT_TASK_DISEASE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'GenderTUAB': {
         'channel_names': _EEG_19_CHANNELS,
@@ -203,7 +189,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_TUAB,
         'prompt_task': _PROMPT_TASK_GENDER,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'AgeTUAB': {
         'channel_names': _EEG_19_CHANNELS,
@@ -211,7 +196,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_TUAB,
         'prompt_task': _PROMPT_TASK_AGE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     # ── TUEP ──
     'TUEP': {
@@ -220,7 +204,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_TUEP,
         'prompt_task': _PROMPT_TASK_DISEASE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'DiseaseTUEP': {
         'channel_names': _EEG_19_CHANNELS,
@@ -228,7 +211,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_TUEP,
         'prompt_task': _PROMPT_TASK_DISEASE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'GenderTUEP': {
         'channel_names': _EEG_19_CHANNELS,
@@ -236,7 +218,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_TUEP,
         'prompt_task': _PROMPT_TASK_GENDER,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'AgeTUEP': {
         'channel_names': _EEG_19_CHANNELS,
@@ -244,7 +225,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_TUEP,
         'prompt_task': _PROMPT_TASK_AGE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     # ── Beirut ──
     'Beirut': {
@@ -253,7 +233,6 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_BEIRUT,
         'prompt_task': _PROMPT_TASK_DISEASE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
     },
     'DiseaseBeirut': {
         'channel_names': _EEG_19_CHANNELS,
@@ -261,7 +240,49 @@ DATASET_PROMPTS: Dict[str, dict] = {
         'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
         'prompt_dataset': _PROMPT_DATASET_BEIRUT,
         'prompt_task': _PROMPT_TASK_DISEASE,
-        'prompt_stats_template': _PROMPT_STATS_EEG,
+    },
+    # ── 多域融合（跨数据集）──
+    'DisCAUEEGTUAB': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_MULTIDOMAIN_DISEASE,
+        'prompt_task': _PROMPT_TASK_DISEASE,
+    },
+    'DisCAUEEGTUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_MULTIDOMAIN_DISEASE,
+        'prompt_task': _PROMPT_TASK_DISEASE,
+    },
+    'DisTUABTUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_MULTIDOMAIN_DISEASE,
+        'prompt_task': _PROMPT_TASK_DISEASE,
+    },
+    'AgeCAUEEGTUAB': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_MULTIDOMAIN_AGE,
+        'prompt_task': _PROMPT_TASK_AGE,
+    },
+    'AgeCAUEEGTUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_MULTIDOMAIN_AGE,
+        'prompt_task': _PROMPT_TASK_AGE,
+    },
+    'AgeTUABTUEP': {
+        'channel_names': _EEG_19_CHANNELS,
+        'channel_groups': _EEG_CHANNEL_GROUPS,
+        'homologous_pairs': _EEG_HOMOLOGOUS_PAIRS,
+        'prompt_dataset': _PROMPT_DATASET_MULTIDOMAIN_AGE,
+        'prompt_task': _PROMPT_TASK_AGE,
     },
 }
 

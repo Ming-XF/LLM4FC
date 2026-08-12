@@ -103,7 +103,7 @@ class DiseaseTUEPDataset(BaseDataset):
                                                  episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
-        raw = np.load(self.data_config.data_dir, allow_pickle=True)
+        raw = np.load("../data/TUEP/tuep_disease.npz", allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
         labels = data["labels"]

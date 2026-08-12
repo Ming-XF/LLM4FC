@@ -46,9 +46,6 @@ class TimeLLMConfig(BaseConfig):
                  llm_path='./model/chatglm-6b',
                  use_dataset_prompt=False,
                  use_task_prompt=False,
-                 use_stats_prompt=False,
-                 futurefc_aux_weight=0.0,
-                 sfc_recon_weight=0.0,
                  use_lora=False,
                  lora_rank=16,
                  lora_alpha=32.0,
@@ -72,9 +69,6 @@ class TimeLLMConfig(BaseConfig):
         self.llm_path = llm_path
         self.use_dataset_prompt = use_dataset_prompt
         self.use_task_prompt = use_task_prompt
-        self.use_stats_prompt = use_stats_prompt
-        self.futurefc_aux_weight = futurefc_aux_weight
-        self.sfc_recon_weight = sfc_recon_weight
         self.use_lora = use_lora
         self.lora_rank = lora_rank
         self.lora_alpha = lora_alpha
@@ -224,18 +218,12 @@ class Model(nn.Module):
         self.head_nf = config.d_ff * config.node_size * config.num_windows
         self.task_type = config.task_type
 
-        if self.task_type == 'multi_output_regression':
-            # Next-FC prediction head 不使用 Linear 投影；
-            # 改为在 forward 中对 LLM 输出的节点 token 做 Pearson 相关得到 FC 矩阵。
-            self.output_projection = None  # 由 forward 中的 pearson_fc_head 替代
-            self.num_windows = config.num_windows
-        else:
-            # 分类 / 回归 / fallback 共用同一 Linear 头
-            self.output_projection = nn.Sequential(
-                nn.Flatten(start_dim=1),
-                nn.Linear(self.head_nf, config.output_dim),
-                nn.Dropout(config.dropout),
-            )
+        # 分类 / 回归 共用同一 Linear 头
+        self.output_projection = nn.Sequential(
+            nn.Flatten(start_dim=1),
+            nn.Linear(self.head_nf, config.output_dim),
+            nn.Dropout(config.dropout),
+        )
 
         for param in self.llm.parameters():
             param.requires_grad = False
@@ -263,27 +251,6 @@ class Model(nn.Module):
 
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-
-    @staticmethod
-    def _pearson_fc_head(node_embeddings):
-        """从节点嵌入计算 FC 矩阵（成对 Pearson 相关，完全可微）。
-
-        Args:
-            node_embeddings: (B, C, d) — C 个节点，每个 d 维表示
-
-        Returns:
-            fc: (B, C, C) — 预测的功能连接矩阵，值域 [-1, 1]
-        """
-        B, C, d = node_embeddings.shape
-        node_embeddings = node_embeddings.float()
-        centered = node_embeddings - node_embeddings.mean(dim=-1, keepdim=True)
-        # 协方差分子: (B, C, C)
-        cov = torch.einsum('bic,bjc->bij', centered, centered) / (d - 1)
-        # 每节点标准差: (B, C)
-        std = torch.sqrt(torch.diagonal(cov, dim1=1, dim2=2) + 1e-8)
-        # Pearson r = cov / (std_i * std_j)
-        fc = cov / (std.unsqueeze(1) * std.unsqueeze(2) + 1e-8)
-        return fc
 
     @staticmethod
     def _create_block_causal_mask(S, P_skip, C, T, device, llm_type):
@@ -348,64 +315,6 @@ class Model(nn.Module):
                     module.lora_A.requires_grad_(False)
                     module.lora_B.requires_grad_(False)
 
-    def _build_stats_prompts(self, SFC):
-        pc = self._pc
-        B, N, _ = SFC.shape
-
-        prompts = []
-        for b in range(B):
-            fc = SFC[b].clone()
-            fc.fill_diagonal_(0.0)
-
-            triu_idx = torch.triu_indices(N, N, offset=1)
-            all_edges = fc[triu_idx[0], triu_idx[1]]
-            mean_fc = float(all_edges.mean())
-            std_fc = float(all_edges.std())
-
-            edge_values = []
-            for i, j in zip(triu_idx[0].tolist(), triu_idx[1].tolist()):
-                edge_values.append({
-                    'i': i, 'j': j,
-                    'val': fc[i, j].item(),
-                    'name': f"{pc.channel_names[i]}-{pc.channel_names[j]}",
-                })
-
-            edge_values.sort(key=lambda e: e['val'], reverse=True)
-            max_edge = edge_values[0]
-
-            pos_edges = [e for e in edge_values if e['val'] > 0]
-            min_pos_edge = pos_edges[-1] if pos_edges else max_edge
-
-            neg_edges = [e for e in edge_values if e['val'] < 0]
-            max_neg_edge = neg_edges[-1] if neg_edges else edge_values[-1]
-
-            frontal_idx = pc.channel_groups['frontal']
-            frontal_vals = []
-            for a in range(len(frontal_idx)):
-                for k in range(a + 1, len(frontal_idx)):
-                    frontal_vals.append(
-                        fc[frontal_idx[a], frontal_idx[k]].item())
-            fc_frontal = float(torch.tensor(frontal_vals).mean()) if frontal_vals else 0.0
-
-            homo_vals = [fc[i, j].item() for i, j in pc.homologous_pairs]
-            fc_homologous = float(torch.tensor(homo_vals).mean())
-
-            prompt = pc.prompt_stats_template.format(
-                max_pair=max_edge['name'],
-                max_val=max_edge['val'],
-                min_pos_pair=min_pos_edge['name'],
-                min_pos_val=min_pos_edge['val'],
-                max_neg_pair=max_neg_edge['name'],
-                max_neg_val=max_neg_edge['val'],
-                fc_frontal=fc_frontal,
-                fc_homologous=fc_homologous,
-                mean_fc=mean_fc,
-                std_fc=std_fc,
-            )
-            prompts.append(prompt)
-
-        return prompts
-
     def forward(self, DFC, SFC, labels, gender=None, age=None, education=None):
         B, T, C, _ = DFC.shape
         device = DFC.device
@@ -446,19 +355,6 @@ class Model(nn.Module):
 
         reprogrammed = reprogrammed.to(dtype=torch.bfloat16)
 
-        stats_texts = self._build_stats_prompts(SFC) if self.config.use_stats_prompt else None
-        if self.config.use_stats_prompt:
-            stats_ids = self.tokenizer(
-                stats_texts, return_tensors="pt",
-                padding=True, truncation=True, max_length=256
-            ).input_ids.to(device)
-            stats_embeddings = self._word_embeddings(stats_ids)
-            P_stats = stats_embeddings.shape[1]
-        else:
-            stats_embeddings = torch.empty(
-                B, 0, self.d_llm, device=device, dtype=torch.bfloat16)
-            P_stats = 0
-
         start_tag = self.start_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
         end_tag = self.end_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
         ds_prompt = self.dataset_prompt_embeddings.unsqueeze(0).expand(B, -1, -1)
@@ -472,9 +368,6 @@ class Model(nn.Module):
         if self.config.use_task_prompt:
             prompt_parts.append(task_prompt)
             P_skip += self.P_task
-        if self.config.use_stats_prompt:
-            prompt_parts.append(stats_embeddings.to(dtype=ds_prompt.dtype))
-            P_skip += P_stats
         prompt_parts.append(end_tag)
         P_skip += self.P_end
         prompt_parts.append(reprogrammed.to(dtype=ds_prompt.dtype))
@@ -560,85 +453,20 @@ class Model(nn.Module):
         else:
             raise ValueError(f"Unsupported llm_type: {self.llm_type}")
 
-        # ── 输出头：分类/回归 用 Linear，多值回归用 Pearson 相关 ──
-        if self.task_type == 'multi_output_regression':
-            # ── Next-FC Token Prediction Head ──
-            # 从 LLM 输出中截取 EEG patch token（不含 prompt 前缀）
-            HL_patches = HL[:, P_skip:, :self.config.d_ff]
-            B, S_patch, d_ff = HL_patches.shape
-            T = self.config.num_windows        # 总窗口数 (10)
-            C = self.config.node_size          # 节点数 (19)
-            T_out = labels.shape[1]            # 未来窗口数 (2)，由 labels 形状动态推导
+        # ── 输出头：分类 / 回归 ──
+        HL_patches = HL[:, P_skip:, :self.config.d_ff].to(
+            dtype=self.output_projection[1].weight.dtype)
+        logits = self.output_projection(HL_patches)
 
-            # token 顺序为 time-first: C0T0, C1T0, ..., C18T0, C0T1, ..., C18T9
-            # 未来窗口索引: T-T_out 到 T-1（即第 8, 9 个窗口）
-            future_windows = torch.arange(T - T_out, T, device=HL_patches.device)
-
-            fc_preds = []
-            for w in future_windows:
-                # 窗口 w 的 C 个节点 token 索引: w*C, w*C+1, ..., w*C+(C-1)
-                indices = w * C + torch.arange(C, device=HL_patches.device)
-                node_tokens = HL_patches[:, indices, :]               # (B, C, d_ff)
-                fc_window = self._pearson_fc_head(node_tokens)        # (B, C, C)
-                fc_preds.append(fc_window)
-
-            logits = torch.stack(fc_preds, dim=1)    # (B, T_out, C, C) = (B, 2, 19, 19)
-
-            # labels 即 DFC_target，形状 (B, T_out, C, C)，直接逐元素 MSE
-            loss = F.mse_loss(logits, labels.to(logits.dtype))
+        if self.task_type == 'regression':
+            pred = logits.squeeze(-1)
+            if labels.dim() > 1 and labels.shape[-1] == 1:
+                labels = labels.squeeze(-1)
+            loss = F.mse_loss(pred, labels.float())
         else:
-            # ── 分类 / 回归：沿用原有 Linear 头 ──
-            HL_patches = HL[:, P_skip:, :self.config.d_ff].to(
-                dtype=self.output_projection[1].weight.dtype)
-            logits = self.output_projection(HL_patches)
-
-            if self.task_type == 'regression':
-                pred = logits.squeeze(-1)
-                if labels.dim() > 1 and labels.shape[-1] == 1:
-                    labels = labels.squeeze(-1)
-                loss = F.mse_loss(pred, labels.float())
-            else:
-                if labels.dim() > 1 and labels.shape[-1] > 1:
-                    labels = labels.argmax(dim=-1)
-                loss = F.cross_entropy(logits, labels)
-
-        # ── FutureFC 辅助任务损失 ──
-        if self.config.futurefc_aux_weight > 0 and self.task_type != 'multi_output_regression':
-            T = self.config.num_windows
-            C = self.config.node_size
-            T_half = T // 2  # 后一半窗口
-
-            HL_aux = HL[:, P_skip:, :self.config.d_ff]
-
-            fc_preds = []
-            for w in range(T_half, T):
-                indices = w * C + torch.arange(C, device=HL_aux.device)
-                node_tokens = HL_aux[:, indices, :]           # (B, C, d_ff)
-                fc_window = self._pearson_fc_head(node_tokens)  # (B, C, C)
-                fc_preds.append(fc_window)
-
-            pred_fc = torch.stack(fc_preds, dim=1)            # (B, T_half, C, C)
-            target_fc = DFC[:, T_half:, :, :].to(dtype=pred_fc.dtype)
-            aux_loss = F.mse_loss(pred_fc, target_fc)
-            loss = loss + self.config.futurefc_aux_weight * aux_loss
-
-        # ── SFC Reconstruction 辅助损失 ──
-        if self.config.sfc_recon_weight > 0 and self.training:
-            T_sfc = self.config.num_windows
-            C_sfc = self.config.node_size
-            HL_sfc = HL[:, P_skip:, :self.config.d_ff]        # (B, T*C, d_ff)
-            HL_reshaped = HL_sfc.reshape(B, T_sfc, C_sfc, self.config.d_ff)
-
-            fc_preds = []
-            for w in range(T_sfc):
-                node_tokens = HL_reshaped[:, w, :, :]           # (B, C, d_ff)
-                fc_window = self._pearson_fc_head(node_tokens)  # (B, C, C)
-                fc_preds.append(fc_window)
-
-            pred_sfc_wins = torch.stack(fc_preds, dim=1)        # (B, T, C, C)
-            sfc_pred = pred_sfc_wins.mean(dim=1)                # (B, C, C)
-            sfc_loss = F.mse_loss(sfc_pred, SFC.to(dtype=sfc_pred.dtype))
-            loss = loss + self.config.sfc_recon_weight * sfc_loss
+            if labels.dim() > 1 and labels.shape[-1] > 1:
+                labels = labels.argmax(dim=-1)
+            loss = F.cross_entropy(logits, labels)
 
         return ModelOutputs(
             logits=logits,

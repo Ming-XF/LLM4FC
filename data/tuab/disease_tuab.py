@@ -105,7 +105,7 @@ class DiseaseTUABDataset(BaseDataset):
                                                  episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
-        raw = np.load(self.data_config.data_dir, allow_pickle=True)
+        raw = np.load("../data/TUAB/tuab_disease.npz", allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
         labels = data["labels"]
@@ -221,7 +221,7 @@ def _process_tuab_file(args):
 # Preprocessing — main entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def disease_tuab_preprocess(path="../data/TUAB", hz=200, max_windows_per_subject=(5, 4),
+def disease_tuab_preprocess(path="../data/TUAB", hz=200, max_windows_per_subject=(3, 2),
                             max_subjects=None,
                             train_split=0.7, val_split=0.15):
     """Preprocess the TUH Abnormal EEG Corpus for normal/abnormal classification.

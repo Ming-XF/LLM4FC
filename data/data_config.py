@@ -2,13 +2,9 @@ class DataConfig:
     # ── 任务类型常量 ──
     TASK_CLASSIFICATION = "classification"
     TASK_REGRESSION = "regression"
-    TASK_MULTI_OUTPUT_REGRESSION = "multi_output_regression"
-
     def __init__(self, args, time_series_size=0, node_size=0, node_feature_size=0, output_dim=2,
                  task_type=None):
         self.dataset = args.dataset
-        self.data_dir = args.data_dir
-        self.data2_dir = args.data2_dir
         self.train_set = args.train_set
         self.few_shot = args.few_shot
         self.few_shot_seed = args.few_shot_seed
@@ -58,9 +54,5 @@ class DataConfig:
     @property
     def is_regression(self):
         return self.task_type == self.TASK_REGRESSION
-
-    @property
-    def is_multi_output_regression(self):
-        return self.task_type == self.TASK_MULTI_OUTPUT_REGRESSION
 
 
