@@ -17,12 +17,18 @@ EARLY_STOP_METRIC=${3:?"Usage: $0 <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>"}
 deepspeed --num_gpus=6 main.py \
     --model "TimeLLM" \
     --num_repeat 1 \
+    --save_steps 25 \
+    --batch_size 2 \
+    --num_epochs 200 \
+    --drop_last False \
+    --schedule 'cos' \
+    --early_stop_patience 10 \
+    --early_stop_min_delta 0.001 \
+    --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
     --data_dir "$DATA_DIR" \
-    --few_shot 0 \
-    --few_shot_seed 42 \
-    --pretrain_path "" \
     --futurefc_aux_weight 1 \
+    --sfc_recon_weight 1 \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
     --d_model 64 \
@@ -32,23 +38,18 @@ deepspeed --num_gpus=6 main.py \
     --gcn_hidden 128 \
     --num_gcn_layers 1 \
     --dropout 0.1 \
-    --save_steps 25 \
     --llm_type llama \
     --llm_path ./model/deepseek-r1-distill-llama-8B \
-    --batch_size 2 \
-    --num_epochs 200 \
-    --drop_last False \
-    --schedule 'cos' \
+    --few_shot 0 \
+    --few_shot_seed 42 \
+    --pretrain_path "" \
     --use_dataset_prompt \
     --use_task_prompt \
-    --use_lora \
     --lora_rank 16 \
     --lora_alpha 32 \
     --lora_dropout 0.1 \
     --lora_target_modules "q_proj,v_proj" \
-    --early_stop_patience 10 \
-    --early_stop_min_delta 0.001 \
-    --early_stop_metric "$EARLY_STOP_METRIC" \
+    --block_causal_mask \
     --deepspeed \
     --do_train \
     --do_evaluate \
@@ -60,6 +61,7 @@ deepspeed --num_gpus=6 main.py \
 #
 #   --use_lora \              # enable standard LoRA
 #   --use_gc_lora \           # enable graph-conditioned LoRA (requires --use_lora)
+#   --block_causal_mask \
 
     
 

@@ -70,12 +70,14 @@ def init_model_config(args, data_config: DataConfig):
             use_task_prompt=args.use_task_prompt,
             use_stats_prompt=args.use_stats_prompt,
             futurefc_aux_weight=args.futurefc_aux_weight,
+            sfc_recon_weight=args.sfc_recon_weight,
             use_lora=args.use_lora,
             lora_rank=args.lora_rank,
             lora_alpha=args.lora_alpha,
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             use_gc_lora=args.use_gc_lora,
+            block_causal_mask=args.block_causal_mask,
         )
         model = Model(model_config)
     else:
@@ -175,6 +177,8 @@ def init_config():
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
     model_group.add_argument("--futurefc_aux_weight", default=0.0, type=float,
                              help="Weight for FutureFC auxiliary loss (0=disabled)")
+    model_group.add_argument("--sfc_recon_weight", default=0.0, type=float,
+                             help="Weight for SFC reconstruction auxiliary loss (0=disabled)")
 
     # ── LoRA / GC-LoRA ──
     model_group.add_argument("--use_lora", action="store_true",
@@ -189,6 +193,9 @@ def init_config():
                              help="Comma-separated target module names (default: q_proj,v_proj)")
     model_group.add_argument("--use_gc_lora", action="store_true",
                              help="Enable GC-LoRA (graph-conditioned LoRA; requires --use_lora)")
+    model_group.add_argument("--block_causal_mask", action="store_true",
+                             help="Enable block-causal attention mask "
+                                  "(same-window bidirectional, cross-window causal)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

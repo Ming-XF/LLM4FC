@@ -48,12 +48,14 @@ class TimeLLMConfig(BaseConfig):
                  use_task_prompt=False,
                  use_stats_prompt=False,
                  futurefc_aux_weight=0.0,
+                 sfc_recon_weight=0.0,
                  use_lora=False,
                  lora_rank=16,
                  lora_alpha=32.0,
                  lora_dropout=0.1,
                  lora_target_modules="q_proj,v_proj",
-                 use_gc_lora=False):
+                 use_gc_lora=False,
+                 block_causal_mask=False):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -72,12 +74,14 @@ class TimeLLMConfig(BaseConfig):
         self.use_task_prompt = use_task_prompt
         self.use_stats_prompt = use_stats_prompt
         self.futurefc_aux_weight = futurefc_aux_weight
+        self.sfc_recon_weight = sfc_recon_weight
         self.use_lora = use_lora
         self.lora_rank = lora_rank
         self.lora_alpha = lora_alpha
         self.lora_dropout = lora_dropout
         self.lora_target_modules = lora_target_modules
         self.use_gc_lora = use_gc_lora
+        self.block_causal_mask = block_causal_mask
 
 
 class ReprogrammingLayer(nn.Module):
@@ -281,6 +285,44 @@ class Model(nn.Module):
         fc = cov / (std.unsqueeze(1) * std.unsqueeze(2) + 1e-8)
         return fc
 
+    @staticmethod
+    def _create_block_causal_mask(S, P_skip, C, T, device, llm_type):
+        """构造 Block-Causal Attention Mask.
+
+        - Prompt tokens (0:P_skip): 标准因果注意力
+        - Patch tokens: 同一时间窗口内 (每组 C 个) 双向可见，跨窗口因果
+
+        Args:
+            S: 总序列长度
+            P_skip: prompt token 数量
+            C: 每窗口通道数 (19)
+            T: 时间窗口数 (10)
+            llm_type: 'chatglm' -> bool mask (True=遮蔽, False=可见),
+                      'llama' -> float mask (0=可见, -inf=遮蔽)
+
+        Returns:
+            (S, S) mask, dtype 与 llm_type 对应
+        """
+        row_idx = torch.arange(S, device=device).unsqueeze(1)  # (S, 1)
+        col_idx = torch.arange(S, device=device).unsqueeze(0)  # (1, S)
+
+        # 标准因果: col <= row
+        causal_allowed = (col_idx <= row_idx)
+
+        # 同一时间窗口内: 双向可见
+        # window_of[i] = 窗口编号 (0..T-1) for patch tokens, -1 for prompt
+        window_of = torch.full((S,), -1, dtype=torch.long, device=device)
+        window_of[P_skip:] = torch.arange(T * C, device=device) // C
+        same_window = (window_of.unsqueeze(1) == window_of.unsqueeze(0)) \
+                      & (window_of.unsqueeze(1) >= 0)
+
+        allowed = causal_allowed | same_window
+
+        if llm_type == 'chatglm':
+            return ~allowed                     # True = 遮蔽
+        else:
+            return torch.where(allowed, 0.0, float('-inf'))   # 0 = attend
+
     def freeze_for_finetune(self, freeze_lora: bool = True):
         """冻结 GCN 与 reprogram 层，仅保留预测头可训练。
 
@@ -442,11 +484,13 @@ class Model(nn.Module):
 
         # ── 构造 position_ids 与 attention_mask（分支）────
         if self.llm_type == 'chatglm':
-            # 因果注意力：token i 只能 attend token 0..i
-            # ChatGLM 中 True=遮蔽, False=可见
-            causal_mask = torch.triu(
-                torch.ones(S, S, dtype=torch.bool, device=device), diagonal=1
-            )
+            # ── Block-Causal Mask (同窗口双向) 或 标准因果 ──
+            if self.config.block_causal_mask:
+                causal_mask = self._create_block_causal_mask(
+                    S, P_skip, C, T, device, 'chatglm')
+            else:
+                causal_mask = torch.triu(
+                    torch.ones(S, S, dtype=torch.bool, device=device), diagonal=1)
             attention_mask = causal_mask.unsqueeze(0).unsqueeze(0).expand(B, 1, -1, -1)
 
             global_pos = torch.arange(S, dtype=torch.long, device=device).unsqueeze(0).repeat(B, 1)
@@ -487,10 +531,19 @@ class Model(nn.Module):
             if self.config.use_lora:
                 set_gc_lora_context(self, fc_adj=DFC, prompt_len=P_skip)
 
-            # 不传 attention_mask，LLaMA 内部自动构造因果 mask
+            # 默认不传 attention_mask（LLaMA 内部自动因果）；
+            # 启用 block-causal mask 时传入双向窗口 mask
+            if self.config.block_causal_mask:
+                attn_mask_2d = self._create_block_causal_mask(
+                    S, P_skip, C, T, device, 'llama')
+                attention_mask = attn_mask_2d.unsqueeze(0).unsqueeze(0).expand(B, 1, -1, -1)
+            else:
+                attention_mask = None
+
             transformer_outputs = self._transformer(
                 input_ids=None,
                 position_ids=position_ids,
+                attention_mask=attention_mask,
                 past_key_values=None,
                 inputs_embeds=inputs_embeds,
                 use_cache=False,
@@ -568,6 +621,24 @@ class Model(nn.Module):
             target_fc = DFC[:, T_half:, :, :].to(dtype=pred_fc.dtype)
             aux_loss = F.mse_loss(pred_fc, target_fc)
             loss = loss + self.config.futurefc_aux_weight * aux_loss
+
+        # ── SFC Reconstruction 辅助损失 ──
+        if self.config.sfc_recon_weight > 0 and self.training:
+            T_sfc = self.config.num_windows
+            C_sfc = self.config.node_size
+            HL_sfc = HL[:, P_skip:, :self.config.d_ff]        # (B, T*C, d_ff)
+            HL_reshaped = HL_sfc.reshape(B, T_sfc, C_sfc, self.config.d_ff)
+
+            fc_preds = []
+            for w in range(T_sfc):
+                node_tokens = HL_reshaped[:, w, :, :]           # (B, C, d_ff)
+                fc_window = self._pearson_fc_head(node_tokens)  # (B, C, C)
+                fc_preds.append(fc_window)
+
+            pred_sfc_wins = torch.stack(fc_preds, dim=1)        # (B, T, C, C)
+            sfc_pred = pred_sfc_wins.mean(dim=1)                # (B, C, C)
+            sfc_loss = F.mse_loss(sfc_pred, SFC.to(dtype=sfc_pred.dtype))
+            loss = loss + self.config.sfc_recon_weight * sfc_loss
 
         return ModelOutputs(
             logits=logits,
