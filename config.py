@@ -75,6 +75,11 @@ def init_model_config(args, data_config: DataConfig):
             lora_target_modules=args.lora_target_modules,
             use_gc_lora=args.use_gc_lora,
             block_causal_mask=args.block_causal_mask,
+            use_token_domain_grl=args.use_token_domain_grl,
+            token_domain_lambda=args.token_domain_lambda,
+            num_domains=args.num_domains,
+            domain_cls_hidden=args.domain_cls_hidden,
+            domain_grl_weight=args.domain_grl_weight,
         )
         model = Model(model_config)
     else:
@@ -184,6 +189,17 @@ def init_config():
     model_group.add_argument("--block_causal_mask", action="store_true",
                              help="Enable block-causal attention mask "
                                   "(same-window bidirectional, cross-window causal)")
+    model_group.add_argument("--use_token_domain_grl", action="store_true",
+                             help="Enable token-level domain classifier + GRL "
+                                  "after reprogramming (domain-adversarial)")
+    model_group.add_argument("--token_domain_lambda", default=1.0, type=float,
+                             help="GRL gradient-reversal coefficient lambda (default: 1.0)")
+    model_group.add_argument("--num_domains", default=2, type=int,
+                             help="Number of domains for the token-level domain classifier (default: 2)")
+    model_group.add_argument("--domain_cls_hidden", default=256, type=int,
+                             help="Hidden dim of the token-level domain classifier (default: 256)")
+    model_group.add_argument("--domain_grl_weight", default=1.0, type=float,
+                             help="Weight of the domain-adversarial loss in total loss (default: 1.0)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

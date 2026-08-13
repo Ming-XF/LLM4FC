@@ -103,7 +103,7 @@ class DiseaseTUEPDataset(BaseDataset):
                                                  episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
-        raw = np.load(self.data_config.data_dir, allow_pickle=True)
+        raw = np.load("../data/TUEP/tuep_disease.npz", allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
         labels = data["labels"]
@@ -140,7 +140,7 @@ class DiseaseTUEPDataset(BaseDataset):
 
         SFC = self.connectivity(time_series)
         SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
-        window_size = 6 * self.hz
+        window_size = 12 * self.hz
         step_size = (60 * self.hz - window_size) // 9
         DFC = self.dynamic_connectivity(time_series, window_size, step_size)
         DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
@@ -438,4 +438,4 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    disease_tuep_preprocess("../data/TUEP", hz=200, max_windows_per_subject=(80, None), max_subjects=None)
+    disease_tuep_preprocess("../data/TUEP", hz=200, max_windows_per_subject=(30, 60), max_subjects=None)

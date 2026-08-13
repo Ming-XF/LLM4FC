@@ -438,4 +438,4 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    disease_tuep_preprocess("../data/TUEP", hz=200, max_windows_per_subject=(80, None), max_subjects=None)
+    disease_tuep_preprocess("../data/TUEP", hz=200, max_windows_per_subject=(30, 60), max_subjects=None)

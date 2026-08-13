@@ -28,6 +28,46 @@ class GCNLayer(nn.Module):
         return out
 
 
+class GradientReversalFunction(torch.autograd.Function):
+    """DANN 梯度反转层：前向恒等，反向梯度乘 -lambda。
+
+    lambda_ 越大，域对抗越强。
+    """
+    @staticmethod
+    def forward(ctx, x, lambda_):
+        ctx.lambda_ = lambda_
+        return x
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return -ctx.lambda_ * grad_output, None
+
+
+class GradientReversalLayer(nn.Module):
+    def forward(self, x, lambda_):
+        return GradientReversalFunction.apply(x, lambda_)
+
+
+class DomainClassifier(nn.Module):
+    """轻量 token-level 域分类器。
+
+    对 (B, T*C, d_llm) 的 reprogrammed token 做 mean 池化后，
+    经两层 MLP 预测样本来源域 (B, num_domains)。
+    """
+    def __init__(self, d_llm, hidden, num_domains, dropout=0.1):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(d_llm, hidden),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden, num_domains),
+        )
+
+    def forward(self, tokens):
+        x = tokens.mean(dim=1)          # (B, T*C, d_llm) -> (B, d_llm)
+        return self.net(x)              # (B, num_domains)
+
+
 
 class TimeLLMConfig(BaseConfig):
     def __init__(self, node_size,
@@ -52,7 +92,12 @@ class TimeLLMConfig(BaseConfig):
                  lora_dropout=0.1,
                  lora_target_modules="q_proj,v_proj",
                  use_gc_lora=False,
-                 block_causal_mask=False):
+                 block_causal_mask=False,
+                 use_token_domain_grl=False,
+                 token_domain_lambda=1.0,
+                 num_domains=2,
+                 domain_cls_hidden=256,
+                 domain_grl_weight=1.0):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -76,6 +121,11 @@ class TimeLLMConfig(BaseConfig):
         self.lora_target_modules = lora_target_modules
         self.use_gc_lora = use_gc_lora
         self.block_causal_mask = block_causal_mask
+        self.use_token_domain_grl = use_token_domain_grl
+        self.token_domain_lambda = token_domain_lambda
+        self.num_domains = num_domains
+        self.domain_cls_hidden = domain_cls_hidden
+        self.domain_grl_weight = domain_grl_weight
 
 
 class ReprogrammingLayer(nn.Module):
@@ -213,6 +263,15 @@ class Model(nn.Module):
             attention_dropout=config.dropout,
         )
 
+        # ── Token-level 域对抗（GRL + 域分类器）──────────────
+        self.use_token_domain_grl = config.use_token_domain_grl
+        if self.use_token_domain_grl:
+            self.grl = GradientReversalLayer()
+            self.domain_classifier = DomainClassifier(
+                self.d_llm, config.domain_cls_hidden, config.num_domains,
+                dropout=config.dropout,
+            )
+
         # 节点初始特征用 one-hot → Linear 投影，训练中可学习
 
         self.head_nf = config.d_ff * config.node_size * config.num_windows
@@ -315,7 +374,8 @@ class Model(nn.Module):
                     module.lora_A.requires_grad_(False)
                     module.lora_B.requires_grad_(False)
 
-    def forward(self, DFC, SFC, labels, gender=None, age=None, education=None):
+    def forward(self, DFC, SFC, labels, gender=None, age=None, education=None,
+                domain_label=None):
         B, T, C, _ = DFC.shape
         device = DFC.device
 
@@ -352,6 +412,13 @@ class Model(nn.Module):
             source_embeddings.to(dtype=reprogram_dtype),
             source_embeddings.to(dtype=reprogram_dtype),
         )
+
+        # ── Token-level 域对抗：reprogramming 输出后、进入 LLM 前 ──
+        domain_loss = None
+        if self.use_token_domain_grl and domain_label is not None:
+            grl_out = self.grl(reprogrammed, self.config.token_domain_lambda)
+            domain_logits = self.domain_classifier(grl_out)   # (B, num_domains)
+            domain_loss = F.cross_entropy(domain_logits, domain_label)
 
         reprogrammed = reprogrammed.to(dtype=torch.bfloat16)
 
@@ -468,6 +535,9 @@ class Model(nn.Module):
                 labels = labels.argmax(dim=-1)
             loss = F.cross_entropy(logits, labels)
 
+        if domain_loss is not None:
+            loss = loss + self.config.domain_grl_weight * domain_loss
+
         return ModelOutputs(
             logits=logits,
             loss=loss,
@@ -475,5 +545,6 @@ class Model(nn.Module):
                 'gcn_out': gcn_out,
                 'reprogrammed': reprogrammed,
                 'HL_patches': HL_patches,
+                'domain_loss': domain_loss,
             }
         )
