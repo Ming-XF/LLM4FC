@@ -38,7 +38,6 @@ deepspeed --num_gpus=6 main.py \
     --few_shot 0 \
     --few_shot_seed 42 \
     --pretrain_path "" \
-    --use_dataset_prompt \
     --use_task_prompt \
     --lora_rank 16 \
     --lora_alpha 32 \
@@ -56,6 +55,7 @@ deepspeed --num_gpus=6 main.py \
 #   --use_lora \              # enable standard LoRA
 #   --use_gc_lora \           # enable graph-conditioned LoRA (requires --use_lora)
 #   --block_causal_mask \
+#   --use_dataset_prompt \
 
     
 
