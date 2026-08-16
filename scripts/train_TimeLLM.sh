@@ -12,8 +12,9 @@
 DATASET=${1:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC>"}
 EARLY_STOP_METRIC=${2:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC>"}
 
-deepspeed --num_gpus=3 main.py \
+deepspeed --num_gpus=6 main.py \
     --model "TimeLLM" \
+    --num_epochs 200 \
     --num_repeat 1 \
     --save_steps 25 \
     --schedule 'cos' \
@@ -32,8 +33,7 @@ deepspeed --num_gpus=3 main.py \
     --dropout 0.1 \
     --llm_type llama \
     --llm_path ./model/deepseek-r1-distill-llama-8B \
-    --num_epochs 10 \
-    --few_shot 5 \
+    --few_shot 0 \
     --few_shot_seed 42 \
     --pretrain_path "./output_dir/TimeLLM_AgeCAUEEG_train" \
     --use_task_prompt \
