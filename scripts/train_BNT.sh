@@ -21,9 +21,7 @@ deepspeed --num_gpus=6 main.py \
     --pretrain_path "" \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
-    --batch_size 4 \
     --num_epochs 200 \
-    --drop_last False \
     --schedule 'cos' \
     --early_stop_patience 10 \
     --early_stop_min_delta 0.001 \

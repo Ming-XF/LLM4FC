@@ -124,7 +124,8 @@ def init_config():
     data_group.add_argument("--batch_size", default=64, type=int, help="")
     data_group.add_argument("--num_workers", default=5, type=int, help="")
     data_group.add_argument("--num_epochs", default=200, type=int, help="")
-    data_group.add_argument("--drop_last", default=True, type=bool, help="")
+    data_group.add_argument("--drop_last", action="store_true",
+                            help="Drop the last incomplete batch (off by default)")
     data_group.add_argument("--frequency", default=500, type=int, help="")
     data_group.add_argument("--D", default=2, type=int, help="")
     data_group.add_argument("--F1", default=8, type=int, help="")

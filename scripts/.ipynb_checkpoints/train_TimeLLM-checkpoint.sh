@@ -35,9 +35,9 @@ deepspeed --num_gpus=6 main.py \
     --dropout 0.1 \
     --llm_type llama \
     --llm_path ./model/deepseek-r1-distill-llama-8B \
-    --few_shot 5 \
+    --few_shot 0 \
     --few_shot_seed 42 \
-    --pretrain_path "./output_dir/TimeLLM_DisCAUEEGTUAB_train_GRL" \
+    --pretrain_path "" \
     --use_task_prompt \
     --lora_rank 16 \
     --lora_alpha 32 \

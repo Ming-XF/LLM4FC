@@ -1,33 +1,28 @@
 #!/bin/bash
 #
 # ALTER training script
-# Usage: ./scripts/train_ALTER.sh <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>
+# Usage: ./scripts/train_ALTER.sh <DATASET> <EARLY_STOP_METRIC>
 #
 # Examples:
-#   ./scripts/train_ALTER.sh DiseaseBeirut   ../data/Beirut/beirut_disease.npy     AUC
-#   ./scripts/train_ALTER.sh GenderDS        ../data/DS/ds_gender.npz              AUC
-#   ./scripts/train_ALTER.sh AgeCAUEEG       ../data/CAUEEG/caueeg_age.npz         Loss
-#   ./scripts/train_ALTER.sh FutureFCTUEP    ../data/TUEP/tuep_futurefc.npz        Loss
+#   ./scripts/train_ALTER.sh DiseaseBeirut   AUC
+#   ./scripts/train_ALTER.sh GenderDS        AUC
+#   ./scripts/train_ALTER.sh AgeCAUEEG       Loss
 #
 
-DATASET=${1:?"Usage: $0 <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>"}
-DATA_DIR=${2:?"Usage: $0 <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>"}
-EARLY_STOP_METRIC=${3:?"Usage: $0 <DATASET> <DATA_DIR> <EARLY_STOP_METRIC>"}
+DATASET=${1:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC>"}
+EARLY_STOP_METRIC=${2:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC>"}
 
-deepspeed --num_gpus=6 main.py \
+deepspeed --num_gpus=3 main.py \
     --model "ALTER" \
     --num_repeat 1 \
     --dataset "$DATASET" \
-    --few_shot 0 \
+    --few_shot 10 \
     --few_shot_seed 42 \
-    --pretrain_path "" \
-    --data_dir "$DATA_DIR" \
+    --pretrain_path "./outpt_dir/ALTER_AgeCAUEEG_train" \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
     --num_heads 1 \
-    --batch_size 2 \
     --num_epochs 200 \
-    --drop_last False \
     --schedule 'cos' \
     --early_stop_patience 10 \
     --early_stop_min_delta 0.001 \

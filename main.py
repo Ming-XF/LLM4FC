@@ -47,6 +47,34 @@ def set_seed(seed=42):
     os.environ['PYTHONHASHSEED'] = str(seed)
 
 
+def _apply_deepspeed_config(args, ds_config_path):
+    """让 DeepSpeed 配置成为 batch size 与学习率的唯一来源。
+
+    读取 train_micro_batch_size_per_gpu 与 optimizer.params.lr，
+    分别覆盖 args.batch_size 与 args.learning_rate，使 DataLoader
+    与调度器使用的值与 DeepSpeed 实际一致。
+    """
+    with open(ds_config_path) as _f:
+        ds_cfg = _json.load(_f)
+
+    micro_batch = ds_cfg.get('train_micro_batch_size_per_gpu')
+    if micro_batch is None:
+        raise ValueError(
+            f"DeepSpeed config '{ds_config_path}' is missing "
+            f"'train_micro_batch_size_per_gpu'")
+    args.batch_size = int(micro_batch)
+
+    lr = ds_cfg.get('optimizer', {}).get('params', {}).get('lr')
+    if lr is None:
+        raise ValueError(
+            f"DeepSpeed config '{ds_config_path}' is missing "
+            f"'optimizer.params.lr'")
+    args.learning_rate = float(lr)
+
+    print(f"[DS] batch_size={args.batch_size}, lr={args.learning_rate} "
+          f"(from {ds_config_path})")
+
+
 def main(args):
     # ── 判断运行模式 ──
     transfer_mode = bool(args.pretrain_path)
@@ -67,6 +95,8 @@ def main(args):
                 else:
                     raise FileNotFoundError(
                         f"DeepSpeed config not found: {ds_path} or {auto_path}")
+            # 让 DeepSpeed 配置成为 batch size 与学习率的唯一来源
+            _apply_deepspeed_config(args, args.deepspeed_config)
         elif args.do_parallel:
             local_rank = int(os.environ['LOCAL_RANK'])
             world_size = int(os.environ['WORLD_SIZE'])
@@ -120,9 +150,7 @@ def main(args):
                     finetune_ds_path = "deepspeed/finetune.json"
                     if os.path.exists(finetune_ds_path):
                         args.deepspeed_config = finetune_ds_path
-                        with open(finetune_ds_path) as _f:
-                            _ds_cfg = _json.load(_f)
-                        args.learning_rate = _ds_cfg['optimizer']['params']['lr']
+                        _apply_deepspeed_config(args, finetune_ds_path)
                     else:
                         logger.warning(
                             f"Finetune DeepSpeed config not found: "
