@@ -16,13 +16,13 @@ deepspeed --num_gpus=3 main.py \
     --model "ALTER" \
     --num_repeat 1 \
     --dataset "$DATASET" \
-    --few_shot 10 \
+    --num_epochs 10 \
+    --few_shot 5 \
     --few_shot_seed 42 \
-    --pretrain_path "./outpt_dir/ALTER_AgeCAUEEG_train" \
+    --pretrain_path "./output_dir/ALTER_AgeCAUEEG_train" \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
     --num_heads 1 \
-    --num_epochs 200 \
     --schedule 'cos' \
     --early_stop_patience 10 \
     --early_stop_min_delta 0.001 \

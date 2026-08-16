@@ -283,12 +283,12 @@ class Trainer(object):
             logger.info("Final model saved at epoch %d", self.args.num_epochs)
 
     def finetune(self):
-        """Fine-tune for few-shot transfer learning with val-based early stopping.
+        """Fine-tune for few-shot transfer learning with a fixed number of epochs.
 
-        Evaluates on the (untouched, full-subject) validation set each epoch.
-        Keeps the checkpoint with the best val metric (taken from
-        ``--early_stop_metric``; defaults to Loss), stops early when the
-        metric stops improving, then evaluates on the test set.
+        Trains for exactly ``--num_epochs`` epochs (no early stopping, no
+        checkpoint selection on the target-domain val set), then evaluates on
+        the test set using the weights from the final epoch. This keeps the
+        few-shot protocol fair and comparable across models.
         """
         epochs = self.args.num_epochs
         is_rank_0 = (not torch.distributed.is_initialized()
@@ -312,30 +312,7 @@ class Trainer(object):
             self.optimizer = init_optimizer(self.model, self.args)
             self.scheduler = None
 
-        # ── 早停指标：动态推断（与 train() 保持一致）──
-        from utils.early_stopping import EarlyStopping
-        metric_name = self.args.early_stop_metric
-        LOWER_IS_BETTER = {'Loss', 'MSE', 'MAE', 'RMSE'}
-        HIGHER_IS_BETTER = {'Accuracy', 'AUC', 'Precision', 'Sensitivity',
-                           'Specificity', 'Recall', 'F_score', 'R2', 'PearsonR',
-                           'PearsonR_mean'}
-        if metric_name in LOWER_IS_BETTER:
-            mode = 'min'
-        elif metric_name in HIGHER_IS_BETTER:
-            mode = 'max'
-        else:
-            mode = 'min'
-
-        early_stopper = EarlyStopping(
-            patience=self.args.early_stop_patience,
-            min_delta=self.args.early_stop_min_delta,
-            mode=mode,
-        )
-        best_model_dir = os.path.join(self.args.model_dir,
-                                      self._get_save_dir_name() + '_best')
-        stop_requested = False
-
-        # ── Epoch loop with validation ──
+        # ── Fixed-epoch loop (no early stopping, no val evaluation) ──
         for epoch in tqdm(range(1, epochs + 1), desc="ft-epoch", ncols=0):
             if self.args.deepspeed:
                 train_sampler = getattr(self.data_loaders['train'].sampler,
@@ -347,61 +324,14 @@ class Trainer(object):
             train_loss = self.train_epoch(epoch)
             end_time = timer()
 
-            # ── Validate on full val set (not reduced by few-shot) ──
-            val_result = self.evaluate(dataloader_key='val')
-
-            if is_rank_0 and val_result is not None:
-                val_metric = val_result.get(metric_name)
-                if val_metric is None:
-                    logger.warning(
-                        f"Metric '{metric_name}' not in eval result; "
-                        f"falling back to 'Loss'")
-                    val_metric = val_result.get('Loss', float('inf'))
-                val_loss = val_result.get('Loss', float('inf'))
-                improved = early_stopper.step(val_metric)
-
-                if improved:
-                    self.save_model(path=best_model_dir)
-                    logger.info("Best model saved (val %s=%.4f, epoch=%d)",
-                                metric_name, early_stopper.best_score, epoch)
-
+            if is_rank_0:
                 msg = (f"FT Epoch: {epoch}/{epochs}, "
                        f"Train Loss: {train_loss:.5f}, "
-                       f"Val Loss: {val_loss:.5f}, "
-                       f"Val {metric_name}: {val_metric:.4f}, "
-                       f"Best {metric_name}: {early_stopper.best_score:.4f}, "
-                       f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
                        f"Time: {(end_time - start_time):.1f}s")
                 tqdm.write(msg)
                 logger.info(msg)
 
-                if early_stopper.early_stop:
-                    stop_requested = True
-
-            # ── Broadcast early stop across ranks ──
-            if self.args.deepspeed and torch.distributed.is_initialized():
-                stop_tensor = torch.tensor([1 if stop_requested else 0],
-                                           device=self.device, dtype=torch.int)
-                torch.distributed.broadcast(stop_tensor, src=0)
-                if stop_tensor.item() == 1:
-                    logger.info("Early stopping triggered at epoch %d", epoch)
-                    break
-            elif stop_requested:
-                break
-
-        # ── Load best checkpoint (if one was saved) ──
-        best_path = os.path.join(best_model_dir,
-                                 f'{self.args.model}-{self.task_id}.bin')
-        if os.path.exists(best_path):
-            self.load_model(path=best_model_dir)
-            if is_rank_0:
-                logger.info("Loaded best checkpoint from %s", best_model_dir)
-        else:
-            if is_rank_0:
-                logger.info("No best checkpoint found at %s, "
-                            "using current weights", best_path)
-
-        # ── Final test evaluation on best model ──
+        # ── Final test evaluation using the last-epoch weights ──
         result = self.evaluate(dataloader_key='test')
         self.test_result = result
 
