@@ -149,7 +149,7 @@ class BNT(nn.Module):
         if self.task_type == 'classification':
             self.loss_fn = torch.nn.CrossEntropyLoss(reduction='sum')
         else:
-            self.loss_fn = torch.nn.MSELoss()
+            self.loss_fn = torch.nn.HuberLoss(delta=1.0)
 
     def forward(self, node_feature: torch.tensor, labels: torch.tensor):
 

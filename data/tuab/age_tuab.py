@@ -105,6 +105,8 @@ class AgeTUABDataset(BaseDataset):
         labels = data["labels"].astype(np.float32)
         subject_id = data["subject_id"]
         self.hz = data["hz"]
+        self.label_min = float(data['label_min']) if 'label_min' in data else None
+        self.label_max = float(data['label_max']) if 'label_max' in data else None
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
@@ -348,15 +350,25 @@ def age_tuab_preprocess(path="../data/TUAB", hz=200,
           f"val={n_val} subj ({len(split_val_index)} samples), "
           f"test={n_total - n_train - n_val} subj ({len(split_test_index)} samples)")
 
+    # ── 年龄归一化（固定先验边界，无泄漏）──
+    labels_raw = labels.astype(np.float32)
+    label_min = float(AGE_LABEL_MIN)
+    label_max = float(AGE_LABEL_MAX)
+    span = label_max - label_min
+    labels = ((labels_raw - label_min) / span).astype(np.float32)
+
     print(f"\nTotal samples: {len(labels)}")
     print(f"  Subjects: {len(np.unique(subject_ids))}")
-    print(f"  Age range: {labels.min():.1f}–{labels.max():.1f} "
-          f"(mean={labels.mean():.1f}, median={np.median(labels):.0f})")
+    print(f"  Age range: {labels_raw.min():.1f}–{labels_raw.max():.1f} "
+          f"(mean={labels_raw.mean():.1f}, median={np.median(labels_raw):.0f})")
+    print(f"  Normalized with fixed bounds [{AGE_LABEL_MIN:.0f},{AGE_LABEL_MAX:.0f}]")
     print(f"  Shape: {time_series.shape}")
 
     np.savez(output_path,
              timeseries=time_series,
-             labels=labels, subject_id=subject_ids, hz=hz,
+             labels=labels, labels_raw=labels_raw,
+             label_min=label_min, label_max=label_max,
+             subject_id=subject_ids, hz=hz,
              split_train_index=split_train_index,
              split_val_index=split_val_index,
              split_test_index=split_test_index)

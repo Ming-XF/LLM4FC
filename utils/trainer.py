@@ -87,6 +87,7 @@ class Trainer(object):
         datasets = eval(
             f"{self.args.dataset}Dataset")(self.data_config, k=self.task_id,
                                            episode_seed=self.episode_seed)
+        self.dataset = datasets
 
         if self.args.deepspeed:
             data_loaders = init_deepspeed_dataloader(self.data_config, datasets)
@@ -806,15 +807,23 @@ class Trainer(object):
             preds_v = preds[valid]
             labels_v = labels[valid]
 
+            # 反变换系数：把归一化量纲的指标还原到「岁」
+            span = 1.0
+            ds = getattr(self, 'dataset', None)
+            lmin = getattr(ds, 'label_min', None) if ds is not None else None
+            lmax = getattr(ds, 'label_max', None) if ds is not None else None
+            if lmin is not None and lmax is not None and lmax > lmin:
+                span = float(lmax - lmin)
+
             if len(preds_v) > 1:
                 mse = np.mean((preds_v - labels_v) ** 2)
                 mae = np.mean(np.abs(preds_v - labels_v))
                 rmse = np.sqrt(mse)
                 r2 = r2_score(labels_v, preds_v)
                 pearson_r, pearson_p = pearsonr(preds_v, labels_v)
-                result['MSE'] = float(mse)
-                result['MAE'] = float(mae)
-                result['RMSE'] = float(rmse)
+                result['MSE'] = float(mse * span ** 2)
+                result['MAE'] = float(mae * span)
+                result['RMSE'] = float(rmse * span)
                 result['R2'] = float(r2)
                 result['PearsonR'] = float(pearson_r)
             else:

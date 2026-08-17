@@ -1,1121 +1,451 @@
-08/16/2026 16:42:02 - INFO - __main__ -   ########## few-shot seed=42 ##########
-08/16/2026 16:42:02 - INFO - __main__ -   ########## few-shot seed=42 ##########
-08/16/2026 16:42:02 - INFO - __main__ -   ########## few-shot seed=42 ##########
-08/16/2026 16:42:13 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpl0e7fz78/test.c -o /tmp/tmpl0e7fz78/test.o
-08/16/2026 16:42:13 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpl0e7fz78/test.o -laio -o /tmp/tmpl0e7fz78/a.out
-08/16/2026 16:42:13 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpmjy3z_sc/test.c -o /tmp/tmpmjy3z_sc/test.o
-08/16/2026 16:42:13 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpmjy3z_sc/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmpmjy3z_sc/a.out
-08/16/2026 16:42:13 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpip52bzrm/test.c -o /tmp/tmpip52bzrm/test.o
-08/16/2026 16:42:13 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpip52bzrm/test.o -laio -o /tmp/tmpip52bzrm/a.out
-08/16/2026 16:42:13 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmp3_drzf4v/test.c -o /tmp/tmp3_drzf4v/test.o
-08/16/2026 16:42:13 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmp3_drzf4v/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmp3_drzf4v/a.out
-08/16/2026 16:42:14 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpge2xkten/test.c -o /tmp/tmpge2xkten/test.o
-08/16/2026 16:42:14 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpge2xkten/test.o -laio -o /tmp/tmpge2xkten/a.out
-08/16/2026 16:42:14 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpqea8blr7/test.c -o /tmp/tmpqea8blr7/test.o
-08/16/2026 16:42:14 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpqea8blr7/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmpqea8blr7/a.out
-08/16/2026 16:42:14 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
-08/16/2026 16:42:14 - INFO - utils.trainer -   Model loaded from ./output_dir/ALTER_AgeCAUEEG_train/ALTER-0.bin (27/27 keys)
-08/16/2026 16:42:14 - INFO - utils.trainer -   ***** Running few-shot fine-tune (transfer) *****
-08/16/2026 16:42:14 - INFO - utils.trainer -     Num train examples = 2
-08/16/2026 16:42:14 - INFO - utils.trainer -     Num val   examples = 87
-08/16/2026 16:42:14 - INFO - utils.trainer -     Num test  examples = 88
-08/16/2026 16:42:14 - INFO - utils.trainer -     Max fine-tune epochs = 200
-08/16/2026 16:42:14 - INFO - utils.trainer -     Fine-tune lr = 0.0001
-08/16/2026 16:42:14 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
-08/16/2026 16:42:14 - INFO - utils.trainer -   Model loaded from ./output_dir/ALTER_AgeCAUEEG_train/ALTER-0.bin (27/27 keys)
-08/16/2026 16:42:14 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
-08/16/2026 16:42:14 - INFO - utils.trainer -   Model loaded from ./output_dir/ALTER_AgeCAUEEG_train/ALTER-0.bin (27/27 keys)
-08/16/2026 16:42:17 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:42:19 - INFO - utils.trainer -   Loss: 2641.92179
-08/16/2026 16:42:19 - INFO - utils.trainer -   MSE: 2633.72900
-08/16/2026 16:42:19 - INFO - utils.trainer -   MAE: 48.22840
-08/16/2026 16:42:19 - INFO - utils.trainer -   RMSE: 51.31987
-08/16/2026 16:42:19 - INFO - utils.trainer -   R2: -7.55800
-08/16/2026 16:42:19 - INFO - utils.trainer -   PearsonR: 0.03126
-08/16/2026 16:42:19 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:42:19 - INFO - utils.trainer -   Best model saved (val Loss=2641.9218, epoch=1)
-08/16/2026 16:42:19 - INFO - utils.trainer -   FT Epoch: 1/200, Train Loss: 792.43568, Val Loss: 2641.92179, Val Loss: 2641.9218, Best Loss: 2641.9218, No improve: 0/10, Time: 2.2s
-08/16/2026 16:42:21 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:42:24 - INFO - utils.trainer -   Loss: 2640.98177
-08/16/2026 16:42:24 - INFO - utils.trainer -   MSE: 2632.79004
-08/16/2026 16:42:24 - INFO - utils.trainer -   MAE: 48.21867
-08/16/2026 16:42:24 - INFO - utils.trainer -   RMSE: 51.31072
-08/16/2026 16:42:24 - INFO - utils.trainer -   R2: -7.55495
-08/16/2026 16:42:24 - INFO - utils.trainer -   PearsonR: -0.02674
-08/16/2026 16:42:24 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:42:24 - INFO - utils.trainer -   Best model saved (val Loss=2640.9818, epoch=2)
-08/16/2026 16:42:24 - INFO - utils.trainer -   FT Epoch: 2/200, Train Loss: 2855.79968, Val Loss: 2640.98177, Val Loss: 2640.9818, Best Loss: 2640.9818, No improve: 0/10, Time: 1.7s
-08/16/2026 16:42:25 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:42:28 - INFO - utils.trainer -   Loss: 2640.03206
-08/16/2026 16:42:28 - INFO - utils.trainer -   MSE: 2631.84229
-08/16/2026 16:42:28 - INFO - utils.trainer -   MAE: 48.20883
-08/16/2026 16:42:28 - INFO - utils.trainer -   RMSE: 51.30148
-08/16/2026 16:42:28 - INFO - utils.trainer -   R2: -7.55187
-08/16/2026 16:42:28 - INFO - utils.trainer -   PearsonR: -0.05546
-08/16/2026 16:42:28 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:42:28 - INFO - utils.trainer -   Best model saved (val Loss=2640.0321, epoch=3)
-08/16/2026 16:42:28 - INFO - utils.trainer -   FT Epoch: 3/200, Train Loss: 2144.10907, Val Loss: 2640.03206, Val Loss: 2640.0321, Best Loss: 2640.0321, No improve: 0/10, Time: 1.7s
-08/16/2026 16:42:30 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:42:32 - INFO - utils.trainer -   Loss: 2639.13411
-08/16/2026 16:42:32 - INFO - utils.trainer -   MSE: 2630.94531
-08/16/2026 16:42:32 - INFO - utils.trainer -   MAE: 48.19953
-08/16/2026 16:42:32 - INFO - utils.trainer -   RMSE: 51.29274
-08/16/2026 16:42:32 - INFO - utils.trainer -   R2: -7.54895
-08/16/2026 16:42:32 - INFO - utils.trainer -   PearsonR: -0.04154
-08/16/2026 16:42:32 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:42:32 - INFO - utils.trainer -   Best model saved (val Loss=2639.1341, epoch=4)
-08/16/2026 16:42:32 - INFO - utils.trainer -   FT Epoch: 4/200, Train Loss: 3388.60938, Val Loss: 2639.13411, Val Loss: 2639.1341, Best Loss: 2639.1341, No improve: 0/10, Time: 2.1s
-08/16/2026 16:42:34 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:42:37 - INFO - utils.trainer -   Loss: 2638.36108
-08/16/2026 16:42:37 - INFO - utils.trainer -   MSE: 2630.17358
-08/16/2026 16:42:37 - INFO - utils.trainer -   MAE: 48.19152
-08/16/2026 16:42:37 - INFO - utils.trainer -   RMSE: 51.28522
-08/16/2026 16:42:37 - INFO - utils.trainer -   R2: -7.54645
-08/16/2026 16:42:37 - INFO - utils.trainer -   PearsonR: -0.04583
-08/16/2026 16:42:37 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:42:37 - INFO - utils.trainer -   Best model saved (val Loss=2638.3611, epoch=5)
-08/16/2026 16:42:37 - INFO - utils.trainer -   FT Epoch: 5/200, Train Loss: 5341.53003, Val Loss: 2638.36108, Val Loss: 2638.3611, Best Loss: 2638.3611, No improve: 0/10, Time: 1.7s
-08/16/2026 16:42:39 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:42:41 - INFO - utils.trainer -   Loss: 2637.85588
-08/16/2026 16:42:41 - INFO - utils.trainer -   MSE: 2629.66919
-08/16/2026 16:42:41 - INFO - utils.trainer -   MAE: 48.18629
-08/16/2026 16:42:41 - INFO - utils.trainer -   RMSE: 51.28030
-08/16/2026 16:42:41 - INFO - utils.trainer -   R2: -7.54481
-08/16/2026 16:42:41 - INFO - utils.trainer -   PearsonR: -0.05484
-08/16/2026 16:42:41 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:42:41 - INFO - utils.trainer -   Best model saved (val Loss=2637.8559, epoch=6)
-08/16/2026 16:42:41 - INFO - utils.trainer -   FT Epoch: 6/200, Train Loss: 4051.59082, Val Loss: 2637.85588, Val Loss: 2637.8559, Best Loss: 2637.8559, No improve: 0/10, Time: 2.1s
-08/16/2026 16:42:43 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:42:46 - INFO - utils.trainer -   Loss: 2637.35913
-08/16/2026 16:42:46 - INFO - utils.trainer -   MSE: 2629.17310
-08/16/2026 16:42:46 - INFO - utils.trainer -   MAE: 48.18114
-08/16/2026 16:42:46 - INFO - utils.trainer -   RMSE: 51.27546
-08/16/2026 16:42:46 - INFO - utils.trainer -   R2: -7.54320
-08/16/2026 16:42:46 - INFO - utils.trainer -   PearsonR: -0.05285
-08/16/2026 16:42:46 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:42:46 - INFO - utils.trainer -   Best model saved (val Loss=2637.3591, epoch=7)
-08/16/2026 16:42:46 - INFO - utils.trainer -   FT Epoch: 7/200, Train Loss: 3947.43701, Val Loss: 2637.35913, Val Loss: 2637.3591, Best Loss: 2637.3591, No improve: 0/10, Time: 1.6s
-08/16/2026 16:42:47 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:42:50 - INFO - utils.trainer -   Loss: 2636.83398
-08/16/2026 16:42:50 - INFO - utils.trainer -   MSE: 2628.64868
-08/16/2026 16:42:50 - INFO - utils.trainer -   MAE: 48.17570
-08/16/2026 16:42:50 - INFO - utils.trainer -   RMSE: 51.27035
-08/16/2026 16:42:50 - INFO - utils.trainer -   R2: -7.54149
-08/16/2026 16:42:50 - INFO - utils.trainer -   PearsonR: -0.04582
-08/16/2026 16:42:50 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:42:50 - INFO - utils.trainer -   Best model saved (val Loss=2636.8340, epoch=8)
-08/16/2026 16:42:50 - INFO - utils.trainer -   FT Epoch: 8/200, Train Loss: 3345.06165, Val Loss: 2636.83398, Val Loss: 2636.8340, Best Loss: 2636.8340, No improve: 0/10, Time: 1.9s
-08/16/2026 16:42:52 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:42:54 - INFO - utils.trainer -   Loss: 2636.29484
-08/16/2026 16:42:54 - INFO - utils.trainer -   MSE: 2628.11035
-08/16/2026 16:42:54 - INFO - utils.trainer -   MAE: 48.17011
-08/16/2026 16:42:54 - INFO - utils.trainer -   RMSE: 51.26510
-08/16/2026 16:42:54 - INFO - utils.trainer -   R2: -7.53974
-08/16/2026 16:42:54 - INFO - utils.trainer -   PearsonR: -0.03815
-08/16/2026 16:42:54 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:42:54 - INFO - utils.trainer -   Best model saved (val Loss=2636.2948, epoch=9)
-08/16/2026 16:42:54 - INFO - utils.trainer -   FT Epoch: 9/200, Train Loss: 2892.58167, Val Loss: 2636.29484, Val Loss: 2636.2948, Best Loss: 2636.2948, No improve: 0/10, Time: 1.7s
-08/16/2026 16:42:56 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:42:59 - INFO - utils.trainer -   Loss: 2635.74967
-08/16/2026 16:42:59 - INFO - utils.trainer -   MSE: 2627.56616
-08/16/2026 16:42:59 - INFO - utils.trainer -   MAE: 48.16446
-08/16/2026 16:42:59 - INFO - utils.trainer -   RMSE: 51.25979
-08/16/2026 16:42:59 - INFO - utils.trainer -   R2: -7.53797
-08/16/2026 16:42:59 - INFO - utils.trainer -   PearsonR: -0.02813
-08/16/2026 16:42:59 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:42:59 - INFO - utils.trainer -   Best model saved (val Loss=2635.7497, epoch=10)
-08/16/2026 16:42:59 - INFO - utils.trainer -   FT Epoch: 10/200, Train Loss: 3289.95422, Val Loss: 2635.74967, Val Loss: 2635.7497, Best Loss: 2635.7497, No improve: 0/10, Time: 1.6s
-08/16/2026 16:43:00 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:03 - INFO - utils.trainer -   Loss: 2635.21086
-08/16/2026 16:43:03 - INFO - utils.trainer -   MSE: 2627.02783
-08/16/2026 16:43:03 - INFO - utils.trainer -   MAE: 48.15888
-08/16/2026 16:43:03 - INFO - utils.trainer -   RMSE: 51.25454
-08/16/2026 16:43:03 - INFO - utils.trainer -   R2: -7.53623
-08/16/2026 16:43:03 - INFO - utils.trainer -   PearsonR: -0.02305
-08/16/2026 16:43:03 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:03 - INFO - utils.trainer -   Best model saved (val Loss=2635.2109, epoch=11)
-08/16/2026 16:43:03 - INFO - utils.trainer -   FT Epoch: 11/200, Train Loss: 2428.70667, Val Loss: 2635.21086, Val Loss: 2635.2109, Best Loss: 2635.2109, No improve: 0/10, Time: 1.7s
-08/16/2026 16:43:05 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:08 - INFO - utils.trainer -   Loss: 2634.72754
-08/16/2026 16:43:08 - INFO - utils.trainer -   MSE: 2626.54541
-08/16/2026 16:43:08 - INFO - utils.trainer -   MAE: 48.15386
-08/16/2026 16:43:08 - INFO - utils.trainer -   RMSE: 51.24983
-08/16/2026 16:43:08 - INFO - utils.trainer -   R2: -7.53466
-08/16/2026 16:43:08 - INFO - utils.trainer -   PearsonR: -0.02563
-08/16/2026 16:43:08 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:08 - INFO - utils.trainer -   Best model saved (val Loss=2634.7275, epoch=12)
-08/16/2026 16:43:08 - INFO - utils.trainer -   FT Epoch: 12/200, Train Loss: 2537.94397, Val Loss: 2634.72754, Val Loss: 2634.7275, Best Loss: 2634.7275, No improve: 0/10, Time: 1.7s
-08/16/2026 16:43:09 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:12 - INFO - utils.trainer -   Loss: 2634.23869
-08/16/2026 16:43:12 - INFO - utils.trainer -   MSE: 2626.05737
-08/16/2026 16:43:12 - INFO - utils.trainer -   MAE: 48.14880
-08/16/2026 16:43:12 - INFO - utils.trainer -   RMSE: 51.24507
-08/16/2026 16:43:12 - INFO - utils.trainer -   R2: -7.53307
-08/16/2026 16:43:12 - INFO - utils.trainer -   PearsonR: -0.02067
-08/16/2026 16:43:12 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:12 - INFO - utils.trainer -   Best model saved (val Loss=2634.2387, epoch=13)
-08/16/2026 16:43:12 - INFO - utils.trainer -   FT Epoch: 13/200, Train Loss: 2841.74255, Val Loss: 2634.23869, Val Loss: 2634.2387, Best Loss: 2634.2387, No improve: 0/10, Time: 1.9s
-08/16/2026 16:43:14 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:17 - INFO - utils.trainer -   Loss: 2633.72664
-08/16/2026 16:43:17 - INFO - utils.trainer -   MSE: 2625.54590
-08/16/2026 16:43:17 - INFO - utils.trainer -   MAE: 48.14349
-08/16/2026 16:43:17 - INFO - utils.trainer -   RMSE: 51.24008
-08/16/2026 16:43:17 - INFO - utils.trainer -   R2: -7.53141
-08/16/2026 16:43:17 - INFO - utils.trainer -   PearsonR: -0.02119
-08/16/2026 16:43:17 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:17 - INFO - utils.trainer -   Best model saved (val Loss=2633.7266, epoch=14)
-08/16/2026 16:43:17 - INFO - utils.trainer -   FT Epoch: 14/200, Train Loss: 2511.01636, Val Loss: 2633.72664, Val Loss: 2633.7266, Best Loss: 2633.7266, No improve: 0/10, Time: 1.7s
-08/16/2026 16:43:19 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:21 - INFO - utils.trainer -   Loss: 2633.19832
-08/16/2026 16:43:21 - INFO - utils.trainer -   MSE: 2625.01831
-08/16/2026 16:43:21 - INFO - utils.trainer -   MAE: 48.13800
-08/16/2026 16:43:21 - INFO - utils.trainer -   RMSE: 51.23493
-08/16/2026 16:43:21 - INFO - utils.trainer -   R2: -7.52970
-08/16/2026 16:43:21 - INFO - utils.trainer -   PearsonR: -0.02210
-08/16/2026 16:43:21 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:21 - INFO - utils.trainer -   Best model saved (val Loss=2633.1983, epoch=15)
-08/16/2026 16:43:21 - INFO - utils.trainer -   FT Epoch: 15/200, Train Loss: 2698.07483, Val Loss: 2633.19832, Val Loss: 2633.1983, Best Loss: 2633.1983, No improve: 0/10, Time: 2.0s
-08/16/2026 16:43:23 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:26 - INFO - utils.trainer -   Loss: 2632.64982
-08/16/2026 16:43:26 - INFO - utils.trainer -   MSE: 2624.47070
-08/16/2026 16:43:26 - INFO - utils.trainer -   MAE: 48.13232
-08/16/2026 16:43:26 - INFO - utils.trainer -   RMSE: 51.22959
-08/16/2026 16:43:26 - INFO - utils.trainer -   R2: -7.52792
-08/16/2026 16:43:26 - INFO - utils.trainer -   PearsonR: -0.02231
-08/16/2026 16:43:26 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:26 - INFO - utils.trainer -   Best model saved (val Loss=2632.6498, epoch=16)
-08/16/2026 16:43:26 - INFO - utils.trainer -   FT Epoch: 16/200, Train Loss: 3174.13904, Val Loss: 2632.64982, Val Loss: 2632.6498, Best Loss: 2632.6498, No improve: 0/10, Time: 1.7s
-08/16/2026 16:43:27 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:30 - INFO - utils.trainer -   Loss: 2632.08171
-08/16/2026 16:43:30 - INFO - utils.trainer -   MSE: 2623.90356
-08/16/2026 16:43:30 - INFO - utils.trainer -   MAE: 48.12643
-08/16/2026 16:43:30 - INFO - utils.trainer -   RMSE: 51.22405
-08/16/2026 16:43:30 - INFO - utils.trainer -   R2: -7.52607
-08/16/2026 16:43:30 - INFO - utils.trainer -   PearsonR: -0.02932
-08/16/2026 16:43:30 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:30 - INFO - utils.trainer -   Best model saved (val Loss=2632.0817, epoch=17)
-08/16/2026 16:43:30 - INFO - utils.trainer -   FT Epoch: 17/200, Train Loss: 3247.64099, Val Loss: 2632.08171, Val Loss: 2632.0817, Best Loss: 2632.0817, No improve: 0/10, Time: 1.6s
-08/16/2026 16:43:32 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:35 - INFO - utils.trainer -   Loss: 2631.49552
-08/16/2026 16:43:35 - INFO - utils.trainer -   MSE: 2623.31787
-08/16/2026 16:43:35 - INFO - utils.trainer -   MAE: 48.12034
-08/16/2026 16:43:35 - INFO - utils.trainer -   RMSE: 51.21833
-08/16/2026 16:43:35 - INFO - utils.trainer -   R2: -7.52417
-08/16/2026 16:43:35 - INFO - utils.trainer -   PearsonR: -0.03890
-08/16/2026 16:43:35 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:35 - INFO - utils.trainer -   Best model saved (val Loss=2631.4955, epoch=18)
-08/16/2026 16:43:35 - INFO - utils.trainer -   FT Epoch: 18/200, Train Loss: 3032.80627, Val Loss: 2631.49552, Val Loss: 2631.4955, Best Loss: 2631.4955, No improve: 0/10, Time: 1.7s
-08/16/2026 16:43:36 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:39 - INFO - utils.trainer -   Loss: 2630.90112
-08/16/2026 16:43:39 - INFO - utils.trainer -   MSE: 2622.72437
-08/16/2026 16:43:39 - INFO - utils.trainer -   MAE: 48.11417
-08/16/2026 16:43:39 - INFO - utils.trainer -   RMSE: 51.21254
-08/16/2026 16:43:39 - INFO - utils.trainer -   R2: -7.52224
-08/16/2026 16:43:39 - INFO - utils.trainer -   PearsonR: -0.04775
-08/16/2026 16:43:39 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:39 - INFO - utils.trainer -   Best model saved (val Loss=2630.9011, epoch=19)
-08/16/2026 16:43:39 - INFO - utils.trainer -   FT Epoch: 19/200, Train Loss: 2989.04578, Val Loss: 2630.90112, Val Loss: 2630.9011, Best Loss: 2630.9011, No improve: 0/10, Time: 1.7s
-08/16/2026 16:43:41 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:43 - INFO - utils.trainer -   Loss: 2630.30737
-08/16/2026 16:43:43 - INFO - utils.trainer -   MSE: 2622.13159
-08/16/2026 16:43:43 - INFO - utils.trainer -   MAE: 48.10801
-08/16/2026 16:43:43 - INFO - utils.trainer -   RMSE: 51.20675
-08/16/2026 16:43:43 - INFO - utils.trainer -   R2: -7.52032
-08/16/2026 16:43:43 - INFO - utils.trainer -   PearsonR: -0.06032
-08/16/2026 16:43:43 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:43 - INFO - utils.trainer -   Best model saved (val Loss=2630.3074, epoch=20)
-08/16/2026 16:43:43 - INFO - utils.trainer -   FT Epoch: 20/200, Train Loss: 3942.39294, Val Loss: 2630.30737, Val Loss: 2630.3074, Best Loss: 2630.3074, No improve: 0/10, Time: 1.7s
-08/16/2026 16:43:45 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:48 - INFO - utils.trainer -   Loss: 2629.69019
-08/16/2026 16:43:48 - INFO - utils.trainer -   MSE: 2621.51538
-08/16/2026 16:43:48 - INFO - utils.trainer -   MAE: 48.10160
-08/16/2026 16:43:48 - INFO - utils.trainer -   RMSE: 51.20074
-08/16/2026 16:43:48 - INFO - utils.trainer -   R2: -7.51831
-08/16/2026 16:43:48 - INFO - utils.trainer -   PearsonR: -0.07245
-08/16/2026 16:43:48 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:48 - INFO - utils.trainer -   Best model saved (val Loss=2629.6902, epoch=21)
-08/16/2026 16:43:48 - INFO - utils.trainer -   FT Epoch: 21/200, Train Loss: 3547.69336, Val Loss: 2629.69019, Val Loss: 2629.6902, Best Loss: 2629.6902, No improve: 0/10, Time: 1.7s
-08/16/2026 16:43:49 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:52 - INFO - utils.trainer -   Loss: 2629.06364
-08/16/2026 16:43:52 - INFO - utils.trainer -   MSE: 2620.88965
-08/16/2026 16:43:52 - INFO - utils.trainer -   MAE: 48.09509
-08/16/2026 16:43:52 - INFO - utils.trainer -   RMSE: 51.19463
-08/16/2026 16:43:52 - INFO - utils.trainer -   R2: -7.51628
-08/16/2026 16:43:52 - INFO - utils.trainer -   PearsonR: -0.08278
-08/16/2026 16:43:52 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:52 - INFO - utils.trainer -   Best model saved (val Loss=2629.0636, epoch=22)
-08/16/2026 16:43:52 - INFO - utils.trainer -   FT Epoch: 22/200, Train Loss: 2180.87311, Val Loss: 2629.06364, Val Loss: 2629.0636, Best Loss: 2629.0636, No improve: 0/10, Time: 1.7s
-08/16/2026 16:43:54 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:43:57 - INFO - utils.trainer -   Loss: 2628.41488
-08/16/2026 16:43:57 - INFO - utils.trainer -   MSE: 2620.24194
-08/16/2026 16:43:57 - INFO - utils.trainer -   MAE: 48.08835
-08/16/2026 16:43:57 - INFO - utils.trainer -   RMSE: 51.18830
-08/16/2026 16:43:57 - INFO - utils.trainer -   R2: -7.51418
-08/16/2026 16:43:57 - INFO - utils.trainer -   PearsonR: -0.09041
-08/16/2026 16:43:57 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:43:57 - INFO - utils.trainer -   Best model saved (val Loss=2628.4149, epoch=23)
-08/16/2026 16:43:57 - INFO - utils.trainer -   FT Epoch: 23/200, Train Loss: 2873.59546, Val Loss: 2628.41488, Val Loss: 2628.4149, Best Loss: 2628.4149, No improve: 0/10, Time: 1.7s
-08/16/2026 16:43:59 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:01 - INFO - utils.trainer -   Loss: 2627.72974
-08/16/2026 16:44:01 - INFO - utils.trainer -   MSE: 2619.55737
-08/16/2026 16:44:01 - INFO - utils.trainer -   MAE: 48.08124
-08/16/2026 16:44:01 - INFO - utils.trainer -   RMSE: 51.18161
-08/16/2026 16:44:01 - INFO - utils.trainer -   R2: -7.51195
-08/16/2026 16:44:01 - INFO - utils.trainer -   PearsonR: -0.09777
-08/16/2026 16:44:01 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:01 - INFO - utils.trainer -   Best model saved (val Loss=2627.7297, epoch=24)
-08/16/2026 16:44:01 - INFO - utils.trainer -   FT Epoch: 24/200, Train Loss: 4217.79248, Val Loss: 2627.72974, Val Loss: 2627.7297, Best Loss: 2627.7297, No improve: 0/10, Time: 2.1s
-08/16/2026 16:44:03 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:06 - INFO - utils.trainer -   Loss: 2627.00643
-08/16/2026 16:44:06 - INFO - utils.trainer -   MSE: 2618.83521
-08/16/2026 16:44:06 - INFO - utils.trainer -   MAE: 48.07372
-08/16/2026 16:44:06 - INFO - utils.trainer -   RMSE: 51.17456
-08/16/2026 16:44:06 - INFO - utils.trainer -   R2: -7.50960
-08/16/2026 16:44:06 - INFO - utils.trainer -   PearsonR: -0.10223
-08/16/2026 16:44:06 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:06 - INFO - utils.trainer -   Best model saved (val Loss=2627.0064, epoch=25)
-08/16/2026 16:44:06 - INFO - utils.trainer -   FT Epoch: 25/200, Train Loss: 4760.66736, Val Loss: 2627.00643, Val Loss: 2627.0064, Best Loss: 2627.0064, No improve: 0/10, Time: 1.8s
-08/16/2026 16:44:08 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:10 - INFO - utils.trainer -   Loss: 2626.24683
-08/16/2026 16:44:10 - INFO - utils.trainer -   MSE: 2618.07666
-08/16/2026 16:44:10 - INFO - utils.trainer -   MAE: 48.06583
-08/16/2026 16:44:10 - INFO - utils.trainer -   RMSE: 51.16714
-08/16/2026 16:44:10 - INFO - utils.trainer -   R2: -7.50714
-08/16/2026 16:44:10 - INFO - utils.trainer -   PearsonR: -0.10398
-08/16/2026 16:44:10 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:10 - INFO - utils.trainer -   Best model saved (val Loss=2626.2468, epoch=26)
-08/16/2026 16:44:10 - INFO - utils.trainer -   FT Epoch: 26/200, Train Loss: 5549.02808, Val Loss: 2626.24683, Val Loss: 2626.2468, Best Loss: 2626.2468, No improve: 0/10, Time: 1.9s
-08/16/2026 16:44:12 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:15 - INFO - utils.trainer -   Loss: 2625.45190
-08/16/2026 16:44:15 - INFO - utils.trainer -   MSE: 2617.28296
-08/16/2026 16:44:15 - INFO - utils.trainer -   MAE: 48.05756
-08/16/2026 16:44:15 - INFO - utils.trainer -   RMSE: 51.15939
-08/16/2026 16:44:15 - INFO - utils.trainer -   R2: -7.50456
-08/16/2026 16:44:15 - INFO - utils.trainer -   PearsonR: -0.10586
-08/16/2026 16:44:15 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:15 - INFO - utils.trainer -   Best model saved (val Loss=2625.4519, epoch=27)
-08/16/2026 16:44:15 - INFO - utils.trainer -   FT Epoch: 27/200, Train Loss: 2507.52899, Val Loss: 2625.45190, Val Loss: 2625.4519, Best Loss: 2625.4519, No improve: 0/10, Time: 1.7s
-08/16/2026 16:44:16 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:19 - INFO - utils.trainer -   Loss: 2624.62044
-08/16/2026 16:44:19 - INFO - utils.trainer -   MSE: 2616.45264
-08/16/2026 16:44:19 - INFO - utils.trainer -   MAE: 48.04892
-08/16/2026 16:44:19 - INFO - utils.trainer -   RMSE: 51.15127
-08/16/2026 16:44:19 - INFO - utils.trainer -   R2: -7.50186
-08/16/2026 16:44:19 - INFO - utils.trainer -   PearsonR: -0.10643
-08/16/2026 16:44:19 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:19 - INFO - utils.trainer -   Best model saved (val Loss=2624.6204, epoch=28)
-08/16/2026 16:44:19 - INFO - utils.trainer -   FT Epoch: 28/200, Train Loss: 3510.10327, Val Loss: 2624.62044, Val Loss: 2624.6204, Best Loss: 2624.6204, No improve: 0/10, Time: 1.8s
-08/16/2026 16:44:20 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:23 - INFO - utils.trainer -   Loss: 2623.74927
-08/16/2026 16:44:23 - INFO - utils.trainer -   MSE: 2615.58252
-08/16/2026 16:44:23 - INFO - utils.trainer -   MAE: 48.03986
-08/16/2026 16:44:23 - INFO - utils.trainer -   RMSE: 51.14277
-08/16/2026 16:44:23 - INFO - utils.trainer -   R2: -7.49904
-08/16/2026 16:44:23 - INFO - utils.trainer -   PearsonR: -0.10666
-08/16/2026 16:44:23 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:23 - INFO - utils.trainer -   Best model saved (val Loss=2623.7493, epoch=29)
-08/16/2026 16:44:23 - INFO - utils.trainer -   FT Epoch: 29/200, Train Loss: 1606.08215, Val Loss: 2623.74927, Val Loss: 2623.7493, Best Loss: 2623.7493, No improve: 0/10, Time: 1.7s
-08/16/2026 16:44:25 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:28 - INFO - utils.trainer -   Loss: 2622.83122
-08/16/2026 16:44:28 - INFO - utils.trainer -   MSE: 2614.66577
-08/16/2026 16:44:28 - INFO - utils.trainer -   MAE: 48.03030
-08/16/2026 16:44:28 - INFO - utils.trainer -   RMSE: 51.13380
-08/16/2026 16:44:28 - INFO - utils.trainer -   R2: -7.49606
-08/16/2026 16:44:28 - INFO - utils.trainer -   PearsonR: -0.10711
-08/16/2026 16:44:28 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:28 - INFO - utils.trainer -   Best model saved (val Loss=2622.8312, epoch=30)
-08/16/2026 16:44:28 - INFO - utils.trainer -   FT Epoch: 30/200, Train Loss: 4513.45630, Val Loss: 2622.83122, Val Loss: 2622.8312, Best Loss: 2622.8312, No improve: 0/10, Time: 1.7s
-08/16/2026 16:44:29 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:32 - INFO - utils.trainer -   Loss: 2621.86011
-08/16/2026 16:44:32 - INFO - utils.trainer -   MSE: 2613.69604
-08/16/2026 16:44:32 - INFO - utils.trainer -   MAE: 48.02020
-08/16/2026 16:44:32 - INFO - utils.trainer -   RMSE: 51.12432
-08/16/2026 16:44:32 - INFO - utils.trainer -   R2: -7.49291
-08/16/2026 16:44:32 - INFO - utils.trainer -   PearsonR: -0.10683
-08/16/2026 16:44:32 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:32 - INFO - utils.trainer -   Best model saved (val Loss=2621.8601, epoch=31)
-08/16/2026 16:44:32 - INFO - utils.trainer -   FT Epoch: 31/200, Train Loss: 2925.58441, Val Loss: 2621.86011, Val Loss: 2621.8601, Best Loss: 2621.8601, No improve: 0/10, Time: 1.7s
-08/16/2026 16:44:34 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:37 - INFO - utils.trainer -   Loss: 2620.83122
-08/16/2026 16:44:37 - INFO - utils.trainer -   MSE: 2612.66870
-08/16/2026 16:44:37 - INFO - utils.trainer -   MAE: 48.00949
-08/16/2026 16:44:37 - INFO - utils.trainer -   RMSE: 51.11427
-08/16/2026 16:44:37 - INFO - utils.trainer -   R2: -7.48957
-08/16/2026 16:44:37 - INFO - utils.trainer -   PearsonR: -0.10625
-08/16/2026 16:44:37 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:37 - INFO - utils.trainer -   Best model saved (val Loss=2620.8312, epoch=32)
-08/16/2026 16:44:37 - INFO - utils.trainer -   FT Epoch: 32/200, Train Loss: 3295.83911, Val Loss: 2620.83122, Val Loss: 2620.8312, Best Loss: 2620.8312, No improve: 0/10, Time: 1.7s
-08/16/2026 16:44:38 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:41 - INFO - utils.trainer -   Loss: 2619.73560
-08/16/2026 16:44:41 - INFO - utils.trainer -   MSE: 2611.57446
-08/16/2026 16:44:41 - INFO - utils.trainer -   MAE: 47.99809
-08/16/2026 16:44:41 - INFO - utils.trainer -   RMSE: 51.10357
-08/16/2026 16:44:41 - INFO - utils.trainer -   R2: -7.48601
-08/16/2026 16:44:41 - INFO - utils.trainer -   PearsonR: -0.10585
-08/16/2026 16:44:41 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:41 - INFO - utils.trainer -   Best model saved (val Loss=2619.7356, epoch=33)
-08/16/2026 16:44:41 - INFO - utils.trainer -   FT Epoch: 33/200, Train Loss: 5166.25903, Val Loss: 2619.73560, Val Loss: 2619.7356, Best Loss: 2619.7356, No improve: 0/10, Time: 1.6s
-08/16/2026 16:44:42 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:45 - INFO - utils.trainer -   Loss: 2618.58236
-08/16/2026 16:44:45 - INFO - utils.trainer -   MSE: 2610.42261
-08/16/2026 16:44:45 - INFO - utils.trainer -   MAE: 47.98607
-08/16/2026 16:44:45 - INFO - utils.trainer -   RMSE: 51.09230
-08/16/2026 16:44:45 - INFO - utils.trainer -   R2: -7.48227
-08/16/2026 16:44:45 - INFO - utils.trainer -   PearsonR: -0.10537
-08/16/2026 16:44:45 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:45 - INFO - utils.trainer -   Best model saved (val Loss=2618.5824, epoch=34)
-08/16/2026 16:44:45 - INFO - utils.trainer -   FT Epoch: 34/200, Train Loss: 3700.77087, Val Loss: 2618.58236, Val Loss: 2618.5824, Best Loss: 2618.5824, No improve: 0/10, Time: 1.7s
-08/16/2026 16:44:47 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:49 - INFO - utils.trainer -   Loss: 2617.34880
-08/16/2026 16:44:49 - INFO - utils.trainer -   MSE: 2609.19092
-08/16/2026 16:44:49 - INFO - utils.trainer -   MAE: 47.97322
-08/16/2026 16:44:49 - INFO - utils.trainer -   RMSE: 51.08024
-08/16/2026 16:44:49 - INFO - utils.trainer -   R2: -7.47827
-08/16/2026 16:44:49 - INFO - utils.trainer -   PearsonR: -0.10532
-08/16/2026 16:44:49 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:49 - INFO - utils.trainer -   Best model saved (val Loss=2617.3488, epoch=35)
-08/16/2026 16:44:49 - INFO - utils.trainer -   FT Epoch: 35/200, Train Loss: 2123.99164, Val Loss: 2617.34880, Val Loss: 2617.3488, Best Loss: 2617.3488, No improve: 0/10, Time: 1.7s
-08/16/2026 16:44:51 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:54 - INFO - utils.trainer -   Loss: 2616.00081
-08/16/2026 16:44:54 - INFO - utils.trainer -   MSE: 2607.84497
-08/16/2026 16:44:54 - INFO - utils.trainer -   MAE: 47.95918
-08/16/2026 16:44:54 - INFO - utils.trainer -   RMSE: 51.06706
-08/16/2026 16:44:54 - INFO - utils.trainer -   R2: -7.47389
-08/16/2026 16:44:54 - INFO - utils.trainer -   PearsonR: -0.10502
-08/16/2026 16:44:54 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:54 - INFO - utils.trainer -   Best model saved (val Loss=2616.0008, epoch=36)
-08/16/2026 16:44:54 - INFO - utils.trainer -   FT Epoch: 36/200, Train Loss: 3837.31042, Val Loss: 2616.00081, Val Loss: 2616.0008, Best Loss: 2616.0008, No improve: 0/10, Time: 1.7s
-08/16/2026 16:44:55 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:44:58 - INFO - utils.trainer -   Loss: 2614.53955
-08/16/2026 16:44:58 - INFO - utils.trainer -   MSE: 2606.38550
-08/16/2026 16:44:58 - INFO - utils.trainer -   MAE: 47.94394
-08/16/2026 16:44:58 - INFO - utils.trainer -   RMSE: 51.05277
-08/16/2026 16:44:58 - INFO - utils.trainer -   R2: -7.46915
-08/16/2026 16:44:58 - INFO - utils.trainer -   PearsonR: -0.10414
-08/16/2026 16:44:58 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:44:58 - INFO - utils.trainer -   Best model saved (val Loss=2614.5396, epoch=37)
-08/16/2026 16:44:58 - INFO - utils.trainer -   FT Epoch: 37/200, Train Loss: 4110.17480, Val Loss: 2614.53955, Val Loss: 2614.5396, Best Loss: 2614.5396, No improve: 0/10, Time: 1.6s
-08/16/2026 16:45:00 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:03 - INFO - utils.trainer -   Loss: 2612.97648
-08/16/2026 16:45:03 - INFO - utils.trainer -   MSE: 2604.82471
-08/16/2026 16:45:03 - INFO - utils.trainer -   MAE: 47.92764
-08/16/2026 16:45:03 - INFO - utils.trainer -   RMSE: 51.03748
-08/16/2026 16:45:03 - INFO - utils.trainer -   R2: -7.46408
-08/16/2026 16:45:03 - INFO - utils.trainer -   PearsonR: -0.10337
-08/16/2026 16:45:03 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:03 - INFO - utils.trainer -   Best model saved (val Loss=2612.9765, epoch=38)
-08/16/2026 16:45:03 - INFO - utils.trainer -   FT Epoch: 38/200, Train Loss: 3053.33508, Val Loss: 2612.97648, Val Loss: 2612.9765, Best Loss: 2612.9765, No improve: 0/10, Time: 1.9s
-08/16/2026 16:45:05 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:07 - INFO - utils.trainer -   Loss: 2611.30949
-08/16/2026 16:45:07 - INFO - utils.trainer -   MSE: 2603.15967
-08/16/2026 16:45:07 - INFO - utils.trainer -   MAE: 47.91024
-08/16/2026 16:45:07 - INFO - utils.trainer -   RMSE: 51.02117
-08/16/2026 16:45:07 - INFO - utils.trainer -   R2: -7.45867
-08/16/2026 16:45:07 - INFO - utils.trainer -   PearsonR: -0.10173
-08/16/2026 16:45:07 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:07 - INFO - utils.trainer -   Best model saved (val Loss=2611.3095, epoch=39)
-08/16/2026 16:45:07 - INFO - utils.trainer -   FT Epoch: 39/200, Train Loss: 2298.80029, Val Loss: 2611.30949, Val Loss: 2611.3095, Best Loss: 2611.3095, No improve: 0/10, Time: 1.8s
-08/16/2026 16:45:09 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:11 - INFO - utils.trainer -   Loss: 2609.50903
-08/16/2026 16:45:11 - INFO - utils.trainer -   MSE: 2601.36157
-08/16/2026 16:45:11 - INFO - utils.trainer -   MAE: 47.89144
-08/16/2026 16:45:11 - INFO - utils.trainer -   RMSE: 51.00354
-08/16/2026 16:45:11 - INFO - utils.trainer -   R2: -7.45283
-08/16/2026 16:45:11 - INFO - utils.trainer -   PearsonR: -0.09952
-08/16/2026 16:45:11 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:11 - INFO - utils.trainer -   Best model saved (val Loss=2609.5090, epoch=40)
-08/16/2026 16:45:11 - INFO - utils.trainer -   FT Epoch: 40/200, Train Loss: 3642.82068, Val Loss: 2609.50903, Val Loss: 2609.5090, Best Loss: 2609.5090, No improve: 0/10, Time: 1.6s
-08/16/2026 16:45:13 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:16 - INFO - utils.trainer -   Loss: 2607.55892
-08/16/2026 16:45:16 - INFO - utils.trainer -   MSE: 2599.41406
-08/16/2026 16:45:16 - INFO - utils.trainer -   MAE: 47.87108
-08/16/2026 16:45:16 - INFO - utils.trainer -   RMSE: 50.98445
-08/16/2026 16:45:16 - INFO - utils.trainer -   R2: -7.44650
-08/16/2026 16:45:16 - INFO - utils.trainer -   PearsonR: -0.09693
-08/16/2026 16:45:16 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:16 - INFO - utils.trainer -   Best model saved (val Loss=2607.5589, epoch=41)
-08/16/2026 16:45:16 - INFO - utils.trainer -   FT Epoch: 41/200, Train Loss: 3552.39771, Val Loss: 2607.55892, Val Loss: 2607.5589, Best Loss: 2607.5589, No improve: 0/10, Time: 1.7s
-08/16/2026 16:45:17 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:20 - INFO - utils.trainer -   Loss: 2605.46541
-08/16/2026 16:45:20 - INFO - utils.trainer -   MSE: 2597.32349
-08/16/2026 16:45:20 - INFO - utils.trainer -   MAE: 47.84921
-08/16/2026 16:45:20 - INFO - utils.trainer -   RMSE: 50.96394
-08/16/2026 16:45:20 - INFO - utils.trainer -   R2: -7.43970
-08/16/2026 16:45:20 - INFO - utils.trainer -   PearsonR: -0.09364
-08/16/2026 16:45:20 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:20 - INFO - utils.trainer -   Best model saved (val Loss=2605.4654, epoch=42)
-08/16/2026 16:45:20 - INFO - utils.trainer -   FT Epoch: 42/200, Train Loss: 1927.21185, Val Loss: 2605.46541, Val Loss: 2605.4654, Best Loss: 2605.4654, No improve: 0/10, Time: 1.7s
-08/16/2026 16:45:22 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:24 - INFO - utils.trainer -   Loss: 2603.21598
-08/16/2026 16:45:24 - INFO - utils.trainer -   MSE: 2595.07715
-08/16/2026 16:45:24 - INFO - utils.trainer -   MAE: 47.82570
-08/16/2026 16:45:24 - INFO - utils.trainer -   RMSE: 50.94190
-08/16/2026 16:45:24 - INFO - utils.trainer -   R2: -7.43241
-08/16/2026 16:45:24 - INFO - utils.trainer -   PearsonR: -0.09004
-08/16/2026 16:45:24 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:24 - INFO - utils.trainer -   Best model saved (val Loss=2603.2160, epoch=43)
-08/16/2026 16:45:24 - INFO - utils.trainer -   FT Epoch: 43/200, Train Loss: 2626.26080, Val Loss: 2603.21598, Val Loss: 2603.2160, Best Loss: 2603.2160, No improve: 0/10, Time: 1.7s
-08/16/2026 16:45:26 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:29 - INFO - utils.trainer -   Loss: 2600.78247
-08/16/2026 16:45:29 - INFO - utils.trainer -   MSE: 2592.64673
-08/16/2026 16:45:29 - INFO - utils.trainer -   MAE: 47.80024
-08/16/2026 16:45:29 - INFO - utils.trainer -   RMSE: 50.91804
-08/16/2026 16:45:29 - INFO - utils.trainer -   R2: -7.42451
-08/16/2026 16:45:29 - INFO - utils.trainer -   PearsonR: -0.08634
-08/16/2026 16:45:29 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:29 - INFO - utils.trainer -   Best model saved (val Loss=2600.7825, epoch=44)
-08/16/2026 16:45:29 - INFO - utils.trainer -   FT Epoch: 44/200, Train Loss: 3040.24255, Val Loss: 2600.78247, Val Loss: 2600.7825, Best Loss: 2600.7825, No improve: 0/10, Time: 1.7s
-08/16/2026 16:45:31 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:33 - INFO - utils.trainer -   Loss: 2598.14274
-08/16/2026 16:45:33 - INFO - utils.trainer -   MSE: 2590.01025
-08/16/2026 16:45:33 - INFO - utils.trainer -   MAE: 47.77262
-08/16/2026 16:45:33 - INFO - utils.trainer -   RMSE: 50.89214
-08/16/2026 16:45:33 - INFO - utils.trainer -   R2: -7.41594
-08/16/2026 16:45:33 - INFO - utils.trainer -   PearsonR: -0.08296
-08/16/2026 16:45:33 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:33 - INFO - utils.trainer -   Best model saved (val Loss=2598.1427, epoch=45)
-08/16/2026 16:45:33 - INFO - utils.trainer -   FT Epoch: 45/200, Train Loss: 3277.42847, Val Loss: 2598.14274, Val Loss: 2598.1427, Best Loss: 2598.1427, No improve: 0/10, Time: 1.8s
-08/16/2026 16:45:35 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:37 - INFO - utils.trainer -   Loss: 2595.25789
-08/16/2026 16:45:37 - INFO - utils.trainer -   MSE: 2587.12915
-08/16/2026 16:45:37 - INFO - utils.trainer -   MAE: 47.74241
-08/16/2026 16:45:37 - INFO - utils.trainer -   RMSE: 50.86383
-08/16/2026 16:45:37 - INFO - utils.trainer -   R2: -7.40658
-08/16/2026 16:45:37 - INFO - utils.trainer -   PearsonR: -0.07956
-08/16/2026 16:45:37 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:37 - INFO - utils.trainer -   Best model saved (val Loss=2595.2579, epoch=46)
-08/16/2026 16:45:37 - INFO - utils.trainer -   FT Epoch: 46/200, Train Loss: 2233.05786, Val Loss: 2595.25789, Val Loss: 2595.2579, Best Loss: 2595.2579, No improve: 0/10, Time: 1.7s
-08/16/2026 16:45:39 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:42 - INFO - utils.trainer -   Loss: 2592.12996
-08/16/2026 16:45:42 - INFO - utils.trainer -   MSE: 2584.00537
-08/16/2026 16:45:42 - INFO - utils.trainer -   MAE: 47.70964
-08/16/2026 16:45:42 - INFO - utils.trainer -   RMSE: 50.83311
-08/16/2026 16:45:42 - INFO - utils.trainer -   R2: -7.39643
-08/16/2026 16:45:42 - INFO - utils.trainer -   PearsonR: -0.07644
-08/16/2026 16:45:42 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:42 - INFO - utils.trainer -   Best model saved (val Loss=2592.1300, epoch=47)
-08/16/2026 16:45:42 - INFO - utils.trainer -   FT Epoch: 47/200, Train Loss: 2977.57166, Val Loss: 2592.12996, Val Loss: 2592.1300, Best Loss: 2592.1300, No improve: 0/10, Time: 1.8s
-08/16/2026 16:45:43 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:46 - INFO - utils.trainer -   Loss: 2588.70825
-08/16/2026 16:45:46 - INFO - utils.trainer -   MSE: 2580.58813
-08/16/2026 16:45:46 - INFO - utils.trainer -   MAE: 47.67376
-08/16/2026 16:45:46 - INFO - utils.trainer -   RMSE: 50.79949
-08/16/2026 16:45:46 - INFO - utils.trainer -   R2: -7.38533
-08/16/2026 16:45:46 - INFO - utils.trainer -   PearsonR: -0.07371
-08/16/2026 16:45:46 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:46 - INFO - utils.trainer -   Best model saved (val Loss=2588.7083, epoch=48)
-08/16/2026 16:45:46 - INFO - utils.trainer -   FT Epoch: 48/200, Train Loss: 5062.49341, Val Loss: 2588.70825, Val Loss: 2588.7083, Best Loss: 2588.7083, No improve: 0/10, Time: 1.7s
-08/16/2026 16:45:48 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:50 - INFO - utils.trainer -   Loss: 2584.83285
-08/16/2026 16:45:50 - INFO - utils.trainer -   MSE: 2576.71753
-08/16/2026 16:45:50 - INFO - utils.trainer -   MAE: 47.63308
-08/16/2026 16:45:50 - INFO - utils.trainer -   RMSE: 50.76138
-08/16/2026 16:45:50 - INFO - utils.trainer -   R2: -7.37275
-08/16/2026 16:45:50 - INFO - utils.trainer -   PearsonR: -0.07029
-08/16/2026 16:45:50 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:50 - INFO - utils.trainer -   Best model saved (val Loss=2584.8328, epoch=49)
-08/16/2026 16:45:50 - INFO - utils.trainer -   FT Epoch: 49/200, Train Loss: 2695.68176, Val Loss: 2584.83285, Val Loss: 2584.8328, Best Loss: 2584.8328, No improve: 0/10, Time: 1.7s
-08/16/2026 16:45:52 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:55 - INFO - utils.trainer -   Loss: 2580.47437
-08/16/2026 16:45:55 - INFO - utils.trainer -   MSE: 2572.36450
-08/16/2026 16:45:55 - INFO - utils.trainer -   MAE: 47.58731
-08/16/2026 16:45:55 - INFO - utils.trainer -   RMSE: 50.71848
-08/16/2026 16:45:55 - INFO - utils.trainer -   R2: -7.35860
-08/16/2026 16:45:55 - INFO - utils.trainer -   PearsonR: -0.06738
-08/16/2026 16:45:55 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:55 - INFO - utils.trainer -   Best model saved (val Loss=2580.4744, epoch=50)
-08/16/2026 16:45:55 - INFO - utils.trainer -   FT Epoch: 50/200, Train Loss: 3099.24536, Val Loss: 2580.47437, Val Loss: 2580.4744, Best Loss: 2580.4744, No improve: 0/10, Time: 1.7s
-08/16/2026 16:45:57 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:45:59 - INFO - utils.trainer -   Loss: 2575.63346
-08/16/2026 16:45:59 - INFO - utils.trainer -   MSE: 2567.52979
-08/16/2026 16:45:59 - INFO - utils.trainer -   MAE: 47.53642
-08/16/2026 16:45:59 - INFO - utils.trainer -   RMSE: 50.67080
-08/16/2026 16:45:59 - INFO - utils.trainer -   R2: -7.34289
-08/16/2026 16:45:59 - INFO - utils.trainer -   PearsonR: -0.06448
-08/16/2026 16:45:59 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:45:59 - INFO - utils.trainer -   Best model saved (val Loss=2575.6335, epoch=51)
-08/16/2026 16:45:59 - INFO - utils.trainer -   FT Epoch: 51/200, Train Loss: 4943.42725, Val Loss: 2575.63346, Val Loss: 2575.6335, Best Loss: 2575.6335, No improve: 0/10, Time: 2.0s
-08/16/2026 16:46:01 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:04 - INFO - utils.trainer -   Loss: 2570.23910
-08/16/2026 16:46:04 - INFO - utils.trainer -   MSE: 2562.14258
-08/16/2026 16:46:04 - INFO - utils.trainer -   MAE: 47.47964
-08/16/2026 16:46:04 - INFO - utils.trainer -   RMSE: 50.61761
-08/16/2026 16:46:04 - INFO - utils.trainer -   R2: -7.32539
-08/16/2026 16:46:04 - INFO - utils.trainer -   PearsonR: -0.06132
-08/16/2026 16:46:04 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:04 - INFO - utils.trainer -   Best model saved (val Loss=2570.2391, epoch=52)
-08/16/2026 16:46:04 - INFO - utils.trainer -   FT Epoch: 52/200, Train Loss: 2079.81104, Val Loss: 2570.23910, Val Loss: 2570.2391, Best Loss: 2570.2391, No improve: 0/10, Time: 1.7s
-08/16/2026 16:46:05 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:08 - INFO - utils.trainer -   Loss: 2564.23560
-08/16/2026 16:46:08 - INFO - utils.trainer -   MSE: 2556.14673
-08/16/2026 16:46:08 - INFO - utils.trainer -   MAE: 47.41637
-08/16/2026 16:46:08 - INFO - utils.trainer -   RMSE: 50.55835
-08/16/2026 16:46:08 - INFO - utils.trainer -   R2: -7.30591
-08/16/2026 16:46:08 - INFO - utils.trainer -   PearsonR: -0.05833
-08/16/2026 16:46:08 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:08 - INFO - utils.trainer -   Best model saved (val Loss=2564.2356, epoch=53)
-08/16/2026 16:46:08 - INFO - utils.trainer -   FT Epoch: 53/200, Train Loss: 3309.33325, Val Loss: 2564.23560, Val Loss: 2564.2356, Best Loss: 2564.2356, No improve: 0/10, Time: 1.7s
-08/16/2026 16:46:10 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:13 - INFO - utils.trainer -   Loss: 2557.55477
-08/16/2026 16:46:13 - INFO - utils.trainer -   MSE: 2549.47437
-08/16/2026 16:46:13 - INFO - utils.trainer -   MAE: 47.34585
-08/16/2026 16:46:13 - INFO - utils.trainer -   RMSE: 50.49232
-08/16/2026 16:46:13 - INFO - utils.trainer -   R2: -7.28422
-08/16/2026 16:46:13 - INFO - utils.trainer -   PearsonR: -0.05608
-08/16/2026 16:46:13 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:13 - INFO - utils.trainer -   Best model saved (val Loss=2557.5548, epoch=54)
-08/16/2026 16:46:13 - INFO - utils.trainer -   FT Epoch: 54/200, Train Loss: 3227.58264, Val Loss: 2557.55477, Val Loss: 2557.5548, Best Loss: 2557.5548, No improve: 0/10, Time: 2.0s
-08/16/2026 16:46:14 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:17 - INFO - utils.trainer -   Loss: 2550.14347
-08/16/2026 16:46:17 - INFO - utils.trainer -   MSE: 2542.07251
-08/16/2026 16:46:17 - INFO - utils.trainer -   MAE: 47.26749
-08/16/2026 16:46:17 - INFO - utils.trainer -   RMSE: 50.41897
-08/16/2026 16:46:17 - INFO - utils.trainer -   R2: -7.26017
-08/16/2026 16:46:17 - INFO - utils.trainer -   PearsonR: -0.05411
-08/16/2026 16:46:17 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:17 - INFO - utils.trainer -   Best model saved (val Loss=2550.1435, epoch=55)
-08/16/2026 16:46:17 - INFO - utils.trainer -   FT Epoch: 55/200, Train Loss: 3682.08057, Val Loss: 2550.14347, Val Loss: 2550.1435, Best Loss: 2550.1435, No improve: 0/10, Time: 1.7s
-08/16/2026 16:46:18 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:21 - INFO - utils.trainer -   Loss: 2541.85726
-08/16/2026 16:46:21 - INFO - utils.trainer -   MSE: 2533.79688
-08/16/2026 16:46:21 - INFO - utils.trainer -   MAE: 47.17972
-08/16/2026 16:46:21 - INFO - utils.trainer -   RMSE: 50.33683
-08/16/2026 16:46:21 - INFO - utils.trainer -   R2: -7.23328
-08/16/2026 16:46:21 - INFO - utils.trainer -   PearsonR: -0.05240
-08/16/2026 16:46:21 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:21 - INFO - utils.trainer -   Best model saved (val Loss=2541.8573, epoch=56)
-08/16/2026 16:46:21 - INFO - utils.trainer -   FT Epoch: 56/200, Train Loss: 2509.60742, Val Loss: 2541.85726, Val Loss: 2541.8573, Best Loss: 2541.8573, No improve: 0/10, Time: 1.7s
-08/16/2026 16:46:23 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:25 - INFO - utils.trainer -   Loss: 2532.49740
-08/16/2026 16:46:25 - INFO - utils.trainer -   MSE: 2524.44849
-08/16/2026 16:46:25 - INFO - utils.trainer -   MAE: 47.08038
-08/16/2026 16:46:25 - INFO - utils.trainer -   RMSE: 50.24389
-08/16/2026 16:46:25 - INFO - utils.trainer -   R2: -7.20291
-08/16/2026 16:46:25 - INFO - utils.trainer -   PearsonR: -0.05052
-08/16/2026 16:46:25 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:25 - INFO - utils.trainer -   Best model saved (val Loss=2532.4974, epoch=57)
-08/16/2026 16:46:25 - INFO - utils.trainer -   FT Epoch: 57/200, Train Loss: 4239.74768, Val Loss: 2532.49740, Val Loss: 2532.4974, Best Loss: 2532.4974, No improve: 0/10, Time: 1.7s
-08/16/2026 16:46:27 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:30 - INFO - utils.trainer -   Loss: 2521.96777
-08/16/2026 16:46:30 - INFO - utils.trainer -   MSE: 2513.93237
-08/16/2026 16:46:30 - INFO - utils.trainer -   MAE: 46.96836
-08/16/2026 16:46:30 - INFO - utils.trainer -   RMSE: 50.13913
-08/16/2026 16:46:30 - INFO - utils.trainer -   R2: -7.16873
-08/16/2026 16:46:30 - INFO - utils.trainer -   PearsonR: -0.04901
-08/16/2026 16:46:30 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:30 - INFO - utils.trainer -   Best model saved (val Loss=2521.9678, epoch=58)
-08/16/2026 16:46:30 - INFO - utils.trainer -   FT Epoch: 58/200, Train Loss: 2265.84216, Val Loss: 2521.96777, Val Loss: 2521.9678, Best Loss: 2521.9678, No improve: 0/10, Time: 1.7s
-08/16/2026 16:46:32 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:34 - INFO - utils.trainer -   Loss: 2510.23454
-08/16/2026 16:46:34 - INFO - utils.trainer -   MSE: 2502.21387
-08/16/2026 16:46:34 - INFO - utils.trainer -   MAE: 46.84320
-08/16/2026 16:46:34 - INFO - utils.trainer -   RMSE: 50.02213
-08/16/2026 16:46:34 - INFO - utils.trainer -   R2: -7.13066
-08/16/2026 16:46:34 - INFO - utils.trainer -   PearsonR: -0.04780
-08/16/2026 16:46:34 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:34 - INFO - utils.trainer -   Best model saved (val Loss=2510.2345, epoch=59)
-08/16/2026 16:46:34 - INFO - utils.trainer -   FT Epoch: 59/200, Train Loss: 4967.22485, Val Loss: 2510.23454, Val Loss: 2510.2345, Best Loss: 2510.2345, No improve: 0/10, Time: 1.8s
-08/16/2026 16:46:36 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:38 - INFO - utils.trainer -   Loss: 2497.21191
-08/16/2026 16:46:38 - INFO - utils.trainer -   MSE: 2489.20776
-08/16/2026 16:46:38 - INFO - utils.trainer -   MAE: 46.70390
-08/16/2026 16:46:38 - INFO - utils.trainer -   RMSE: 49.89196
-08/16/2026 16:46:38 - INFO - utils.trainer -   R2: -7.08840
-08/16/2026 16:46:38 - INFO - utils.trainer -   PearsonR: -0.04657
-08/16/2026 16:46:38 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:38 - INFO - utils.trainer -   Best model saved (val Loss=2497.2119, epoch=60)
-08/16/2026 16:46:38 - INFO - utils.trainer -   FT Epoch: 60/200, Train Loss: 4696.88989, Val Loss: 2497.21191, Val Loss: 2497.2119, Best Loss: 2497.2119, No improve: 0/10, Time: 1.7s
-08/16/2026 16:46:40 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:43 - INFO - utils.trainer -   Loss: 2482.68115
-08/16/2026 16:46:43 - INFO - utils.trainer -   MSE: 2474.69556
-08/16/2026 16:46:43 - INFO - utils.trainer -   MAE: 46.54794
-08/16/2026 16:46:43 - INFO - utils.trainer -   RMSE: 49.74631
-08/16/2026 16:46:43 - INFO - utils.trainer -   R2: -7.04124
-08/16/2026 16:46:43 - INFO - utils.trainer -   PearsonR: -0.04565
-08/16/2026 16:46:43 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:43 - INFO - utils.trainer -   Best model saved (val Loss=2482.6812, epoch=61)
-08/16/2026 16:46:43 - INFO - utils.trainer -   FT Epoch: 61/200, Train Loss: 4413.27197, Val Loss: 2482.68115, Val Loss: 2482.6812, Best Loss: 2482.6812, No improve: 0/10, Time: 1.8s
-08/16/2026 16:46:44 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:47 - INFO - utils.trainer -   Loss: 2466.45028
-08/16/2026 16:46:47 - INFO - utils.trainer -   MSE: 2458.48535
-08/16/2026 16:46:47 - INFO - utils.trainer -   MAE: 46.37313
-08/16/2026 16:46:47 - INFO - utils.trainer -   RMSE: 49.58311
-08/16/2026 16:46:47 - INFO - utils.trainer -   R2: -6.98857
-08/16/2026 16:46:47 - INFO - utils.trainer -   PearsonR: -0.04458
-08/16/2026 16:46:47 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:47 - INFO - utils.trainer -   Best model saved (val Loss=2466.4503, epoch=62)
-08/16/2026 16:46:47 - INFO - utils.trainer -   FT Epoch: 62/200, Train Loss: 4218.10999, Val Loss: 2466.45028, Val Loss: 2466.4503, Best Loss: 2466.4503, No improve: 0/10, Time: 1.7s
-08/16/2026 16:46:49 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:51 - INFO - utils.trainer -   Loss: 2448.35433
-08/16/2026 16:46:51 - INFO - utils.trainer -   MSE: 2440.41309
-08/16/2026 16:46:51 - INFO - utils.trainer -   MAE: 46.17746
-08/16/2026 16:46:51 - INFO - utils.trainer -   RMSE: 49.40054
-08/16/2026 16:46:51 - INFO - utils.trainer -   R2: -6.92984
-08/16/2026 16:46:51 - INFO - utils.trainer -   PearsonR: -0.04389
-08/16/2026 16:46:51 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:51 - INFO - utils.trainer -   Best model saved (val Loss=2448.3543, epoch=63)
-08/16/2026 16:46:51 - INFO - utils.trainer -   FT Epoch: 63/200, Train Loss: 4204.23120, Val Loss: 2448.35433, Val Loss: 2448.3543, Best Loss: 2448.3543, No improve: 0/10, Time: 1.7s
-08/16/2026 16:46:53 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:46:56 - INFO - utils.trainer -   Loss: 2428.23169
-08/16/2026 16:46:56 - INFO - utils.trainer -   MSE: 2420.31689
-08/16/2026 16:46:56 - INFO - utils.trainer -   MAE: 45.95888
-08/16/2026 16:46:56 - INFO - utils.trainer -   RMSE: 49.19672
-08/16/2026 16:46:56 - INFO - utils.trainer -   R2: -6.86454
-08/16/2026 16:46:56 - INFO - utils.trainer -   PearsonR: -0.04324
-08/16/2026 16:46:56 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:46:56 - INFO - utils.trainer -   Best model saved (val Loss=2428.2317, epoch=64)
-08/16/2026 16:46:56 - INFO - utils.trainer -   FT Epoch: 64/200, Train Loss: 3510.64844, Val Loss: 2428.23169, Val Loss: 2428.2317, Best Loss: 2428.2317, No improve: 0/10, Time: 1.7s
-08/16/2026 16:46:57 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:00 - INFO - utils.trainer -   Loss: 2405.96631
-08/16/2026 16:47:00 - INFO - utils.trainer -   MSE: 2398.08081
-08/16/2026 16:47:00 - INFO - utils.trainer -   MAE: 45.71579
-08/16/2026 16:47:00 - INFO - utils.trainer -   RMSE: 48.97020
-08/16/2026 16:47:00 - INFO - utils.trainer -   R2: -6.79229
-08/16/2026 16:47:00 - INFO - utils.trainer -   PearsonR: -0.04272
-08/16/2026 16:47:00 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:00 - INFO - utils.trainer -   Best model saved (val Loss=2405.9663, epoch=65)
-08/16/2026 16:47:00 - INFO - utils.trainer -   FT Epoch: 65/200, Train Loss: 2611.70990, Val Loss: 2405.96631, Val Loss: 2405.9663, Best Loss: 2405.9663, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:02 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:04 - INFO - utils.trainer -   Loss: 2381.50407
-08/16/2026 16:47:04 - INFO - utils.trainer -   MSE: 2373.65137
-08/16/2026 16:47:04 - INFO - utils.trainer -   MAE: 45.44715
-08/16/2026 16:47:04 - INFO - utils.trainer -   RMSE: 48.72013
-08/16/2026 16:47:04 - INFO - utils.trainer -   R2: -6.71291
-08/16/2026 16:47:04 - INFO - utils.trainer -   PearsonR: -0.04275
-08/16/2026 16:47:04 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:04 - INFO - utils.trainer -   Best model saved (val Loss=2381.5041, epoch=66)
-08/16/2026 16:47:04 - INFO - utils.trainer -   FT Epoch: 66/200, Train Loss: 3335.78253, Val Loss: 2381.50407, Val Loss: 2381.5041, Best Loss: 2381.5041, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:06 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:08 - INFO - utils.trainer -   Loss: 2354.60490
-08/16/2026 16:47:08 - INFO - utils.trainer -   MSE: 2346.78833
-08/16/2026 16:47:08 - INFO - utils.trainer -   MAE: 45.15028
-08/16/2026 16:47:08 - INFO - utils.trainer -   RMSE: 48.44366
-08/16/2026 16:47:08 - INFO - utils.trainer -   R2: -6.62562
-08/16/2026 16:47:08 - INFO - utils.trainer -   PearsonR: -0.04296
-08/16/2026 16:47:08 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:08 - INFO - utils.trainer -   Best model saved (val Loss=2354.6049, epoch=67)
-08/16/2026 16:47:08 - INFO - utils.trainer -   FT Epoch: 67/200, Train Loss: 3697.47778, Val Loss: 2354.60490, Val Loss: 2354.6049, Best Loss: 2354.6049, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:10 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:13 - INFO - utils.trainer -   Loss: 2325.25350
-08/16/2026 16:47:13 - INFO - utils.trainer -   MSE: 2317.47803
-08/16/2026 16:47:13 - INFO - utils.trainer -   MAE: 44.82542
-08/16/2026 16:47:13 - INFO - utils.trainer -   RMSE: 48.14019
-08/16/2026 16:47:13 - INFO - utils.trainer -   R2: -6.53038
-08/16/2026 16:47:13 - INFO - utils.trainer -   PearsonR: -0.04295
-08/16/2026 16:47:13 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:13 - INFO - utils.trainer -   Best model saved (val Loss=2325.2535, epoch=68)
-08/16/2026 16:47:13 - INFO - utils.trainer -   FT Epoch: 68/200, Train Loss: 4791.98425, Val Loss: 2325.25350, Val Loss: 2325.2535, Best Loss: 2325.2535, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:15 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:17 - INFO - utils.trainer -   Loss: 2293.28190
-08/16/2026 16:47:17 - INFO - utils.trainer -   MSE: 2285.55151
-08/16/2026 16:47:17 - INFO - utils.trainer -   MAE: 44.46912
-08/16/2026 16:47:17 - INFO - utils.trainer -   RMSE: 47.80744
-08/16/2026 16:47:17 - INFO - utils.trainer -   R2: -6.42664
-08/16/2026 16:47:17 - INFO - utils.trainer -   PearsonR: -0.04279
-08/16/2026 16:47:17 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:17 - INFO - utils.trainer -   Best model saved (val Loss=2293.2819, epoch=69)
-08/16/2026 16:47:17 - INFO - utils.trainer -   FT Epoch: 69/200, Train Loss: 3753.19153, Val Loss: 2293.28190, Val Loss: 2293.2819, Best Loss: 2293.2819, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:19 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:21 - INFO - utils.trainer -   Loss: 2258.04256
-08/16/2026 16:47:21 - INFO - utils.trainer -   MSE: 2250.36230
-08/16/2026 16:47:21 - INFO - utils.trainer -   MAE: 44.07384
-08/16/2026 16:47:21 - INFO - utils.trainer -   RMSE: 47.43798
-08/16/2026 16:47:21 - INFO - utils.trainer -   R2: -6.31229
-08/16/2026 16:47:21 - INFO - utils.trainer -   PearsonR: -0.04252
-08/16/2026 16:47:22 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:22 - INFO - utils.trainer -   Best model saved (val Loss=2258.0426, epoch=70)
-08/16/2026 16:47:22 - INFO - utils.trainer -   FT Epoch: 70/200, Train Loss: 4265.60229, Val Loss: 2258.04256, Val Loss: 2258.0426, Best Loss: 2258.0426, No improve: 0/10, Time: 1.8s
-08/16/2026 16:47:23 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:26 - INFO - utils.trainer -   Loss: 2219.58944
-08/16/2026 16:47:26 - INFO - utils.trainer -   MSE: 2211.96509
-08/16/2026 16:47:26 - INFO - utils.trainer -   MAE: 43.64003
-08/16/2026 16:47:26 - INFO - utils.trainer -   RMSE: 47.03153
-08/16/2026 16:47:26 - INFO - utils.trainer -   R2: -6.18753
-08/16/2026 16:47:26 - INFO - utils.trainer -   PearsonR: -0.04207
-08/16/2026 16:47:26 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:26 - INFO - utils.trainer -   Best model saved (val Loss=2219.5894, epoch=71)
-08/16/2026 16:47:26 - INFO - utils.trainer -   FT Epoch: 71/200, Train Loss: 2489.03479, Val Loss: 2219.58944, Val Loss: 2219.5894, Best Loss: 2219.5894, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:28 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:30 - INFO - utils.trainer -   Loss: 2177.79386
-08/16/2026 16:47:30 - INFO - utils.trainer -   MSE: 2170.22998
-08/16/2026 16:47:30 - INFO - utils.trainer -   MAE: 43.16338
-08/16/2026 16:47:30 - INFO - utils.trainer -   RMSE: 46.58573
-08/16/2026 16:47:30 - INFO - utils.trainer -   R2: -6.05191
-08/16/2026 16:47:30 - INFO - utils.trainer -   PearsonR: -0.04208
-08/16/2026 16:47:30 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:30 - INFO - utils.trainer -   Best model saved (val Loss=2177.7939, epoch=72)
-08/16/2026 16:47:30 - INFO - utils.trainer -   FT Epoch: 72/200, Train Loss: 2509.59241, Val Loss: 2177.79386, Val Loss: 2177.7939, Best Loss: 2177.7939, No improve: 0/10, Time: 1.8s
-08/16/2026 16:47:32 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:34 - INFO - utils.trainer -   Loss: 2132.57463
-08/16/2026 16:47:34 - INFO - utils.trainer -   MSE: 2125.07739
-08/16/2026 16:47:34 - INFO - utils.trainer -   MAE: 42.64139
-08/16/2026 16:47:34 - INFO - utils.trainer -   RMSE: 46.09856
-08/16/2026 16:47:34 - INFO - utils.trainer -   R2: -5.90520
-08/16/2026 16:47:34 - INFO - utils.trainer -   PearsonR: -0.04272
-08/16/2026 16:47:34 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:34 - INFO - utils.trainer -   Best model saved (val Loss=2132.5746, epoch=73)
-08/16/2026 16:47:34 - INFO - utils.trainer -   FT Epoch: 73/200, Train Loss: 3087.88184, Val Loss: 2132.57463, Val Loss: 2132.5746, Best Loss: 2132.5746, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:36 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:39 - INFO - utils.trainer -   Loss: 2083.89274
-08/16/2026 16:47:39 - INFO - utils.trainer -   MSE: 2076.46777
-08/16/2026 16:47:39 - INFO - utils.trainer -   MAE: 42.07200
-08/16/2026 16:47:39 - INFO - utils.trainer -   RMSE: 45.56828
-08/16/2026 16:47:39 - INFO - utils.trainer -   R2: -5.74724
-08/16/2026 16:47:39 - INFO - utils.trainer -   PearsonR: -0.04343
-08/16/2026 16:47:39 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:39 - INFO - utils.trainer -   Best model saved (val Loss=2083.8927, epoch=74)
-08/16/2026 16:47:39 - INFO - utils.trainer -   FT Epoch: 74/200, Train Loss: 1918.53720, Val Loss: 2083.89274, Val Loss: 2083.8927, Best Loss: 2083.8927, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:40 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:43 - INFO - utils.trainer -   Loss: 2031.66361
-08/16/2026 16:47:43 - INFO - utils.trainer -   MSE: 2024.31848
-08/16/2026 16:47:43 - INFO - utils.trainer -   MAE: 41.45248
-08/16/2026 16:47:43 - INFO - utils.trainer -   RMSE: 44.99243
-08/16/2026 16:47:43 - INFO - utils.trainer -   R2: -5.57779
-08/16/2026 16:47:43 - INFO - utils.trainer -   PearsonR: -0.04343
-08/16/2026 16:47:43 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:43 - INFO - utils.trainer -   Best model saved (val Loss=2031.6636, epoch=75)
-08/16/2026 16:47:43 - INFO - utils.trainer -   FT Epoch: 75/200, Train Loss: 1928.66278, Val Loss: 2031.66361, Val Loss: 2031.6636, Best Loss: 2031.6636, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:45 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:47 - INFO - utils.trainer -   Loss: 1975.69226
-08/16/2026 16:47:47 - INFO - utils.trainer -   MSE: 1968.43420
-08/16/2026 16:47:47 - INFO - utils.trainer -   MAE: 40.77795
-08/16/2026 16:47:47 - INFO - utils.trainer -   RMSE: 44.36704
-08/16/2026 16:47:47 - INFO - utils.trainer -   R2: -5.39620
-08/16/2026 16:47:47 - INFO - utils.trainer -   PearsonR: -0.04337
-08/16/2026 16:47:47 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:47 - INFO - utils.trainer -   Best model saved (val Loss=1975.6923, epoch=76)
-08/16/2026 16:47:47 - INFO - utils.trainer -   FT Epoch: 76/200, Train Loss: 4314.60962, Val Loss: 1975.69226, Val Loss: 1975.6923, Best Loss: 1975.6923, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:49 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:52 - INFO - utils.trainer -   Loss: 1915.54508
-08/16/2026 16:47:52 - INFO - utils.trainer -   MSE: 1908.38257
-08/16/2026 16:47:52 - INFO - utils.trainer -   MAE: 40.04027
-08/16/2026 16:47:52 - INFO - utils.trainer -   RMSE: 43.68504
-08/16/2026 16:47:52 - INFO - utils.trainer -   R2: -5.20107
-08/16/2026 16:47:52 - INFO - utils.trainer -   PearsonR: -0.04328
-08/16/2026 16:47:52 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:52 - INFO - utils.trainer -   Best model saved (val Loss=1915.5451, epoch=77)
-08/16/2026 16:47:52 - INFO - utils.trainer -   FT Epoch: 77/200, Train Loss: 2144.64343, Val Loss: 1915.54508, Val Loss: 1915.5451, Best Loss: 1915.5451, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:53 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:47:56 - INFO - utils.trainer -   Loss: 1850.99198
-08/16/2026 16:47:56 - INFO - utils.trainer -   MSE: 1843.93481
-08/16/2026 16:47:56 - INFO - utils.trainer -   MAE: 39.23281
-08/16/2026 16:47:56 - INFO - utils.trainer -   RMSE: 42.94106
-08/16/2026 16:47:56 - INFO - utils.trainer -   R2: -4.99165
-08/16/2026 16:47:56 - INFO - utils.trainer -   PearsonR: -0.04324
-08/16/2026 16:47:56 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:47:56 - INFO - utils.trainer -   Best model saved (val Loss=1850.9920, epoch=78)
-08/16/2026 16:47:56 - INFO - utils.trainer -   FT Epoch: 78/200, Train Loss: 2757.97803, Val Loss: 1850.99198, Val Loss: 1850.9920, Best Loss: 1850.9920, No improve: 0/10, Time: 1.7s
-08/16/2026 16:47:58 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:01 - INFO - utils.trainer -   Loss: 1782.18608
-08/16/2026 16:48:01 - INFO - utils.trainer -   MSE: 1775.24475
-08/16/2026 16:48:01 - INFO - utils.trainer -   MAE: 38.35314
-08/16/2026 16:48:01 - INFO - utils.trainer -   RMSE: 42.13365
-08/16/2026 16:48:01 - INFO - utils.trainer -   R2: -4.76845
-08/16/2026 16:48:01 - INFO - utils.trainer -   PearsonR: -0.04295
-08/16/2026 16:48:01 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:01 - INFO - utils.trainer -   Best model saved (val Loss=1782.1861, epoch=79)
-08/16/2026 16:48:01 - INFO - utils.trainer -   FT Epoch: 79/200, Train Loss: 1098.60187, Val Loss: 1782.18608, Val Loss: 1782.1861, Best Loss: 1782.1861, No improve: 0/10, Time: 1.7s
-08/16/2026 16:48:03 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:05 - INFO - utils.trainer -   Loss: 1709.83215
-08/16/2026 16:48:05 - INFO - utils.trainer -   MSE: 1703.01685
-08/16/2026 16:48:05 - INFO - utils.trainer -   MAE: 37.40705
-08/16/2026 16:48:05 - INFO - utils.trainer -   RMSE: 41.26762
-08/16/2026 16:48:05 - INFO - utils.trainer -   R2: -4.53376
-08/16/2026 16:48:05 - INFO - utils.trainer -   PearsonR: -0.04215
-08/16/2026 16:48:05 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:05 - INFO - utils.trainer -   Best model saved (val Loss=1709.8322, epoch=80)
-08/16/2026 16:48:05 - INFO - utils.trainer -   FT Epoch: 80/200, Train Loss: 3281.53357, Val Loss: 1709.83215, Val Loss: 1709.8322, Best Loss: 1709.8322, No improve: 0/10, Time: 2.0s
-08/16/2026 16:48:07 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:09 - INFO - utils.trainer -   Loss: 1633.14498
-08/16/2026 16:48:09 - INFO - utils.trainer -   MSE: 1626.46729
-08/16/2026 16:48:09 - INFO - utils.trainer -   MAE: 36.38132
-08/16/2026 16:48:09 - INFO - utils.trainer -   RMSE: 40.32948
-08/16/2026 16:48:09 - INFO - utils.trainer -   R2: -4.28502
-08/16/2026 16:48:09 - INFO - utils.trainer -   PearsonR: -0.04157
-08/16/2026 16:48:09 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:09 - INFO - utils.trainer -   Best model saved (val Loss=1633.1450, epoch=81)
-08/16/2026 16:48:09 - INFO - utils.trainer -   FT Epoch: 81/200, Train Loss: 2676.27301, Val Loss: 1633.14498, Val Loss: 1633.1450, Best Loss: 1633.1450, No improve: 0/10, Time: 1.7s
-08/16/2026 16:48:11 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:13 - INFO - utils.trainer -   Loss: 1552.21326
-08/16/2026 16:48:13 - INFO - utils.trainer -   MSE: 1545.68433
-08/16/2026 16:48:13 - INFO - utils.trainer -   MAE: 35.26485
-08/16/2026 16:48:13 - INFO - utils.trainer -   RMSE: 39.31519
-08/16/2026 16:48:13 - INFO - utils.trainer -   R2: -4.02252
-08/16/2026 16:48:13 - INFO - utils.trainer -   PearsonR: -0.04153
-08/16/2026 16:48:13 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:13 - INFO - utils.trainer -   Best model saved (val Loss=1552.2133, epoch=82)
-08/16/2026 16:48:13 - INFO - utils.trainer -   FT Epoch: 82/200, Train Loss: 2393.27759, Val Loss: 1552.21326, Val Loss: 1552.2133, Best Loss: 1552.2133, No improve: 0/10, Time: 1.7s
-08/16/2026 16:48:15 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:18 - INFO - utils.trainer -   Loss: 1467.60754
-08/16/2026 16:48:18 - INFO - utils.trainer -   MSE: 1461.23914
-08/16/2026 16:48:18 - INFO - utils.trainer -   MAE: 34.05666
-08/16/2026 16:48:18 - INFO - utils.trainer -   RMSE: 38.22616
-08/16/2026 16:48:18 - INFO - utils.trainer -   R2: -3.74813
-08/16/2026 16:48:18 - INFO - utils.trainer -   PearsonR: -0.04213
-08/16/2026 16:48:18 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:18 - INFO - utils.trainer -   Best model saved (val Loss=1467.6075, epoch=83)
-08/16/2026 16:48:18 - INFO - utils.trainer -   FT Epoch: 83/200, Train Loss: 1386.13875, Val Loss: 1467.60754, Val Loss: 1467.6075, Best Loss: 1467.6075, No improve: 0/10, Time: 1.8s
-08/16/2026 16:48:20 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:22 - INFO - utils.trainer -   Loss: 1378.98429
-08/16/2026 16:48:22 - INFO - utils.trainer -   MSE: 1372.79053
-08/16/2026 16:48:22 - INFO - utils.trainer -   MAE: 32.74096
-08/16/2026 16:48:22 - INFO - utils.trainer -   RMSE: 37.05119
-08/16/2026 16:48:22 - INFO - utils.trainer -   R2: -3.46073
-08/16/2026 16:48:22 - INFO - utils.trainer -   PearsonR: -0.04300
-08/16/2026 16:48:22 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:22 - INFO - utils.trainer -   Best model saved (val Loss=1378.9843, epoch=84)
-08/16/2026 16:48:22 - INFO - utils.trainer -   FT Epoch: 84/200, Train Loss: 2183.43011, Val Loss: 1378.98429, Val Loss: 1378.9843, Best Loss: 1378.9843, No improve: 0/10, Time: 1.7s
-08/16/2026 16:48:24 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:27 - INFO - utils.trainer -   Loss: 1286.87944
-08/16/2026 16:48:27 - INFO - utils.trainer -   MSE: 1280.87708
-08/16/2026 16:48:27 - INFO - utils.trainer -   MAE: 31.32100
-08/16/2026 16:48:27 - INFO - utils.trainer -   RMSE: 35.78934
-08/16/2026 16:48:27 - INFO - utils.trainer -   R2: -3.16206
-08/16/2026 16:48:27 - INFO - utils.trainer -   PearsonR: -0.04339
-08/16/2026 16:48:27 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:27 - INFO - utils.trainer -   Best model saved (val Loss=1286.8794, epoch=85)
-08/16/2026 16:48:27 - INFO - utils.trainer -   FT Epoch: 85/200, Train Loss: 3452.04492, Val Loss: 1286.87944, Val Loss: 1286.8794, Best Loss: 1286.8794, No improve: 0/10, Time: 1.7s
-08/16/2026 16:48:28 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:31 - INFO - utils.trainer -   Loss: 1191.37073
-08/16/2026 16:48:31 - INFO - utils.trainer -   MSE: 1185.57727
-08/16/2026 16:48:31 - INFO - utils.trainer -   MAE: 29.79355
-08/16/2026 16:48:31 - INFO - utils.trainer -   RMSE: 34.43221
-08/16/2026 16:48:31 - INFO - utils.trainer -   R2: -2.85240
-08/16/2026 16:48:31 - INFO - utils.trainer -   PearsonR: -0.04359
-08/16/2026 16:48:31 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:31 - INFO - utils.trainer -   Best model saved (val Loss=1191.3707, epoch=86)
-08/16/2026 16:48:31 - INFO - utils.trainer -   FT Epoch: 86/200, Train Loss: 2153.59436, Val Loss: 1191.37073, Val Loss: 1191.3707, Best Loss: 1191.3707, No improve: 0/10, Time: 1.7s
-08/16/2026 16:48:33 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:35 - INFO - utils.trainer -   Loss: 1094.79224
-08/16/2026 16:48:35 - INFO - utils.trainer -   MSE: 1089.22424
-08/16/2026 16:48:35 - INFO - utils.trainer -   MAE: 28.21372
-08/16/2026 16:48:35 - INFO - utils.trainer -   RMSE: 33.00340
-08/16/2026 16:48:35 - INFO - utils.trainer -   R2: -2.53931
-08/16/2026 16:48:35 - INFO - utils.trainer -   PearsonR: -0.04365
-08/16/2026 16:48:35 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:35 - INFO - utils.trainer -   Best model saved (val Loss=1094.7922, epoch=87)
-08/16/2026 16:48:35 - INFO - utils.trainer -   FT Epoch: 87/200, Train Loss: 719.51685, Val Loss: 1094.79224, Val Loss: 1094.7922, Best Loss: 1094.7922, No improve: 0/10, Time: 1.7s
-08/16/2026 16:48:37 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:40 - INFO - utils.trainer -   Loss: 998.15257
-08/16/2026 16:48:40 - INFO - utils.trainer -   MSE: 992.82660
-08/16/2026 16:48:40 - INFO - utils.trainer -   MAE: 26.61893
-08/16/2026 16:48:40 - INFO - utils.trainer -   RMSE: 31.50915
-08/16/2026 16:48:40 - INFO - utils.trainer -   R2: -2.22608
-08/16/2026 16:48:40 - INFO - utils.trainer -   PearsonR: -0.04384
-08/16/2026 16:48:40 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:40 - INFO - utils.trainer -   Best model saved (val Loss=998.1526, epoch=88)
-08/16/2026 16:48:40 - INFO - utils.trainer -   FT Epoch: 88/200, Train Loss: 1572.85968, Val Loss: 998.15257, Val Loss: 998.1526, Best Loss: 998.1526, No improve: 0/10, Time: 1.7s
-08/16/2026 16:48:41 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:44 - INFO - utils.trainer -   Loss: 900.94226
-08/16/2026 16:48:44 - INFO - utils.trainer -   MSE: 895.88043
-08/16/2026 16:48:44 - INFO - utils.trainer -   MAE: 24.99691
-08/16/2026 16:48:44 - INFO - utils.trainer -   RMSE: 29.93126
-08/16/2026 16:48:44 - INFO - utils.trainer -   R2: -1.91106
-08/16/2026 16:48:44 - INFO - utils.trainer -   PearsonR: -0.04366
-08/16/2026 16:48:44 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:44 - INFO - utils.trainer -   Best model saved (val Loss=900.9423, epoch=89)
-08/16/2026 16:48:44 - INFO - utils.trainer -   FT Epoch: 89/200, Train Loss: 1652.43665, Val Loss: 900.94226, Val Loss: 900.9423, Best Loss: 900.9423, No improve: 0/10, Time: 1.7s
-08/16/2026 16:48:46 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:49 - INFO - utils.trainer -   Loss: 805.16488
-08/16/2026 16:48:49 - INFO - utils.trainer -   MSE: 800.38782
-08/16/2026 16:48:49 - INFO - utils.trainer -   MAE: 23.40450
-08/16/2026 16:48:49 - INFO - utils.trainer -   RMSE: 28.29113
-08/16/2026 16:48:49 - INFO - utils.trainer -   R2: -1.60077
-08/16/2026 16:48:49 - INFO - utils.trainer -   PearsonR: -0.04371
-08/16/2026 16:48:49 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:49 - INFO - utils.trainer -   Best model saved (val Loss=805.1649, epoch=90)
-08/16/2026 16:48:49 - INFO - utils.trainer -   FT Epoch: 90/200, Train Loss: 1051.11725, Val Loss: 805.16488, Val Loss: 805.1649, Best Loss: 805.1649, No improve: 0/10, Time: 1.7s
-08/16/2026 16:48:51 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:53 - INFO - utils.trainer -   Loss: 713.78615
-08/16/2026 16:48:53 - INFO - utils.trainer -   MSE: 709.30981
-08/16/2026 16:48:53 - INFO - utils.trainer -   MAE: 21.84981
-08/16/2026 16:48:53 - INFO - utils.trainer -   RMSE: 26.63287
-08/16/2026 16:48:53 - INFO - utils.trainer -   R2: -1.30482
-08/16/2026 16:48:53 - INFO - utils.trainer -   PearsonR: -0.04453
-08/16/2026 16:48:53 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:53 - INFO - utils.trainer -   Best model saved (val Loss=713.7862, epoch=91)
-08/16/2026 16:48:53 - INFO - utils.trainer -   FT Epoch: 91/200, Train Loss: 1213.49207, Val Loss: 713.78615, Val Loss: 713.7862, Best Loss: 713.7862, No improve: 0/10, Time: 2.0s
-08/16/2026 16:48:55 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:48:58 - INFO - utils.trainer -   Loss: 629.22054
-08/16/2026 16:48:58 - INFO - utils.trainer -   MSE: 625.05920
-08/16/2026 16:48:58 - INFO - utils.trainer -   MAE: 20.36916
-08/16/2026 16:48:58 - INFO - utils.trainer -   RMSE: 25.00118
-08/16/2026 16:48:58 - INFO - utils.trainer -   R2: -1.03106
-08/16/2026 16:48:58 - INFO - utils.trainer -   PearsonR: -0.04527
-08/16/2026 16:48:58 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:48:58 - INFO - utils.trainer -   Best model saved (val Loss=629.2205, epoch=92)
-08/16/2026 16:48:58 - INFO - utils.trainer -   FT Epoch: 92/200, Train Loss: 1015.64307, Val Loss: 629.22054, Val Loss: 629.2205, Best Loss: 629.2205, No improve: 0/10, Time: 1.7s
-08/16/2026 16:49:00 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:02 - INFO - utils.trainer -   Loss: 551.97190
-08/16/2026 16:49:02 - INFO - utils.trainer -   MSE: 548.14380
-08/16/2026 16:49:02 - INFO - utils.trainer -   MAE: 18.98095
-08/16/2026 16:49:02 - INFO - utils.trainer -   RMSE: 23.41247
-08/16/2026 16:49:02 - INFO - utils.trainer -   R2: -0.78113
-08/16/2026 16:49:02 - INFO - utils.trainer -   PearsonR: -0.04568
-08/16/2026 16:49:02 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:49:02 - INFO - utils.trainer -   Best model saved (val Loss=551.9719, epoch=93)
-08/16/2026 16:49:02 - INFO - utils.trainer -   FT Epoch: 93/200, Train Loss: 403.98508, Val Loss: 551.97190, Val Loss: 551.9719, Best Loss: 551.9719, No improve: 0/10, Time: 2.1s
-08/16/2026 16:49:04 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:06 - INFO - utils.trainer -   Loss: 483.15829
-08/16/2026 16:49:06 - INFO - utils.trainer -   MSE: 479.68460
-08/16/2026 16:49:06 - INFO - utils.trainer -   MAE: 17.68368
-08/16/2026 16:49:06 - INFO - utils.trainer -   RMSE: 21.90170
-08/16/2026 16:49:06 - INFO - utils.trainer -   R2: -0.55868
-08/16/2026 16:49:06 - INFO - utils.trainer -   PearsonR: -0.04592
-08/16/2026 16:49:06 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:49:06 - INFO - utils.trainer -   Best model saved (val Loss=483.1583, epoch=94)
-08/16/2026 16:49:06 - INFO - utils.trainer -   FT Epoch: 94/200, Train Loss: 1436.49661, Val Loss: 483.15829, Val Loss: 483.1583, Best Loss: 483.1583, No improve: 0/10, Time: 1.7s
-08/16/2026 16:49:08 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:10 - INFO - utils.trainer -   Loss: 424.83534
-08/16/2026 16:49:10 - INFO - utils.trainer -   MSE: 421.73898
-08/16/2026 16:49:10 - INFO - utils.trainer -   MAE: 16.57759
-08/16/2026 16:49:10 - INFO - utils.trainer -   RMSE: 20.53629
-08/16/2026 16:49:10 - INFO - utils.trainer -   R2: -0.37039
-08/16/2026 16:49:10 - INFO - utils.trainer -   PearsonR: -0.04596
-08/16/2026 16:49:10 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:49:10 - INFO - utils.trainer -   Best model saved (val Loss=424.8353, epoch=95)
-08/16/2026 16:49:10 - INFO - utils.trainer -   FT Epoch: 95/200, Train Loss: 433.71123, Val Loss: 424.83534, Val Loss: 424.8353, Best Loss: 424.8353, No improve: 0/10, Time: 1.6s
-08/16/2026 16:49:12 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:15 - INFO - utils.trainer -   Loss: 380.87440
-08/16/2026 16:49:15 - INFO - utils.trainer -   MSE: 378.16428
-08/16/2026 16:49:15 - INFO - utils.trainer -   MAE: 15.71368
-08/16/2026 16:49:15 - INFO - utils.trainer -   RMSE: 19.44645
-08/16/2026 16:49:15 - INFO - utils.trainer -   R2: -0.22880
-08/16/2026 16:49:15 - INFO - utils.trainer -   PearsonR: -0.04614
-08/16/2026 16:49:15 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:49:15 - INFO - utils.trainer -   Best model saved (val Loss=380.8744, epoch=96)
-08/16/2026 16:49:15 - INFO - utils.trainer -   FT Epoch: 96/200, Train Loss: 338.70003, Val Loss: 380.87440, Val Loss: 380.8744, Best Loss: 380.8744, No improve: 0/10, Time: 1.7s
-08/16/2026 16:49:16 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:19 - INFO - utils.trainer -   Loss: 352.31755
-08/16/2026 16:49:19 - INFO - utils.trainer -   MSE: 349.99777
-08/16/2026 16:49:19 - INFO - utils.trainer -   MAE: 15.19389
-08/16/2026 16:49:19 - INFO - utils.trainer -   RMSE: 18.70823
-08/16/2026 16:49:19 - INFO - utils.trainer -   R2: -0.13728
-08/16/2026 16:49:19 - INFO - utils.trainer -   PearsonR: -0.04597
-08/16/2026 16:49:19 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:49:19 - INFO - utils.trainer -   Best model saved (val Loss=352.3175, epoch=97)
-08/16/2026 16:49:19 - INFO - utils.trainer -   FT Epoch: 97/200, Train Loss: 803.57497, Val Loss: 352.31755, Val Loss: 352.3175, Best Loss: 352.3175, No improve: 0/10, Time: 1.8s
-08/16/2026 16:49:21 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:23 - INFO - utils.trainer -   Loss: 339.10712
-08/16/2026 16:49:23 - INFO - utils.trainer -   MSE: 337.18582
-08/16/2026 16:49:23 - INFO - utils.trainer -   MAE: 14.96557
-08/16/2026 16:49:23 - INFO - utils.trainer -   RMSE: 18.36262
-08/16/2026 16:49:23 - INFO - utils.trainer -   R2: -0.09565
-08/16/2026 16:49:23 - INFO - utils.trainer -   PearsonR: -0.04543
-08/16/2026 16:49:23 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:49:23 - INFO - utils.trainer -   Best model saved (val Loss=339.1071, epoch=98)
-08/16/2026 16:49:23 - INFO - utils.trainer -   FT Epoch: 98/200, Train Loss: 124.11036, Val Loss: 339.10712, Val Loss: 339.1071, Best Loss: 339.1071, No improve: 0/10, Time: 1.7s
-08/16/2026 16:49:25 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:28 - INFO - utils.trainer -   Loss: 341.36033
-08/16/2026 16:49:28 - INFO - utils.trainer -   MSE: 339.83200
-08/16/2026 16:49:28 - INFO - utils.trainer -   MAE: 15.04820
-08/16/2026 16:49:28 - INFO - utils.trainer -   RMSE: 18.43453
-08/16/2026 16:49:28 - INFO - utils.trainer -   R2: -0.10425
-08/16/2026 16:49:28 - INFO - utils.trainer -   PearsonR: -0.04485
-08/16/2026 16:49:28 - INFO - utils.trainer -   FT Epoch: 99/200, Train Loss: 145.34853, Val Loss: 341.36033, Val Loss: 341.3603, Best Loss: 339.1071, No improve: 1/10, Time: 1.7s
-08/16/2026 16:49:29 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:32 - INFO - utils.trainer -   Loss: 358.23805
-08/16/2026 16:49:32 - INFO - utils.trainer -   MSE: 357.09732
-08/16/2026 16:49:32 - INFO - utils.trainer -   MAE: 15.42715
-08/16/2026 16:49:32 - INFO - utils.trainer -   RMSE: 18.89702
-08/16/2026 16:49:32 - INFO - utils.trainer -   R2: -0.16035
-08/16/2026 16:49:32 - INFO - utils.trainer -   PearsonR: -0.04413
-08/16/2026 16:49:32 - INFO - utils.trainer -   FT Epoch: 100/200, Train Loss: 335.37587, Val Loss: 358.23805, Val Loss: 358.2380, Best Loss: 339.1071, No improve: 2/10, Time: 1.7s
-08/16/2026 16:49:34 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:36 - INFO - utils.trainer -   Loss: 388.02256
-08/16/2026 16:49:36 - INFO - utils.trainer -   MSE: 387.25107
-08/16/2026 16:49:36 - INFO - utils.trainer -   MAE: 16.07142
-08/16/2026 16:49:36 - INFO - utils.trainer -   RMSE: 19.67870
-08/16/2026 16:49:36 - INFO - utils.trainer -   R2: -0.25833
-08/16/2026 16:49:36 - INFO - utils.trainer -   PearsonR: -0.04348
-08/16/2026 16:49:36 - INFO - utils.trainer -   FT Epoch: 101/200, Train Loss: 123.21401, Val Loss: 388.02256, Val Loss: 388.0226, Best Loss: 339.1071, No improve: 3/10, Time: 1.7s
-08/16/2026 16:49:38 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:41 - INFO - utils.trainer -   Loss: 427.19309
-08/16/2026 16:49:41 - INFO - utils.trainer -   MSE: 426.75781
-08/16/2026 16:49:41 - INFO - utils.trainer -   MAE: 16.87994
-08/16/2026 16:49:41 - INFO - utils.trainer -   RMSE: 20.65812
-08/16/2026 16:49:41 - INFO - utils.trainer -   R2: -0.38670
-08/16/2026 16:49:41 - INFO - utils.trainer -   PearsonR: -0.04276
-08/16/2026 16:49:41 - INFO - utils.trainer -   FT Epoch: 102/200, Train Loss: 325.83478, Val Loss: 427.19309, Val Loss: 427.1931, Best Loss: 339.1071, No improve: 4/10, Time: 1.7s
-08/16/2026 16:49:42 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:45 - INFO - utils.trainer -   Loss: 466.20566
-08/16/2026 16:49:45 - INFO - utils.trainer -   MSE: 466.03030
-08/16/2026 16:49:45 - INFO - utils.trainer -   MAE: 17.68032
-08/16/2026 16:49:45 - INFO - utils.trainer -   RMSE: 21.58773
-08/16/2026 16:49:45 - INFO - utils.trainer -   R2: -0.51431
-08/16/2026 16:49:45 - INFO - utils.trainer -   PearsonR: -0.04163
-08/16/2026 16:49:45 - INFO - utils.trainer -   FT Epoch: 103/200, Train Loss: 184.25376, Val Loss: 466.20566, Val Loss: 466.2057, Best Loss: 339.1071, No improve: 5/10, Time: 1.7s
-08/16/2026 16:49:47 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:50 - INFO - utils.trainer -   Loss: 492.58667
-08/16/2026 16:49:50 - INFO - utils.trainer -   MSE: 492.56158
-08/16/2026 16:49:50 - INFO - utils.trainer -   MAE: 18.24074
-08/16/2026 16:49:50 - INFO - utils.trainer -   RMSE: 22.19373
-08/16/2026 16:49:50 - INFO - utils.trainer -   R2: -0.60052
-08/16/2026 16:49:50 - INFO - utils.trainer -   PearsonR: -0.03942
-08/16/2026 16:49:50 - INFO - utils.trainer -   FT Epoch: 104/200, Train Loss: 183.46836, Val Loss: 492.58667, Val Loss: 492.5867, Best Loss: 339.1071, No improve: 6/10, Time: 2.1s
-08/16/2026 16:49:51 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:54 - INFO - utils.trainer -   Loss: 514.82039
-08/16/2026 16:49:54 - INFO - utils.trainer -   MSE: 514.90356
-08/16/2026 16:49:54 - INFO - utils.trainer -   MAE: 18.70600
-08/16/2026 16:49:54 - INFO - utils.trainer -   RMSE: 22.69149
-08/16/2026 16:49:54 - INFO - utils.trainer -   R2: -0.67312
-08/16/2026 16:49:54 - INFO - utils.trainer -   PearsonR: -0.03803
-08/16/2026 16:49:54 - INFO - utils.trainer -   FT Epoch: 105/200, Train Loss: 295.73727, Val Loss: 514.82039, Val Loss: 514.8204, Best Loss: 339.1071, No improve: 7/10, Time: 1.7s
-08/16/2026 16:49:56 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:49:58 - INFO - utils.trainer -   Loss: 542.44297
-08/16/2026 16:49:58 - INFO - utils.trainer -   MSE: 542.64191
-08/16/2026 16:49:58 - INFO - utils.trainer -   MAE: 19.26223
-08/16/2026 16:49:58 - INFO - utils.trainer -   RMSE: 23.29468
-08/16/2026 16:49:58 - INFO - utils.trainer -   R2: -0.76325
-08/16/2026 16:49:58 - INFO - utils.trainer -   PearsonR: -0.03813
-08/16/2026 16:49:58 - INFO - utils.trainer -   FT Epoch: 106/200, Train Loss: 60.93905, Val Loss: 542.44297, Val Loss: 542.4430, Best Loss: 339.1071, No improve: 8/10, Time: 1.7s
-08/16/2026 16:50:00 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:50:02 - INFO - utils.trainer -   Loss: 560.07113
-08/16/2026 16:50:02 - INFO - utils.trainer -   MSE: 560.33099
-08/16/2026 16:50:02 - INFO - utils.trainer -   MAE: 19.60689
-08/16/2026 16:50:02 - INFO - utils.trainer -   RMSE: 23.67131
-08/16/2026 16:50:02 - INFO - utils.trainer -   R2: -0.82073
-08/16/2026 16:50:02 - INFO - utils.trainer -   PearsonR: -0.03778
-08/16/2026 16:50:02 - INFO - utils.trainer -   FT Epoch: 107/200, Train Loss: 84.33920, Val Loss: 560.07113, Val Loss: 560.0711, Best Loss: 339.1071, No improve: 9/10, Time: 1.7s
-08/16/2026 16:50:04 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
-08/16/2026 16:50:07 - INFO - utils.trainer -   Loss: 565.96352
-08/16/2026 16:50:07 - INFO - utils.trainer -   MSE: 566.22064
-08/16/2026 16:50:07 - INFO - utils.trainer -   MAE: 19.71227
-08/16/2026 16:50:07 - INFO - utils.trainer -   RMSE: 23.79539
-08/16/2026 16:50:07 - INFO - utils.trainer -   R2: -0.83987
-08/16/2026 16:50:07 - INFO - utils.trainer -   PearsonR: -0.03695
-08/16/2026 16:50:07 - INFO - utils.trainer -   FT Epoch: 108/200, Train Loss: 308.14761, Val Loss: 565.96352, Val Loss: 565.9635, Best Loss: 339.1071, No improve: 10/10, Time: 1.6s
-08/16/2026 16:50:07 - INFO - utils.trainer -   Early stopping triggered at epoch 108
-08/16/2026 16:50:07 - INFO - utils.trainer -   Early stopping triggered at epoch 108
-08/16/2026 16:50:07 - INFO - utils.trainer -   Early stopping triggered at epoch 108
-08/16/2026 16:50:07 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
-08/16/2026 16:50:07 - INFO - utils.trainer -   Model loaded from output_dir/ALTER_AgeTUAB_fewshot_best/ALTER-0.bin (27/27 keys)
-08/16/2026 16:50:07 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
-08/16/2026 16:50:07 - INFO - utils.trainer -   Model loaded from output_dir/ALTER_AgeTUAB_fewshot_best/ALTER-0.bin (27/27 keys)
-08/16/2026 16:50:07 - INFO - utils.trainer -   Loaded best checkpoint from output_dir/ALTER_AgeTUAB_fewshot_best
-08/16/2026 16:50:07 - INFO - utils.trainer -   ***** Running regression evaluation on test0 dataset *****
-08/16/2026 16:50:07 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
-08/16/2026 16:50:07 - INFO - utils.trainer -   Model loaded from output_dir/ALTER_AgeTUAB_fewshot_best/ALTER-0.bin (27/27 keys)
-08/16/2026 16:50:09 - INFO - utils.trainer -   Loss: 340.22868
-08/16/2026 16:50:09 - INFO - utils.trainer -   MSE: 340.92804
-08/16/2026 16:50:09 - INFO - utils.trainer -   MAE: 15.26463
-08/16/2026 16:50:09 - INFO - utils.trainer -   RMSE: 18.46424
-08/16/2026 16:50:09 - INFO - utils.trainer -   R2: -0.05576
-08/16/2026 16:50:09 - INFO - utils.trainer -   PearsonR: 0.00949
-08/16/2026 16:50:09 - INFO - utils.trainer -   === Few-shot fine-tune test result ===
-08/16/2026 16:50:09 - INFO - utils.trainer -     Loss: 340.22868
-08/16/2026 16:50:09 - INFO - utils.trainer -     MSE: 340.92804
-08/16/2026 16:50:09 - INFO - utils.trainer -     MAE: 15.26463
-08/16/2026 16:50:09 - INFO - utils.trainer -     RMSE: 18.46424
-08/16/2026 16:50:09 - INFO - utils.trainer -     R2: -0.05576
-08/16/2026 16:50:09 - INFO - utils.trainer -     PearsonR: 0.00949
-08/16/2026 16:50:09 - INFO - __main__ -   
+08/18/2026 02:38:29 - INFO - __main__ -   ########## few-shot seed=42 ##########
+08/18/2026 02:38:29 - INFO - __main__ -   ########## few-shot seed=42 ##########
+08/18/2026 02:38:29 - INFO - __main__ -   ########## few-shot seed=42 ##########
+08/18/2026 02:38:40 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpgqvji7gl/test.c -o /tmp/tmpgqvji7gl/test.o
+08/18/2026 02:38:40 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpgqvji7gl/test.o -laio -o /tmp/tmpgqvji7gl/a.out
+08/18/2026 02:38:40 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmp82k3lvk4/test.c -o /tmp/tmp82k3lvk4/test.o
+08/18/2026 02:38:40 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmp82k3lvk4/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmp82k3lvk4/a.out
+08/18/2026 02:38:40 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmprx1ue1vg/test.c -o /tmp/tmprx1ue1vg/test.o
+08/18/2026 02:38:40 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmprx1ue1vg/test.o -laio -o /tmp/tmprx1ue1vg/a.out
+08/18/2026 02:38:40 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpnm2zs1mh/test.c -o /tmp/tmpnm2zs1mh/test.o
+08/18/2026 02:38:40 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpnm2zs1mh/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmpnm2zs1mh/a.out
+08/18/2026 02:38:41 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmprsgt97xd/test.c -o /tmp/tmprsgt97xd/test.o
+08/18/2026 02:38:41 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmprsgt97xd/test.o -laio -o /tmp/tmprsgt97xd/a.out
+08/18/2026 02:38:41 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmp1zob4pd1/test.c -o /tmp/tmp1zob4pd1/test.o
+08/18/2026 02:38:41 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmp1zob4pd1/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmp1zob4pd1/a.out
+08/18/2026 02:38:41 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
+08/18/2026 02:38:41 - INFO - utils.trainer -   Model loaded from ./output_dir/ALTER_AgeCAUEEG_train/ALTER-0.bin (27/27 keys)
+08/18/2026 02:38:42 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
+08/18/2026 02:38:42 - INFO - utils.trainer -   Model loaded from ./output_dir/ALTER_AgeCAUEEG_train/ALTER-0.bin (27/27 keys)
+08/18/2026 02:38:42 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
+08/18/2026 02:38:42 - INFO - utils.trainer -   Model loaded from ./output_dir/ALTER_AgeCAUEEG_train/ALTER-0.bin (27/27 keys)
+08/18/2026 02:38:42 - INFO - utils.trainer -   ***** Running few-shot fine-tune (transfer) *****
+08/18/2026 02:38:42 - INFO - utils.trainer -     Num train examples = 2
+08/18/2026 02:38:42 - INFO - utils.trainer -     Num val   examples = 87
+08/18/2026 02:38:42 - INFO - utils.trainer -     Num test  examples = 88
+08/18/2026 02:38:42 - INFO - utils.trainer -     Max fine-tune epochs = 200
+08/18/2026 02:38:42 - INFO - utils.trainer -     Fine-tune lr = 0.0001
+08/18/2026 02:38:44 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:38:46 - INFO - utils.trainer -   Loss: 0.23497
+08/18/2026 02:38:46 - INFO - utils.trainer -   MSE: 3714.22510
+08/18/2026 02:38:46 - INFO - utils.trainer -   MAE: 58.36509
+08/18/2026 02:38:46 - INFO - utils.trainer -   RMSE: 60.94444
+08/18/2026 02:38:46 - INFO - utils.trainer -   R2: -11.06920
+08/18/2026 02:38:46 - INFO - utils.trainer -   PearsonR: 0.01629
+08/18/2026 02:38:46 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:38:46 - INFO - utils.trainer -   Best model saved (val Loss=0.2350, epoch=1)
+08/18/2026 02:38:46 - INFO - utils.trainer -   FT Epoch: 1/200, Train Loss: 0.27494, Val Loss: 0.23497, Val Loss: 0.2350, Best Loss: 0.2350, No improve: 0/10, Time: 2.1s
+08/18/2026 02:38:48 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:38:50 - INFO - utils.trainer -   Loss: 0.22656
+08/18/2026 02:38:50 - INFO - utils.trainer -   MSE: 3580.65283
+08/18/2026 02:38:50 - INFO - utils.trainer -   MAE: 57.20929
+08/18/2026 02:38:50 - INFO - utils.trainer -   RMSE: 59.83855
+08/18/2026 02:38:50 - INFO - utils.trainer -   R2: -10.63517
+08/18/2026 02:38:50 - INFO - utils.trainer -   PearsonR: -0.04636
+08/18/2026 02:38:50 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:38:50 - INFO - utils.trainer -   Best model saved (val Loss=0.2266, epoch=2)
+08/18/2026 02:38:50 - INFO - utils.trainer -   FT Epoch: 2/200, Train Loss: 0.26821, Val Loss: 0.22656, Val Loss: 0.2266, Best Loss: 0.2266, No improve: 0/10, Time: 1.6s
+08/18/2026 02:38:52 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:38:54 - INFO - utils.trainer -   Loss: 0.21842
+08/18/2026 02:38:54 - INFO - utils.trainer -   MSE: 3451.61719
+08/18/2026 02:38:54 - INFO - utils.trainer -   MAE: 56.07016
+08/18/2026 02:38:54 - INFO - utils.trainer -   RMSE: 58.75046
+08/18/2026 02:38:54 - INFO - utils.trainer -   R2: -10.21587
+08/18/2026 02:38:54 - INFO - utils.trainer -   PearsonR: -0.04088
+08/18/2026 02:38:54 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:38:54 - INFO - utils.trainer -   Best model saved (val Loss=0.2184, epoch=3)
+08/18/2026 02:38:54 - INFO - utils.trainer -   FT Epoch: 3/200, Train Loss: 0.36067, Val Loss: 0.21842, Val Loss: 0.2184, Best Loss: 0.2184, No improve: 0/10, Time: 1.7s
+08/18/2026 02:38:56 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:38:58 - INFO - utils.trainer -   Loss: 0.21090
+08/18/2026 02:38:58 - INFO - utils.trainer -   MSE: 3332.31470
+08/18/2026 02:38:58 - INFO - utils.trainer -   MAE: 54.99601
+08/18/2026 02:38:58 - INFO - utils.trainer -   RMSE: 57.72620
+08/18/2026 02:38:58 - INFO - utils.trainer -   R2: -9.82820
+08/18/2026 02:38:58 - INFO - utils.trainer -   PearsonR: -0.02845
+08/18/2026 02:38:58 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:38:58 - INFO - utils.trainer -   Best model saved (val Loss=0.2109, epoch=4)
+08/18/2026 02:38:58 - INFO - utils.trainer -   FT Epoch: 4/200, Train Loss: 0.35096, Val Loss: 0.21090, Val Loss: 0.2109, Best Loss: 0.2109, No improve: 0/10, Time: 1.6s
+08/18/2026 02:39:00 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:03 - INFO - utils.trainer -   Loss: 0.20624
+08/18/2026 02:39:03 - INFO - utils.trainer -   MSE: 3258.57959
+08/18/2026 02:39:03 - INFO - utils.trainer -   MAE: 54.32148
+08/18/2026 02:39:03 - INFO - utils.trainer -   RMSE: 57.08397
+08/18/2026 02:39:03 - INFO - utils.trainer -   R2: -9.58860
+08/18/2026 02:39:03 - INFO - utils.trainer -   PearsonR: -0.04127
+08/18/2026 02:39:03 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:03 - INFO - utils.trainer -   Best model saved (val Loss=0.2062, epoch=5)
+08/18/2026 02:39:03 - INFO - utils.trainer -   FT Epoch: 5/200, Train Loss: 0.37242, Val Loss: 0.20624, Val Loss: 0.2062, Best Loss: 0.2062, No improve: 0/10, Time: 1.6s
+08/18/2026 02:39:05 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:07 - INFO - utils.trainer -   Loss: 0.20170
+08/18/2026 02:39:07 - INFO - utils.trainer -   MSE: 3186.56421
+08/18/2026 02:39:07 - INFO - utils.trainer -   MAE: 53.65453
+08/18/2026 02:39:07 - INFO - utils.trainer -   RMSE: 56.44966
+08/18/2026 02:39:07 - INFO - utils.trainer -   R2: -9.35459
+08/18/2026 02:39:07 - INFO - utils.trainer -   PearsonR: -0.03865
+08/18/2026 02:39:07 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:07 - INFO - utils.trainer -   Best model saved (val Loss=0.2017, epoch=6)
+08/18/2026 02:39:07 - INFO - utils.trainer -   FT Epoch: 6/200, Train Loss: 0.29138, Val Loss: 0.20170, Val Loss: 0.2017, Best Loss: 0.2017, No improve: 0/10, Time: 2.0s
+08/18/2026 02:39:09 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:11 - INFO - utils.trainer -   Loss: 0.19705
+08/18/2026 02:39:11 - INFO - utils.trainer -   MSE: 3112.89160
+08/18/2026 02:39:11 - INFO - utils.trainer -   MAE: 52.96350
+08/18/2026 02:39:11 - INFO - utils.trainer -   RMSE: 55.79330
+08/18/2026 02:39:11 - INFO - utils.trainer -   R2: -9.11520
+08/18/2026 02:39:11 - INFO - utils.trainer -   PearsonR: -0.04918
+08/18/2026 02:39:11 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:11 - INFO - utils.trainer -   Best model saved (val Loss=0.1970, epoch=7)
+08/18/2026 02:39:11 - INFO - utils.trainer -   FT Epoch: 7/200, Train Loss: 0.35566, Val Loss: 0.19705, Val Loss: 0.1970, Best Loss: 0.1970, No improve: 0/10, Time: 1.6s
+08/18/2026 02:39:13 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:16 - INFO - utils.trainer -   Loss: 0.19211
+08/18/2026 02:39:16 - INFO - utils.trainer -   MSE: 3034.78833
+08/18/2026 02:39:16 - INFO - utils.trainer -   MAE: 52.22086
+08/18/2026 02:39:16 - INFO - utils.trainer -   RMSE: 55.08891
+08/18/2026 02:39:16 - INFO - utils.trainer -   R2: -8.86141
+08/18/2026 02:39:16 - INFO - utils.trainer -   PearsonR: -0.06513
+08/18/2026 02:39:16 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:16 - INFO - utils.trainer -   Best model saved (val Loss=0.1921, epoch=8)
+08/18/2026 02:39:16 - INFO - utils.trainer -   FT Epoch: 8/200, Train Loss: 0.17667, Val Loss: 0.19211, Val Loss: 0.1921, Best Loss: 0.1921, No improve: 0/10, Time: 1.6s
+08/18/2026 02:39:17 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:20 - INFO - utils.trainer -   Loss: 0.18695
+08/18/2026 02:39:20 - INFO - utils.trainer -   MSE: 2953.10791
+08/18/2026 02:39:20 - INFO - utils.trainer -   MAE: 51.43273
+08/18/2026 02:39:20 - INFO - utils.trainer -   RMSE: 54.34250
+08/18/2026 02:39:20 - INFO - utils.trainer -   R2: -8.59599
+08/18/2026 02:39:20 - INFO - utils.trainer -   PearsonR: -0.07325
+08/18/2026 02:39:20 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:20 - INFO - utils.trainer -   Best model saved (val Loss=0.1870, epoch=9)
+08/18/2026 02:39:20 - INFO - utils.trainer -   FT Epoch: 9/200, Train Loss: 0.18834, Val Loss: 0.18695, Val Loss: 0.1870, Best Loss: 0.1870, No improve: 0/10, Time: 1.7s
+08/18/2026 02:39:21 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:24 - INFO - utils.trainer -   Loss: 0.18155
+08/18/2026 02:39:24 - INFO - utils.trainer -   MSE: 2867.64331
+08/18/2026 02:39:24 - INFO - utils.trainer -   MAE: 50.59497
+08/18/2026 02:39:24 - INFO - utils.trainer -   RMSE: 53.55038
+08/18/2026 02:39:24 - INFO - utils.trainer -   R2: -8.31827
+08/18/2026 02:39:24 - INFO - utils.trainer -   PearsonR: -0.06700
+08/18/2026 02:39:24 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:24 - INFO - utils.trainer -   Best model saved (val Loss=0.1816, epoch=10)
+08/18/2026 02:39:24 - INFO - utils.trainer -   FT Epoch: 10/200, Train Loss: 0.21780, Val Loss: 0.18155, Val Loss: 0.1816, Best Loss: 0.1816, No improve: 0/10, Time: 1.6s
+08/18/2026 02:39:26 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:28 - INFO - utils.trainer -   Loss: 0.17597
+08/18/2026 02:39:28 - INFO - utils.trainer -   MSE: 2779.28687
+08/18/2026 02:39:28 - INFO - utils.trainer -   MAE: 49.71400
+08/18/2026 02:39:28 - INFO - utils.trainer -   RMSE: 52.71894
+08/18/2026 02:39:28 - INFO - utils.trainer -   R2: -8.03116
+08/18/2026 02:39:28 - INFO - utils.trainer -   PearsonR: -0.05721
+08/18/2026 02:39:28 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:28 - INFO - utils.trainer -   Best model saved (val Loss=0.1760, epoch=11)
+08/18/2026 02:39:28 - INFO - utils.trainer -   FT Epoch: 11/200, Train Loss: 0.28522, Val Loss: 0.17597, Val Loss: 0.1760, Best Loss: 0.1760, No improve: 0/10, Time: 1.6s
+08/18/2026 02:39:30 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:32 - INFO - utils.trainer -   Loss: 0.17056
+08/18/2026 02:39:32 - INFO - utils.trainer -   MSE: 2693.74658
+08/18/2026 02:39:32 - INFO - utils.trainer -   MAE: 48.84594
+08/18/2026 02:39:32 - INFO - utils.trainer -   RMSE: 51.90131
+08/18/2026 02:39:32 - INFO - utils.trainer -   R2: -7.75321
+08/18/2026 02:39:32 - INFO - utils.trainer -   PearsonR: -0.05463
+08/18/2026 02:39:32 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:32 - INFO - utils.trainer -   Best model saved (val Loss=0.1706, epoch=12)
+08/18/2026 02:39:32 - INFO - utils.trainer -   FT Epoch: 12/200, Train Loss: 0.22308, Val Loss: 0.17056, Val Loss: 0.1706, Best Loss: 0.1706, No improve: 0/10, Time: 1.6s
+08/18/2026 02:39:34 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:37 - INFO - utils.trainer -   Loss: 0.16481
+08/18/2026 02:39:37 - INFO - utils.trainer -   MSE: 2602.85010
+08/18/2026 02:39:37 - INFO - utils.trainer -   MAE: 47.90618
+08/18/2026 02:39:37 - INFO - utils.trainer -   RMSE: 51.01814
+08/18/2026 02:39:37 - INFO - utils.trainer -   R2: -7.45784
+08/18/2026 02:39:37 - INFO - utils.trainer -   PearsonR: -0.05333
+08/18/2026 02:39:37 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:37 - INFO - utils.trainer -   Best model saved (val Loss=0.1648, epoch=13)
+08/18/2026 02:39:37 - INFO - utils.trainer -   FT Epoch: 13/200, Train Loss: 0.11760, Val Loss: 0.16481, Val Loss: 0.1648, Best Loss: 0.1648, No improve: 0/10, Time: 1.6s
+08/18/2026 02:39:38 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:41 - INFO - utils.trainer -   Loss: 0.15859
+08/18/2026 02:39:41 - INFO - utils.trainer -   MSE: 2504.35864
+08/18/2026 02:39:41 - INFO - utils.trainer -   MAE: 46.86656
+08/18/2026 02:39:41 - INFO - utils.trainer -   RMSE: 50.04357
+08/18/2026 02:39:41 - INFO - utils.trainer -   R2: -7.13780
+08/18/2026 02:39:41 - INFO - utils.trainer -   PearsonR: -0.05284
+08/18/2026 02:39:41 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:41 - INFO - utils.trainer -   Best model saved (val Loss=0.1586, epoch=14)
+08/18/2026 02:39:41 - INFO - utils.trainer -   FT Epoch: 14/200, Train Loss: 0.19077, Val Loss: 0.15859, Val Loss: 0.1586, Best Loss: 0.1586, No improve: 0/10, Time: 1.6s
+08/18/2026 02:39:43 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:46 - INFO - utils.trainer -   Loss: 0.15196
+08/18/2026 02:39:46 - INFO - utils.trainer -   MSE: 2399.54004
+08/18/2026 02:39:46 - INFO - utils.trainer -   MAE: 45.73413
+08/18/2026 02:39:46 - INFO - utils.trainer -   RMSE: 48.98510
+08/18/2026 02:39:46 - INFO - utils.trainer -   R2: -6.79719
+08/18/2026 02:39:46 - INFO - utils.trainer -   PearsonR: -0.05209
+08/18/2026 02:39:46 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:46 - INFO - utils.trainer -   Best model saved (val Loss=0.1520, epoch=15)
+08/18/2026 02:39:46 - INFO - utils.trainer -   FT Epoch: 15/200, Train Loss: 0.09454, Val Loss: 0.15196, Val Loss: 0.1520, Best Loss: 0.1520, No improve: 0/10, Time: 2.0s
+08/18/2026 02:39:47 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:50 - INFO - utils.trainer -   Loss: 0.14490
+08/18/2026 02:39:50 - INFO - utils.trainer -   MSE: 2287.85181
+08/18/2026 02:39:50 - INFO - utils.trainer -   MAE: 44.49956
+08/18/2026 02:39:50 - INFO - utils.trainer -   RMSE: 47.83149
+08/18/2026 02:39:50 - INFO - utils.trainer -   R2: -6.43427
+08/18/2026 02:39:50 - INFO - utils.trainer -   PearsonR: -0.04974
+08/18/2026 02:39:50 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:50 - INFO - utils.trainer -   Best model saved (val Loss=0.1449, epoch=16)
+08/18/2026 02:39:50 - INFO - utils.trainer -   FT Epoch: 16/200, Train Loss: 0.16997, Val Loss: 0.14490, Val Loss: 0.1449, Best Loss: 0.1449, No improve: 0/10, Time: 1.7s
+08/18/2026 02:39:52 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:54 - INFO - utils.trainer -   Loss: 0.13747
+08/18/2026 02:39:54 - INFO - utils.trainer -   MSE: 2170.34351
+08/18/2026 02:39:54 - INFO - utils.trainer -   MAE: 43.17184
+08/18/2026 02:39:54 - INFO - utils.trainer -   RMSE: 46.58694
+08/18/2026 02:39:54 - INFO - utils.trainer -   R2: -6.05243
+08/18/2026 02:39:54 - INFO - utils.trainer -   PearsonR: -0.04904
+08/18/2026 02:39:54 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:54 - INFO - utils.trainer -   Best model saved (val Loss=0.1375, epoch=17)
+08/18/2026 02:39:54 - INFO - utils.trainer -   FT Epoch: 17/200, Train Loss: 0.19231, Val Loss: 0.13747, Val Loss: 0.1375, Best Loss: 0.1375, No improve: 0/10, Time: 1.7s
+08/18/2026 02:39:56 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:39:58 - INFO - utils.trainer -   Loss: 0.12960
+08/18/2026 02:39:58 - INFO - utils.trainer -   MSE: 2045.80994
+08/18/2026 02:39:58 - INFO - utils.trainer -   MAE: 41.71991
+08/18/2026 02:39:58 - INFO - utils.trainer -   RMSE: 45.23063
+08/18/2026 02:39:58 - INFO - utils.trainer -   R2: -5.64777
+08/18/2026 02:39:58 - INFO - utils.trainer -   PearsonR: -0.04893
+08/18/2026 02:39:58 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:39:58 - INFO - utils.trainer -   Best model saved (val Loss=0.1296, epoch=18)
+08/18/2026 02:39:58 - INFO - utils.trainer -   FT Epoch: 18/200, Train Loss: 0.12387, Val Loss: 0.12960, Val Loss: 0.1296, Best Loss: 0.1296, No improve: 0/10, Time: 1.6s
+08/18/2026 02:40:00 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:03 - INFO - utils.trainer -   Loss: 0.12135
+08/18/2026 02:40:03 - INFO - utils.trainer -   MSE: 1915.36633
+08/18/2026 02:40:03 - INFO - utils.trainer -   MAE: 40.14180
+08/18/2026 02:40:03 - INFO - utils.trainer -   RMSE: 43.76490
+08/18/2026 02:40:03 - INFO - utils.trainer -   R2: -5.22389
+08/18/2026 02:40:03 - INFO - utils.trainer -   PearsonR: -0.04957
+08/18/2026 02:40:03 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:03 - INFO - utils.trainer -   Best model saved (val Loss=0.1214, epoch=19)
+08/18/2026 02:40:03 - INFO - utils.trainer -   FT Epoch: 19/200, Train Loss: 0.15909, Val Loss: 0.12135, Val Loss: 0.1214, Best Loss: 0.1214, No improve: 0/10, Time: 1.7s
+08/18/2026 02:40:05 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:07 - INFO - utils.trainer -   Loss: 0.11269
+08/18/2026 02:40:07 - INFO - utils.trainer -   MSE: 1778.33154
+08/18/2026 02:40:07 - INFO - utils.trainer -   MAE: 38.41280
+08/18/2026 02:40:07 - INFO - utils.trainer -   RMSE: 42.17027
+08/18/2026 02:40:07 - INFO - utils.trainer -   R2: -4.77861
+08/18/2026 02:40:07 - INFO - utils.trainer -   PearsonR: -0.05110
+08/18/2026 02:40:07 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:07 - INFO - utils.trainer -   Best model saved (val Loss=0.1127, epoch=20)
+08/18/2026 02:40:07 - INFO - utils.trainer -   FT Epoch: 20/200, Train Loss: 0.18593, Val Loss: 0.11269, Val Loss: 0.1127, Best Loss: 0.1127, No improve: 0/10, Time: 1.6s
+08/18/2026 02:40:09 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:12 - INFO - utils.trainer -   Loss: 0.10348
+08/18/2026 02:40:12 - INFO - utils.trainer -   MSE: 1632.76294
+08/18/2026 02:40:12 - INFO - utils.trainer -   MAE: 36.48956
+08/18/2026 02:40:12 - INFO - utils.trainer -   RMSE: 40.40746
+08/18/2026 02:40:12 - INFO - utils.trainer -   R2: -4.30559
+08/18/2026 02:40:12 - INFO - utils.trainer -   PearsonR: -0.05196
+08/18/2026 02:40:12 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:12 - INFO - utils.trainer -   Best model saved (val Loss=0.1035, epoch=21)
+08/18/2026 02:40:12 - INFO - utils.trainer -   FT Epoch: 21/200, Train Loss: 0.10088, Val Loss: 0.10348, Val Loss: 0.1035, Best Loss: 0.1035, No improve: 0/10, Time: 1.7s
+08/18/2026 02:40:13 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:16 - INFO - utils.trainer -   Loss: 0.09380
+08/18/2026 02:40:16 - INFO - utils.trainer -   MSE: 1479.78857
+08/18/2026 02:40:16 - INFO - utils.trainer -   MAE: 34.35746
+08/18/2026 02:40:16 - INFO - utils.trainer -   RMSE: 38.46802
+08/18/2026 02:40:16 - INFO - utils.trainer -   R2: -3.80851
+08/18/2026 02:40:16 - INFO - utils.trainer -   PearsonR: -0.05128
+08/18/2026 02:40:16 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:16 - INFO - utils.trainer -   Best model saved (val Loss=0.0938, epoch=22)
+08/18/2026 02:40:16 - INFO - utils.trainer -   FT Epoch: 22/200, Train Loss: 0.23466, Val Loss: 0.09380, Val Loss: 0.0938, Best Loss: 0.0938, No improve: 0/10, Time: 1.7s
+08/18/2026 02:40:17 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:20 - INFO - utils.trainer -   Loss: 0.08334
+08/18/2026 02:40:20 - INFO - utils.trainer -   MSE: 1314.34387
+08/18/2026 02:40:20 - INFO - utils.trainer -   MAE: 31.88746
+08/18/2026 02:40:20 - INFO - utils.trainer -   RMSE: 36.25388
+08/18/2026 02:40:20 - INFO - utils.trainer -   R2: -3.27090
+08/18/2026 02:40:20 - INFO - utils.trainer -   PearsonR: -0.04923
+08/18/2026 02:40:20 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:20 - INFO - utils.trainer -   Best model saved (val Loss=0.0833, epoch=23)
+08/18/2026 02:40:20 - INFO - utils.trainer -   FT Epoch: 23/200, Train Loss: 0.08116, Val Loss: 0.08334, Val Loss: 0.0833, Best Loss: 0.0833, No improve: 0/10, Time: 1.7s
+08/18/2026 02:40:22 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:24 - INFO - utils.trainer -   Loss: 0.07257
+08/18/2026 02:40:24 - INFO - utils.trainer -   MSE: 1144.14355
+08/18/2026 02:40:24 - INFO - utils.trainer -   MAE: 29.16822
+08/18/2026 02:40:24 - INFO - utils.trainer -   RMSE: 33.82519
+08/18/2026 02:40:24 - INFO - utils.trainer -   R2: -2.71784
+08/18/2026 02:40:24 - INFO - utils.trainer -   PearsonR: -0.04700
+08/18/2026 02:40:24 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:24 - INFO - utils.trainer -   Best model saved (val Loss=0.0726, epoch=24)
+08/18/2026 02:40:24 - INFO - utils.trainer -   FT Epoch: 24/200, Train Loss: 0.07922, Val Loss: 0.07257, Val Loss: 0.0726, Best Loss: 0.0726, No improve: 0/10, Time: 1.6s
+08/18/2026 02:40:26 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:28 - INFO - utils.trainer -   Loss: 0.06181
+08/18/2026 02:40:28 - INFO - utils.trainer -   MSE: 974.04565
+08/18/2026 02:40:28 - INFO - utils.trainer -   MAE: 26.33935
+08/18/2026 02:40:28 - INFO - utils.trainer -   RMSE: 31.20971
+08/18/2026 02:40:28 - INFO - utils.trainer -   R2: -2.16512
+08/18/2026 02:40:28 - INFO - utils.trainer -   PearsonR: -0.04443
+08/18/2026 02:40:28 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:28 - INFO - utils.trainer -   Best model saved (val Loss=0.0618, epoch=25)
+08/18/2026 02:40:28 - INFO - utils.trainer -   FT Epoch: 25/200, Train Loss: 0.10740, Val Loss: 0.06181, Val Loss: 0.0618, Best Loss: 0.0618, No improve: 0/10, Time: 1.6s
+08/18/2026 02:40:30 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:32 - INFO - utils.trainer -   Loss: 0.05127
+08/18/2026 02:40:32 - INFO - utils.trainer -   MSE: 807.61401
+08/18/2026 02:40:32 - INFO - utils.trainer -   MAE: 23.51299
+08/18/2026 02:40:32 - INFO - utils.trainer -   RMSE: 28.41855
+08/18/2026 02:40:32 - INFO - utils.trainer -   R2: -1.62430
+08/18/2026 02:40:32 - INFO - utils.trainer -   PearsonR: -0.04233
+08/18/2026 02:40:32 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:32 - INFO - utils.trainer -   Best model saved (val Loss=0.0513, epoch=26)
+08/18/2026 02:40:32 - INFO - utils.trainer -   FT Epoch: 26/200, Train Loss: 0.07138, Val Loss: 0.05127, Val Loss: 0.0513, Best Loss: 0.0513, No improve: 0/10, Time: 1.6s
+08/18/2026 02:40:34 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:37 - INFO - utils.trainer -   Loss: 0.04144
+08/18/2026 02:40:37 - INFO - utils.trainer -   MSE: 652.46735
+08/18/2026 02:40:37 - INFO - utils.trainer -   MAE: 20.82891
+08/18/2026 02:40:37 - INFO - utils.trainer -   RMSE: 25.54344
+08/18/2026 02:40:37 - INFO - utils.trainer -   R2: -1.12016
+08/18/2026 02:40:37 - INFO - utils.trainer -   PearsonR: -0.04066
+08/18/2026 02:40:37 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:37 - INFO - utils.trainer -   Best model saved (val Loss=0.0414, epoch=27)
+08/18/2026 02:40:37 - INFO - utils.trainer -   FT Epoch: 27/200, Train Loss: 0.16889, Val Loss: 0.04144, Val Loss: 0.0414, Best Loss: 0.0414, No improve: 0/10, Time: 1.7s
+08/18/2026 02:40:38 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:41 - INFO - utils.trainer -   Loss: 0.03280
+08/18/2026 02:40:41 - INFO - utils.trainer -   MSE: 516.09564
+08/18/2026 02:40:41 - INFO - utils.trainer -   MAE: 18.39276
+08/18/2026 02:40:41 - INFO - utils.trainer -   RMSE: 22.71774
+08/18/2026 02:40:41 - INFO - utils.trainer -   R2: -0.67703
+08/18/2026 02:40:41 - INFO - utils.trainer -   PearsonR: -0.03881
+08/18/2026 02:40:41 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:41 - INFO - utils.trainer -   Best model saved (val Loss=0.0328, epoch=28)
+08/18/2026 02:40:41 - INFO - utils.trainer -   FT Epoch: 28/200, Train Loss: 0.06294, Val Loss: 0.03280, Val Loss: 0.0328, Best Loss: 0.0328, No improve: 0/10, Time: 1.6s
+08/18/2026 02:40:42 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:45 - INFO - utils.trainer -   Loss: 0.02576
+08/18/2026 02:40:45 - INFO - utils.trainer -   MSE: 405.24219
+08/18/2026 02:40:45 - INFO - utils.trainer -   MAE: 16.31292
+08/18/2026 02:40:45 - INFO - utils.trainer -   RMSE: 20.13063
+08/18/2026 02:40:45 - INFO - utils.trainer -   R2: -0.31682
+08/18/2026 02:40:45 - INFO - utils.trainer -   PearsonR: -0.03638
+08/18/2026 02:40:45 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:45 - INFO - utils.trainer -   Best model saved (val Loss=0.0258, epoch=29)
+08/18/2026 02:40:45 - INFO - utils.trainer -   FT Epoch: 29/200, Train Loss: 0.02127, Val Loss: 0.02576, Val Loss: 0.0258, Best Loss: 0.0258, No improve: 0/10, Time: 1.7s
+08/18/2026 02:40:47 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:49 - INFO - utils.trainer -   Loss: 0.02122
+08/18/2026 02:40:49 - INFO - utils.trainer -   MSE: 334.11996
+08/18/2026 02:40:49 - INFO - utils.trainer -   MAE: 14.87571
+08/18/2026 02:40:49 - INFO - utils.trainer -   RMSE: 18.27895
+08/18/2026 02:40:49 - INFO - utils.trainer -   R2: -0.08571
+08/18/2026 02:40:49 - INFO - utils.trainer -   PearsonR: -0.03518
+08/18/2026 02:40:49 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:49 - INFO - utils.trainer -   Best model saved (val Loss=0.0212, epoch=30)
+08/18/2026 02:40:49 - INFO - utils.trainer -   FT Epoch: 30/200, Train Loss: 0.02510, Val Loss: 0.02122, Val Loss: 0.0212, Best Loss: 0.0212, No improve: 0/10, Time: 1.7s
+08/18/2026 02:40:51 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:54 - INFO - utils.trainer -   Loss: 0.02028
+08/18/2026 02:40:54 - INFO - utils.trainer -   MSE: 320.00095
+08/18/2026 02:40:54 - INFO - utils.trainer -   MAE: 14.66495
+08/18/2026 02:40:54 - INFO - utils.trainer -   RMSE: 17.88857
+08/18/2026 02:40:54 - INFO - utils.trainer -   R2: -0.03983
+08/18/2026 02:40:54 - INFO - utils.trainer -   PearsonR: -0.03431
+08/18/2026 02:40:54 - INFO - utils.trainer -   Model saved to output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:40:54 - INFO - utils.trainer -   Best model saved (val Loss=0.0203, epoch=31)
+08/18/2026 02:40:54 - INFO - utils.trainer -   FT Epoch: 31/200, Train Loss: 0.02536, Val Loss: 0.02028, Val Loss: 0.0203, Best Loss: 0.0203, No improve: 0/10, Time: 1.6s
+08/18/2026 02:40:55 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:40:58 - INFO - utils.trainer -   Loss: 0.02356
+08/18/2026 02:40:58 - INFO - utils.trainer -   MSE: 372.82162
+08/18/2026 02:40:58 - INFO - utils.trainer -   MAE: 15.86537
+08/18/2026 02:40:58 - INFO - utils.trainer -   RMSE: 19.30859
+08/18/2026 02:40:58 - INFO - utils.trainer -   R2: -0.21147
+08/18/2026 02:40:58 - INFO - utils.trainer -   PearsonR: -0.03278
+08/18/2026 02:40:58 - INFO - utils.trainer -   FT Epoch: 32/200, Train Loss: 0.02701, Val Loss: 0.02356, Val Loss: 0.0236, Best Loss: 0.0203, No improve: 1/10, Time: 1.7s
+08/18/2026 02:40:59 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:41:02 - INFO - utils.trainer -   Loss: 0.02984
+08/18/2026 02:41:02 - INFO - utils.trainer -   MSE: 472.95316
+08/18/2026 02:41:02 - INFO - utils.trainer -   MAE: 17.93550
+08/18/2026 02:41:02 - INFO - utils.trainer -   RMSE: 21.74749
+08/18/2026 02:41:02 - INFO - utils.trainer -   R2: -0.53684
+08/18/2026 02:41:02 - INFO - utils.trainer -   PearsonR: -0.03159
+08/18/2026 02:41:02 - INFO - utils.trainer -   FT Epoch: 33/200, Train Loss: 0.01076, Val Loss: 0.02984, Val Loss: 0.0298, Best Loss: 0.0203, No improve: 2/10, Time: 1.7s
+08/18/2026 02:41:04 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:41:07 - INFO - utils.trainer -   Loss: 0.03627
+08/18/2026 02:41:07 - INFO - utils.trainer -   MSE: 575.33557
+08/18/2026 02:41:07 - INFO - utils.trainer -   MAE: 20.00397
+08/18/2026 02:41:07 - INFO - utils.trainer -   RMSE: 23.98615
+08/18/2026 02:41:07 - INFO - utils.trainer -   R2: -0.86953
+08/18/2026 02:41:07 - INFO - utils.trainer -   PearsonR: -0.02945
+08/18/2026 02:41:07 - INFO - utils.trainer -   FT Epoch: 34/200, Train Loss: 0.00600, Val Loss: 0.03627, Val Loss: 0.0363, Best Loss: 0.0203, No improve: 3/10, Time: 2.0s
+08/18/2026 02:41:08 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:41:11 - INFO - utils.trainer -   Loss: 0.03972
+08/18/2026 02:41:11 - INFO - utils.trainer -   MSE: 630.23541
+08/18/2026 02:41:11 - INFO - utils.trainer -   MAE: 21.02718
+08/18/2026 02:41:11 - INFO - utils.trainer -   RMSE: 25.10449
+08/18/2026 02:41:11 - INFO - utils.trainer -   R2: -1.04792
+08/18/2026 02:41:11 - INFO - utils.trainer -   PearsonR: -0.02662
+08/18/2026 02:41:11 - INFO - utils.trainer -   FT Epoch: 35/200, Train Loss: 0.03310, Val Loss: 0.03972, Val Loss: 0.0397, Best Loss: 0.0203, No improve: 4/10, Time: 1.6s
+08/18/2026 02:41:13 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:41:15 - INFO - utils.trainer -   Loss: 0.03962
+08/18/2026 02:41:15 - INFO - utils.trainer -   MSE: 628.67065
+08/18/2026 02:41:15 - INFO - utils.trainer -   MAE: 20.99913
+08/18/2026 02:41:15 - INFO - utils.trainer -   RMSE: 25.07331
+08/18/2026 02:41:15 - INFO - utils.trainer -   R2: -1.04284
+08/18/2026 02:41:15 - INFO - utils.trainer -   PearsonR: -0.02365
+08/18/2026 02:41:15 - INFO - utils.trainer -   FT Epoch: 36/200, Train Loss: 0.01272, Val Loss: 0.03962, Val Loss: 0.0396, Best Loss: 0.0203, No improve: 5/10, Time: 1.8s
+08/18/2026 02:41:17 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:41:19 - INFO - utils.trainer -   Loss: 0.03708
+08/18/2026 02:41:19 - INFO - utils.trainer -   MSE: 588.18591
+08/18/2026 02:41:19 - INFO - utils.trainer -   MAE: 20.24872
+08/18/2026 02:41:19 - INFO - utils.trainer -   RMSE: 24.25255
+08/18/2026 02:41:19 - INFO - utils.trainer -   R2: -0.91128
+08/18/2026 02:41:19 - INFO - utils.trainer -   PearsonR: -0.02013
+08/18/2026 02:41:19 - INFO - utils.trainer -   FT Epoch: 37/200, Train Loss: 0.01515, Val Loss: 0.03708, Val Loss: 0.0371, Best Loss: 0.0203, No improve: 6/10, Time: 1.6s
+08/18/2026 02:41:21 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:41:24 - INFO - utils.trainer -   Loss: 0.03306
+08/18/2026 02:41:24 - INFO - utils.trainer -   MSE: 524.21149
+08/18/2026 02:41:24 - INFO - utils.trainer -   MAE: 18.99561
+08/18/2026 02:41:24 - INFO - utils.trainer -   RMSE: 22.89566
+08/18/2026 02:41:24 - INFO - utils.trainer -   R2: -0.70340
+08/18/2026 02:41:24 - INFO - utils.trainer -   PearsonR: -0.01652
+08/18/2026 02:41:24 - INFO - utils.trainer -   FT Epoch: 38/200, Train Loss: 0.02062, Val Loss: 0.03306, Val Loss: 0.0331, Best Loss: 0.0203, No improve: 7/10, Time: 1.6s
+08/18/2026 02:41:25 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:41:28 - INFO - utils.trainer -   Loss: 0.02980
+08/18/2026 02:41:28 - INFO - utils.trainer -   MSE: 472.37994
+08/18/2026 02:41:28 - INFO - utils.trainer -   MAE: 17.92170
+08/18/2026 02:41:28 - INFO - utils.trainer -   RMSE: 21.73430
+08/18/2026 02:41:28 - INFO - utils.trainer -   R2: -0.53498
+08/18/2026 02:41:28 - INFO - utils.trainer -   PearsonR: -0.01320
+08/18/2026 02:41:28 - INFO - utils.trainer -   FT Epoch: 39/200, Train Loss: 0.00965, Val Loss: 0.02980, Val Loss: 0.0298, Best Loss: 0.0203, No improve: 8/10, Time: 1.7s
+08/18/2026 02:41:30 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:41:32 - INFO - utils.trainer -   Loss: 0.02772
+08/18/2026 02:41:32 - INFO - utils.trainer -   MSE: 439.08670
+08/18/2026 02:41:32 - INFO - utils.trainer -   MAE: 17.22390
+08/18/2026 02:41:32 - INFO - utils.trainer -   RMSE: 20.95440
+08/18/2026 02:41:32 - INFO - utils.trainer -   R2: -0.42679
+08/18/2026 02:41:32 - INFO - utils.trainer -   PearsonR: -0.01017
+08/18/2026 02:41:32 - INFO - utils.trainer -   FT Epoch: 40/200, Train Loss: 0.00996, Val Loss: 0.02772, Val Loss: 0.0277, Best Loss: 0.0203, No improve: 9/10, Time: 1.8s
+08/18/2026 02:41:34 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+08/18/2026 02:41:36 - INFO - utils.trainer -   Loss: 0.02570
+08/18/2026 02:41:36 - INFO - utils.trainer -   MSE: 406.96634
+08/18/2026 02:41:36 - INFO - utils.trainer -   MAE: 16.55917
+08/18/2026 02:41:36 - INFO - utils.trainer -   RMSE: 20.17341
+08/18/2026 02:41:36 - INFO - utils.trainer -   R2: -0.32242
+08/18/2026 02:41:36 - INFO - utils.trainer -   PearsonR: -0.00727
+08/18/2026 02:41:36 - INFO - utils.trainer -   FT Epoch: 41/200, Train Loss: 0.00359, Val Loss: 0.02570, Val Loss: 0.0257, Best Loss: 0.0203, No improve: 10/10, Time: 1.6s
+08/18/2026 02:41:36 - INFO - utils.trainer -   Early stopping triggered at epoch 41
+08/18/2026 02:41:36 - INFO - utils.trainer -   Early stopping triggered at epoch 41
+08/18/2026 02:41:36 - INFO - utils.trainer -   Early stopping triggered at epoch 41
+08/18/2026 02:41:36 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
+08/18/2026 02:41:36 - INFO - utils.trainer -   Model loaded from output_dir/ALTER_AgeTUAB_fewshot_best/ALTER-0.bin (27/27 keys)
+08/18/2026 02:41:36 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
+08/18/2026 02:41:36 - INFO - utils.trainer -   Model loaded from output_dir/ALTER_AgeTUAB_fewshot_best/ALTER-0.bin (27/27 keys)
+08/18/2026 02:41:36 - INFO - utils.trainer -   Loaded best checkpoint from output_dir/ALTER_AgeTUAB_fewshot_best
+08/18/2026 02:41:36 - INFO - utils.trainer -   ***** Running regression evaluation on test0 dataset *****
+08/18/2026 02:41:36 - INFO - utils.trainer -     6 keys not in checkpoint (kept from init)
+08/18/2026 02:41:36 - INFO - utils.trainer -   Model loaded from output_dir/ALTER_AgeTUAB_fewshot_best/ALTER-0.bin (27/27 keys)
+08/18/2026 02:41:39 - INFO - utils.trainer -   Loss: 0.02087
+08/18/2026 02:41:39 - INFO - utils.trainer -   MSE: 332.89847
+08/18/2026 02:41:39 - INFO - utils.trainer -   MAE: 15.14448
+08/18/2026 02:41:39 - INFO - utils.trainer -   RMSE: 18.24550
+08/18/2026 02:41:39 - INFO - utils.trainer -   R2: -0.03151
+08/18/2026 02:41:39 - INFO - utils.trainer -   PearsonR: 0.01624
+08/18/2026 02:41:39 - INFO - utils.trainer -   === Few-shot fine-tune test result ===
+08/18/2026 02:41:39 - INFO - utils.trainer -     Loss: 0.02087
+08/18/2026 02:41:39 - INFO - utils.trainer -     MSE: 332.89847
+08/18/2026 02:41:39 - INFO - utils.trainer -     MAE: 15.14448
+08/18/2026 02:41:39 - INFO - utils.trainer -     RMSE: 18.24550
+08/18/2026 02:41:39 - INFO - utils.trainer -     R2: -0.03151
+08/18/2026 02:41:39 - INFO - utils.trainer -     PearsonR: 0.01624
+08/18/2026 02:41:39 - INFO - __main__ -   
 ============================================================
   5-shot (ALTER_AgeCAUEEG_train → AgeTUAB)  seed=42
 ============================================================
-08/16/2026 16:50:09 - INFO - __main__ -     Loss           : 340.2287
-08/16/2026 16:50:09 - INFO - __main__ -     MSE            : 340.9280
-08/16/2026 16:50:09 - INFO - __main__ -     MAE            : 15.2646
-08/16/2026 16:50:09 - INFO - __main__ -     RMSE           : 18.4642
-08/16/2026 16:50:09 - INFO - __main__ -     R2             : -0.0558
-08/16/2026 16:50:09 - INFO - __main__ -     PearsonR       : 0.0095
+08/18/2026 02:41:39 - INFO - __main__ -     Loss           : 0.0209
+08/18/2026 02:41:39 - INFO - __main__ -     MSE            : 332.8985
+08/18/2026 02:41:39 - INFO - __main__ -     MAE            : 15.1445
+08/18/2026 02:41:39 - INFO - __main__ -     RMSE           : 18.2455
+08/18/2026 02:41:39 - INFO - __main__ -     R2             : -0.0315
+08/18/2026 02:41:39 - INFO - __main__ -     PearsonR       : 0.0162

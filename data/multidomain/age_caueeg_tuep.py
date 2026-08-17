@@ -4,6 +4,7 @@ from random import shuffle
 
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
+from ..preprocess import AGE_LABEL_MIN, AGE_LABEL_MAX
 
 
 class AgeCAUEEGTUEPDataset(BaseDataset):
@@ -25,7 +26,16 @@ class AgeCAUEEGTUEPDataset(BaseDataset):
 
         n1 = len(d1['timeseries'])
         time_series = np.concatenate([d1['timeseries'], d2['timeseries']], axis=0)
-        labels = np.concatenate([d1['labels'], d2['labels']], axis=0)
+        # 联合归一化：固定先验边界，统一跨域量纲（无泄漏）
+        raw1 = d1['labels_raw'] if 'labels_raw' in d1 else d1['labels']
+        raw2 = d2['labels_raw'] if 'labels_raw' in d2 else d2['labels']
+        labels_raw = np.concatenate([raw1, raw2], axis=0).astype(np.float32)
+        label_min = float(AGE_LABEL_MIN)
+        label_max = float(AGE_LABEL_MAX)
+        span = label_max - label_min
+        labels = ((labels_raw - label_min) / span).astype(np.float32)
+        self.label_min = label_min
+        self.label_max = label_max
         subject_id = np.concatenate([d1['subject_id'], d2['subject_id'] + 100000], axis=0)
         domain_label = np.concatenate([
             np.zeros(n1, dtype=np.int64),
@@ -38,7 +48,7 @@ class AgeCAUEEGTUEPDataset(BaseDataset):
         self.data_config.task_type = DataConfig.TASK_REGRESSION
 
         self.all_data['time_series'] = time_series
-        self.all_data['labels'] = labels.astype(np.float32)
+        self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
         self.all_data['domain_label'] = domain_label
 

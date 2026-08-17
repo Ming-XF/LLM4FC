@@ -132,7 +132,7 @@ class GCDGCN(nn.Module):
             else:
                 pred = final_output.squeeze(-1) if final_output.dim() > 1 and final_output.shape[-1] == 1 else final_output
                 lbl = labels.float().view(-1) if labels.dim() > 1 else labels.float()
-                loss = F.mse_loss(pred, lbl)
+                loss = F.huber_loss(pred, lbl, delta=1.0)
             return ModelOutputs(logits=final_output, loss=loss)
         else:
             raise ValueError(f"Invalid stage: {stage}")

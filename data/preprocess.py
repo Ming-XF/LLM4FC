@@ -2,6 +2,13 @@ import numpy as np
 from scipy.linalg import sqrtm
 
 
+# ── 年龄回归的固定先验归一化边界 ──
+# 不从数据拟合 min/max（避免 test 泄漏），且所有域统一量纲，
+# 便于 few-shot / 跨域迁移时 head 输出量纲一致。
+AGE_LABEL_MIN = 0.0
+AGE_LABEL_MAX = 100.0
+
+
 def data_norm(data):
     data_copy = np.copy(data)
     for i in range(len(data)):

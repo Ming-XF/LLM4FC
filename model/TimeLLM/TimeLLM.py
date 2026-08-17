@@ -529,7 +529,7 @@ class Model(nn.Module):
             pred = logits.squeeze(-1)
             if labels.dim() > 1 and labels.shape[-1] == 1:
                 labels = labels.squeeze(-1)
-            loss = F.mse_loss(pred, labels.float())
+            loss = F.huber_loss(pred, labels.float(), delta=1.0)
         else:
             if labels.dim() > 1 and labels.shape[-1] > 1:
                 labels = labels.argmax(dim=-1)
