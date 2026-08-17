@@ -75,6 +75,8 @@ def init_model_config(args, data_config: DataConfig):
             lora_target_modules=args.lora_target_modules,
             use_gc_lora=args.use_gc_lora,
             block_causal_mask=args.block_causal_mask,
+            use_channel_prototype=args.use_channel_prototype,
+            channel_proto_rank=args.channel_proto_rank,
         )
         model = Model(model_config)
     else:
@@ -161,6 +163,10 @@ def init_config():
                              help="Path to pretrained LLM directory")
     model_group.add_argument("--patch_stride", default=5, type=int, help="DFC temporal subsampling stride (TimeLLM v1 only)")
     model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
+    model_group.add_argument("--use_channel_prototype", action="store_true",
+                             help="TimeLLM: per-channel prototypes (shared base + channel bias)")
+    model_group.add_argument("--channel_proto_rank", default=32, type=int,
+                             help="Low-rank dim of per-channel prototype set (r)")
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
     model_group.add_argument("--gcn_hidden", default=128, type=int, help="GCN hidden dimension (TimeLLM v2)")
     model_group.add_argument("--num_gcn_layers", default=1, type=int, help="Number of GCN layers (TimeLLM)")

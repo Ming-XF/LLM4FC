@@ -6,7 +6,7 @@ from transformers import AutoTokenizer, AutoModel
 from ..base import BaseConfig, ModelOutputs
 from .prompts import get_prompt_config
 from .gc_lora import (
-    GCLoRALinear, inject_lora_to_llm,
+    inject_lora_to_llm,
     set_gc_lora_context, clear_gc_lora_context,
 )
 
@@ -51,7 +51,9 @@ class TimeLLMConfig(BaseConfig):
                  lora_dropout=0.1,
                  lora_target_modules="q_proj,v_proj",
                  use_gc_lora=False,
-                 block_causal_mask=False):
+                 block_causal_mask=False,
+                 use_channel_prototype=False,
+                 channel_proto_rank=32):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -75,6 +77,8 @@ class TimeLLMConfig(BaseConfig):
         self.lora_target_modules = lora_target_modules
         self.use_gc_lora = use_gc_lora
         self.block_causal_mask = block_causal_mask
+        self.use_channel_prototype = use_channel_prototype
+        self.channel_proto_rank = channel_proto_rank
 
 
 class ReprogrammingLayer(nn.Module):
@@ -205,6 +209,23 @@ class Model(nn.Module):
         self.vocab_size = self.word_embeddings.shape[0]
         self.mapping_layer = nn.Linear(self.vocab_size, self.num_prototypes)
 
+        # 通道专属原型集合：对 mapping_layer 做 LoRA 低秩分解，1 套共享 → 每通道 1 套
+        # W_c = W_map + B[c] @ A；P_c = P_shared + B[c] @ (A @ we)
+        if config.use_channel_prototype:
+            self.channel_proto_rank = config.channel_proto_rank
+            # A: 共享 down (r, vocab)，随机初始化
+            self.channel_lora_A = nn.Parameter(
+                torch.empty(config.channel_proto_rank, self.vocab_size))
+            nn.init.kaiming_uniform_(self.channel_lora_A)
+            # B: 每通道 up (C, S, r)，零初始化 → ΔW=0，初始即共享集合，平滑启动
+            self.channel_lora_B = nn.Parameter(
+                torch.zeros(config.node_size, config.num_prototypes,
+                            config.channel_proto_rank))
+        else:
+            self.channel_lora_A = None
+            self.channel_lora_B = None
+            self.channel_proto_rank = 0
+
         self.reprogramming_layer = ReprogrammingLayer(
             d_model=config.d_model,
             n_heads=config.n_heads,
@@ -289,31 +310,6 @@ class Model(nn.Module):
         else:
             return torch.where(allowed, 0.0, float('-inf'))   # 0 = attend
 
-    def freeze_for_finetune(self, freeze_lora: bool = True):
-        """冻结 GCN 与 reprogram 层，仅保留预测头可训练。
-
-        Args:
-            freeze_lora: 同时冻结 LoRA / GC-LoRA 权重（默认 True，
-                用于 few-shot transfer）。
-        """
-        for param in self.gcn_layers.parameters():
-            param.requires_grad = False
-        for param in self.channel_embed_projection.parameters():
-            param.requires_grad = False
-        for param in self.node_projection.parameters():
-            param.requires_grad = False
-
-        for param in self.mapping_layer.parameters():
-            param.requires_grad = False
-        for param in self.reprogramming_layer.parameters():
-            param.requires_grad = False
-
-        if freeze_lora and self.config.use_lora:
-            for module in self.modules():
-                if isinstance(module, GCLoRALinear):
-                    module.lora_A.requires_grad_(False)
-                    module.lora_B.requires_grad_(False)
-
     def forward(self, DFC, SFC, labels, gender=None, age=None, education=None):
         B, T, C, _ = DFC.shape
         device = DFC.device
@@ -341,16 +337,35 @@ class Model(nn.Module):
 
         we = self.word_embeddings.permute(1, 0).to(
             dtype=self.mapping_layer.weight.dtype)
-        source_embeddings = self.mapping_layer(we).permute(1, 0)
-        source_embeddings = source_embeddings.to(
-            dtype=self.word_embeddings.dtype)
+        source_embeddings = self.mapping_layer(we).permute(1, 0)  # (S, d_llm) 共享 base 原型
 
         reprogram_dtype = self.reprogramming_layer.query_projection.weight.dtype
-        reprogrammed = self.reprogramming_layer(
-            node_embeddings.to(dtype=reprogram_dtype),
-            source_embeddings.to(dtype=reprogram_dtype),
-            source_embeddings.to(dtype=reprogram_dtype),
-        )
+
+        if self.config.use_channel_prototype:
+            # A 投影到原型空间（共享，每 forward 一次），复用上方已 fp32 化的 we
+            A_we = self.channel_lora_A @ we.permute(1, 0)            # (r, d_llm)
+
+            reprogrammed_chunks = []
+            for c in range(C):
+                node_c = node_embeddings[:, c::C, :]                 # (B, T, d_model)
+                P_c = source_embeddings + self.channel_lora_B[c] @ A_we  # (S, d_llm) 通道 c 专属集合
+                out_c = self.reprogramming_layer(
+                    node_c.to(dtype=reprogram_dtype),
+                    P_c.to(dtype=reprogram_dtype),
+                    P_c.to(dtype=reprogram_dtype),
+                )                                                    # (B, T, d_llm)
+                reprogrammed_chunks.append(out_c)
+            # 拼回时间优先顺序 index = t*C + c（与原来 token 顺序一致）
+            reprogrammed = torch.stack(reprogrammed_chunks, dim=0)   # (C, B, T, d_llm)
+            reprogrammed = reprogrammed.permute(1, 2, 0, 3)          # (B, T, C, d_llm)
+            reprogrammed = reprogrammed.reshape(B, T * C, -1)        # (B, T*C, d_llm)
+        else:
+            source_embeddings = source_embeddings.to(dtype=self.word_embeddings.dtype)
+            reprogrammed = self.reprogramming_layer(
+                node_embeddings.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype),
+            )
 
         reprogrammed = reprogrammed.to(dtype=torch.bfloat16)
 

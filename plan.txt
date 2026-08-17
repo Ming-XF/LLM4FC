@@ -1,72 +1,63 @@
-模型架构目前没有启用Lora、GCLora、Stat Prompt，具体可看scripts中TimeLLM的运行参数。本项目的科研目的有两个：实现FC分析的STOA和跨数据集（跨域）泛化。目前的架构相比于ALTER模型在CAUEEG的疾病诊断任务上实现了性能超越。但在跨域泛化问题上，只是增加了辅助任务FutureFC的损失，后续还会增加mask token损失、对比学习损失等让模型学习到更通用的特征，而不是特定域的不可泛化的特征。在模型架构方案还没进行有效的改进对跨域泛化进行支撑。目前有两个方案：域对抗训练：在GCN输出后加一个域分类器（预测样本来自哪个数据集），通过梯度反转层训练，迫使GCN学习域不变特征。另一个方案是改进reprogram模块，让输入进LLM的token在不同数据集上通用，以发挥LLM的泛化能力。你有什么建议吗？不用修改代码。
+当前的原型映射在 TimeLLM.py 两处：
 
+  1. 定义（第 206 行）：self.mapping_layer = nn.Linear(vocab_size, num_prototypes)
+  2. 使用（第 342–346 行）：
+  we = self.word_embeddings.permute(1, 0)          # (d_llm, vocab_size)
+  source_embeddings = self.mapping_layer(we).permute(1, 0)  # (num_prototypes, d_llm)
 
+  这里 mapping_layer 是确定性线性映射，且与输入无关：它对冻结的 word embedding
+  矩阵做一次全局变换，产出一组 num_prototypes 个所有样本共享的 text prototype，作为 reprogramming_layer
+  的 key/value。query 才是输入相关的 GCN node_embeddings。
 
-这是两个很有价值的方向，我从架构适配性和泛化理论两个角度来分析。
+  所以"把原型映射改成 VAE 重参数化"要改的就是这条 vocab_size → num_prototypes 的确定性映射。
 
-## 方案对比分析
+  设计建议：两个落点，先选语义
 
-### 方案 A：域对抗训练（GCN + GRL + 域分类器）
+  关键决策是 采样得到的 latent 是"全局 codebook"还是"逐样本条件"，这决定了原型还换不换语义。
 
-**优势：**
-- 实现路径清晰：在 `GCN → node_projection` 之间插入梯度反转层和域分类器即可，不改动现有数据流
-- DANN (Ganin et al.) 范式成熟，理论上保证域分类器无法区分 → GCN 特征域不变
-- GCN 输出的特征维度是 `(B, T*C, gcn_hidden=128)`，足够支撑一个轻量域分类器
-- FC 矩阵本身有一定域不变性（Pearson 相关归一化了幅值），GRL 可以进一步消除残存的域特有模式（如不同设备导致的连接强度偏差）
+  方案 A（推荐）：对全局 prototype codebook 做 VAE
 
-**风险：**
-- GRL 的 `lambda` 调度敏感：太弱不起作用，太强会冲垮任务信号
-- EEG 数据集的域标签和任务标签可能存在 **confounding**（比如 Beirut 全是患者+年长人群，TUAB 有大量健康年轻人）——域对抗可能会无意中抹掉有用的病理特征
-- 只作用在 GCN 层，**LLM 输入 token 仍然可能是域特异的**（node projection + reprogramming 之后域信息可能重新显现）
+  保持"原型是所有样本共享的 codebook"这一语义不变，只把确定性映射换成概率映射：
 
-### 方案 B：域不变 Reprogramming
+  - 编码器：Linear(vocab_size, 2·latent_dim)，作用于 we，得到每个原型对应的 mu、logvar（形状
+  num_prototypes × latent_dim）
+  - 重参数化：z = mu + sigma·eps，eps ~ N(0, I)
+  - 解码器：Linear(latent_dim, d_llm)，把 z 映射回原型 token 空间 → source_embeddings (num_prototypes, 
+  d_llm)
+  - KL loss：KL(N(mu, sigma) || N(0, I))，直接加进 forward 返回的 loss 里
 
-这个方向我更看好，理由是：
+  这是最忠实的"采样后映射为原型"，改动最小，且天然契合你当前 loss 单标量的约定（trainer 只读
+  outputs.loss，辅助 loss 必须在 forward 里加好）。
 
-**关键洞察：LLM 是 frozen 的，reprogramming 是唯一的"翻译器"。** 如果翻译给 LLM 的 token 在不同数据集上语义不一致（同一个 token 位置在 Beirut 上表示"颞叶高连接"，在 TUAB 上表示"噪声伪迹"），那 LLM 的通用知识完全用不上。域泛化的瓶颈很可能就在这个翻译层。
+  方案 B：条件 VAE（原型变成逐样本的）
 
-具体可以做几件事：
+  编码器输入改为 GCN 的 node_embeddings（pool 后），采样出 z (B, latent_dim)，再 decode
+  成每样本一套原型。好处是原型变成"内容寻址"，坏处是：
 
-1. **Prototype 共享 + 域特定偏移**：当前 1000 个 learnable text prototypes 是全局共享的。可以改成 `P_shared + P_domain_specific`，其中域特定部分通过域编码器从 FC 统计量生成轻量偏移，让同一个 shared prototype 在不同域上有细微不同的"语义解释"
-2. **Reprogramming 输出的对比对齐**：对来自不同数据集但同一类别的样本，在 reprogrammed token 空间做对比学习（如 NT-Xent loss），显式拉近跨域同类样本的表示
-3. **Token-level domain classifier**：在 reprogramming 输出后（进入 LLM 前）加一个轻量域分类器 + GRL，这比方案 A 更深层，能捕捉到 reprogramming 引入的域偏差
+  - 语义大变：原来"LLM 共享词典"的性质没了，reprogramming 变成样本级 memory
+  - 计算量：每样本 decode num_prototypes × d_llm（500×4096）向量
+  - 与 freeze_for_finetune、few-shot transfer 的"冻结 reprogram 层"逻辑冲突更大
 
-**但方案 B 的难点在于：** 对比学习需要同类别跨域配对，当前 dataloader 是单数据集加载的，需要改造数据管线支持混合数据集采样。
+  我建议先做 A，若 A 的随机性带来的收益明显再考虑 B。
 
-### 我的建议：分层组合策略
+  几个必须处理的细节
 
-两个方案不是互斥的，而是作用于不同层次。建议的优先级：
+  1. KL 权重 / 退火（beta-VAE）：直接 loss = task_loss + beta·kl 很容易 KL
+  collapse（后验塌缩到先验，重参数化退化成无信息）。建议 beta 从小（如 1e-3）起步，或随 epoch 从 0
+  线性退火到 1，加一个 --vae_beta / --vae_anneal 参数。
+  2. 训练/推理分支：训练时采样 z，推理时必须用 mu（确定性），否则测试集结果带采样噪声、不可复现。用
+  self.training 判断即可。
+  3. dtype：LLM 是 bfloat16，但你现有的 node_projection、mapping_layer 都在 float32 跑、最后才 cast。VAE
+  的 encoder/decoder/重参数化也应走 float32，最后 source_embeddings.to(bfloat16) 再喂给
+  reprogramming（和现有 348–355 行的 dtype 处理对齐）。
+  4. freeze_for_finetune：需要把新增的 VAE 模块（mu/logvar 投影、decoder）一并
+  requires_grad_(False)，否则 few-shot transfer 时这些层还在更新。
+  5. 参数规模：当前 mapping_layer 是 num_prototypes × vocab_size（500 × 词表大小，很大），换成 latent_dim
+  × d_llm 的 decoder 反而更省。latent_dim 建议 16~64。
 
-```
-第一层（成本最低，先做）:
-  GCN输出 → GRL → 域分类器  [方案A]
-  目的：让 FC 编码本身域不变
+  一点关于"为什么做这个"的提醒
 
-第二层（与第一层协同）:
-  Reprogrammed token → 对比学习 loss  [方案B的子集]
-  目的：让 LLM 看到的 token 跨域对齐
-  可以与 FutureFC loss 联合训练（FC 结构本身就是域无关的自监督信号）
-
-第三层（更复杂，后续探索）:
-  域感知 prototype / token-level GRL
-  目的：让 reprogramming 映射本身域不变
-```
-
-## 额外的思考
-
-### 1. FutureFC 作为天然的域不变自监督信号
-
-FC 矩阵的拓扑结构（哪个脑区跟哪个脑区连接）是神经科学的 universal property，不依赖采集设备和范式。当前 FutureFC 辅助 loss 只监督了"预测下一时刻 FC"——这个任务本身就是域无关的。你后续计划的 **mask token 损失** 也很适合做域不变特征学习：随机 mask 掉某些时间窗口的 FC，让模型从其他窗口和 LLM 知识中重建——这个任务不依赖域标签，天然跨域通用。
-
-### 2. 实验设计建议
-
-验证域泛化效果时，建议构造明确的 **leave-one-dataset-out** 协议：
-- 在 N-1 个数据集上训练（含域对抗/对比 loss）
-- 在第 N 个数据集上 zero-shot 评估
-- 这样可以清晰区分"模型学到了更通用的特征"还是"在训练集分布内过拟合"
-
-### 3. 关于 ALTER 的 baseline 意义
-
-你提到已经在 CAUEEG 疾病诊断上超越了 ALTER（同域）。如果跨域泛化上反而退步，说明 TimeLLM 的 LLM + reprogramming 虽然增加了模型容量，但也增加了过拟合到源域的风险——这正是方案 A+B 组合需要解决的。"更强的模型"在单域上更好但在跨域上更差，是域泛化的经典 pattern。
-
-**总结：建议先上方案 A（快速验证域对抗在 FC 分析上的有效性），同时改造 dataloader 支持多数据集混合训练，为方案 B 的对比学习做准备。方案 B 的 reprogram 层改进是更有想象力的方向，但工程成本更高，值得作为后续重点。**
+  VAE
+  重参数化本质是给原型流形加一个平滑/正则先验，不是直接的域不变机制——它更多是"抑制源域原型过拟合"，对你
+  plan.txt 里的跨域泛化是辅助性的。如果目标是跨域，建议把它和已有的 FutureFC / 后续 mask-token
+  自监督信号联合训练，并明确它在这条路线里的定位（正则器，而非主机制），这样实验消融也好写。

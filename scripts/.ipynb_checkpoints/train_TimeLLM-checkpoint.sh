@@ -13,7 +13,7 @@ DATASET=${1:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
 EARLY_STOP_METRIC=${2:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
 EARLY_STOP_MIN_DELTA=${3:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
 
-deepspeed --num_gpus=3 main.py \
+deepspeed --num_gpus=6 main.py \
     --model "TimeLLM" \
     --num_epochs 200 \
     --num_repeat 1 \
@@ -34,18 +34,16 @@ deepspeed --num_gpus=3 main.py \
     --dropout 0.1 \
     --llm_type llama \
     --llm_path ./model/deepseek-r1-distill-llama-8B \
-    --few_shot 5 \
+    --few_shot 0 \
     --few_shot_seed 42 \
-    --pretrain_path "./output_dir/TimeLLM_AgeCAUEEG_train" \
+    --pretrain_path "" \
     --use_task_prompt \
     --lora_rank 16 \
     --lora_alpha 32 \
     --lora_dropout 0.1 \
     --lora_target_modules "q_proj,v_proj" \
-    --token_domain_lambda 1.0 \
-    --num_domains 2 \
-    --domain_cls_hidden 256 \
-    --domain_grl_weight 1.0 \
+    --use_channel_prototype \
+    --channel_proto_rank 32 \
     --deepspeed \
     --do_train \
     --do_evaluate \
@@ -60,7 +58,6 @@ deepspeed --num_gpus=3 main.py \
 #   --block_causal_mask \
 #   --use_dataset_prompt \
 #   --use_task_prompt \
-#   --use_token_domain_grl \      # enable token-level domain classifier + GRL
 
     
 
