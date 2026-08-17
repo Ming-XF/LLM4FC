@@ -42,10 +42,6 @@ deepspeed --num_gpus=3 main.py \
     --lora_alpha 32 \
     --lora_dropout 0.1 \
     --lora_target_modules "q_proj,v_proj" \
-    --token_domain_lambda 1.0 \
-    --num_domains 2 \
-    --domain_cls_hidden 256 \
-    --domain_grl_weight 1.0 \
     --deepspeed \
     --do_train \
     --do_evaluate \
@@ -60,7 +56,6 @@ deepspeed --num_gpus=3 main.py \
 #   --block_causal_mask \
 #   --use_dataset_prompt \
 #   --use_task_prompt \
-#   --use_token_domain_grl \      # enable token-level domain classifier + GRL
 
     
 

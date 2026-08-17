@@ -116,6 +116,4 @@ class TimeLLMTrainer(Trainer):
             "SFC": inputs['correlation'].float().to(self.device),
             "labels": labels.to(self.device),
         }
-        if 'domain_label' in inputs:
-            kwargs['domain_label'] = inputs['domain_label'].to(self.device)
         return kwargs
