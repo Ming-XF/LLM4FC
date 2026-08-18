@@ -51,6 +51,7 @@ class TimeLLMConfig(BaseConfig):
                  lora_dropout=0.1,
                  lora_target_modules="q_proj,v_proj",
                  use_gc_lora=False,
+                 lora_num_layers=-1,
                  block_causal_mask=False,
                  use_channel_prototype=False,
                  channel_proto_rank=32):
@@ -76,6 +77,7 @@ class TimeLLMConfig(BaseConfig):
         self.lora_dropout = lora_dropout
         self.lora_target_modules = lora_target_modules
         self.use_gc_lora = use_gc_lora
+        self.lora_num_layers = lora_num_layers
         self.block_causal_mask = block_causal_mask
         self.use_channel_prototype = use_channel_prototype
         self.channel_proto_rank = channel_proto_rank
@@ -254,6 +256,7 @@ class Model(nn.Module):
                 num_nodes=config.node_size,
                 num_windows=config.num_windows,
                 use_graph_cond=config.use_gc_lora,
+                num_layers=config.lora_num_layers,
             )
             _log.info(
                 "Injected %s-LoRA into %d modules (%s), rank=%d, alpha=%.1f",

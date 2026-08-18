@@ -204,6 +204,7 @@ def inject_lora_to_llm(
     num_nodes: int = 19,
     num_windows: int = 10,
     use_graph_cond: bool = False,
+    num_layers: int = -1,
 ) -> int:
     """Replace selected Linear layers inside the LLM decoder stack with
     :class:`GCLoRALinear` wrappers.
@@ -232,6 +233,8 @@ def inject_lora_to_llm(
         Number of time windows *T*.
     use_graph_cond:
         Enable GC-LoRA (GCN between A and B).
+    num_layers:
+        Number of leading decoder layers to inject into (``-1`` = all layers).
 
     Returns
     -------
@@ -256,6 +259,8 @@ def inject_lora_to_llm(
     na = 'GC-' if use_graph_cond else ''
 
     for layer_idx, layer in enumerate(layers):
+        if num_layers >= 0 and layer_idx >= num_layers:
+            break
         for path in search_paths:
             container = getattr(layer, path, None)
             if container is None:

@@ -74,6 +74,7 @@ def init_model_config(args, data_config: DataConfig):
             lora_dropout=args.lora_dropout,
             lora_target_modules=args.lora_target_modules,
             use_gc_lora=args.use_gc_lora,
+            lora_num_layers=args.lora_num_layers,
             block_causal_mask=args.block_causal_mask,
             use_channel_prototype=args.use_channel_prototype,
             channel_proto_rank=args.channel_proto_rank,
@@ -189,6 +190,8 @@ def init_config():
                              help="Comma-separated target module names (default: q_proj,v_proj)")
     model_group.add_argument("--use_gc_lora", action="store_true",
                              help="Enable GC-LoRA (graph-conditioned LoRA; requires --use_lora)")
+    model_group.add_argument("--lora_num_layers", default=-1, type=int,
+                             help="Number of leading LLM layers to inject LoRA into (-1 = all layers)")
     model_group.add_argument("--block_causal_mask", action="store_true",
                              help="Enable block-causal attention mask "
                                   "(same-window bidirectional, cross-window causal)")

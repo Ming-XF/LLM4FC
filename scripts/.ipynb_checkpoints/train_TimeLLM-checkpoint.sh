@@ -39,10 +39,11 @@ deepspeed --num_gpus=6 main.py \
     --use_task_prompt \
     --use_lora \
     --use_gc_lora \
-    --lora_rank 16 \
-    --lora_alpha 32 \
+    --lora_rank 256 \
+    --lora_alpha 512 \
     --lora_dropout 0.1 \
-    --lora_target_modules "o_proj" \
+    --lora_target_modules "v_proj,o_proj" \
+    --lora_num_layers 1 \
     --use_channel_prototype \
     --channel_proto_rank 32 \
     --deepspeed \
