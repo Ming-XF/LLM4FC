@@ -42,8 +42,8 @@ deepspeed --num_gpus=6 main.py \
     --lora_alpha 32 \
     --lora_dropout 0.1 \
     --lora_target_modules "q_proj,v_proj" \
-    --use_channel_prototype \
     --channel_proto_rank 32 \
+    --gcn_after_reprogram \
     --deepspeed \
     --do_train \
     --do_evaluate \
@@ -58,8 +58,9 @@ deepspeed --num_gpus=6 main.py \
 #   --block_causal_mask \
 #   --use_dataset_prompt \
 #   --use_task_prompt \
+#   --use_channel_prototype \
 
-    
+        
 
 
 
