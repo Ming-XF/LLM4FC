@@ -34,8 +34,8 @@ class TimeLLMConfig(BaseConfig):
                  n_heads=8,
                  d_ff=128,
                  num_prototypes=500,
-                 gcn_hidden=128,
                  num_gcn_layers=1,
+                 use_gcn=False,
                  dropout=0.1,
                  num_windows=10,
                  task_type='classification',
@@ -53,15 +53,14 @@ class TimeLLMConfig(BaseConfig):
                  use_gc_lora=False,
                  block_causal_mask=False,
                  use_channel_prototype=False,
-                 channel_proto_rank=32,
-                 gcn_after_reprogram=False):
+                 channel_proto_rank=32):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
         self.d_ff = d_ff
         self.num_prototypes = num_prototypes
-        self.gcn_hidden = gcn_hidden
         self.num_gcn_layers = num_gcn_layers
+        self.use_gcn = use_gcn
         self.dropout = dropout
         self.num_windows = num_windows
         self.task_type = task_type
@@ -80,7 +79,6 @@ class TimeLLMConfig(BaseConfig):
         self.block_causal_mask = block_causal_mask
         self.use_channel_prototype = use_channel_prototype
         self.channel_proto_rank = channel_proto_rank
-        self.gcn_after_reprogram = gcn_after_reprogram
 
 
 class ReprogrammingLayer(nn.Module):
@@ -133,27 +131,12 @@ class Model(nn.Module):
         self.llm_type = config.llm_type
         self.llm_path = config.llm_path
 
-        if config.gcn_after_reprogram:
-            # 新路径：one-hot → reprogram(d_llm) → GCN(d_llm) → LLM
-            self.gcn_layers = nn.ModuleList([
-                GCNLayer(self.d_llm, self.d_llm, dropout=config.dropout)
-                for _ in range(config.num_gcn_layers)
-            ])
-            self.node_projection = None
-            self.channel_embed_projection = nn.Linear(config.node_size, config.d_model)
-        else:
-            # 旧路径：one-hot → GCN(gcn_hidden) → node_projection(d_model) → reprogram(d_llm) → LLM
-            self.gcn_layers = nn.ModuleList([
-                GCNLayer(config.gcn_hidden, config.gcn_hidden, dropout=config.dropout)
-                for _ in range(config.num_gcn_layers)
-            ])
-            self.node_projection = nn.Sequential(
-                nn.Linear(config.gcn_hidden, config.d_model),
-                nn.LayerNorm(config.d_model),
-                nn.GELU(),
-                nn.Dropout(config.dropout),
-            )
-            self.channel_embed_projection = nn.Linear(config.node_size, config.gcn_hidden)
+        # 数据流：one-hot → reprogram(d_llm) → GCN(d_llm) → LLM
+        self.gcn_layers = nn.ModuleList([
+            GCNLayer(self.d_llm, self.d_llm, dropout=config.dropout)
+            for _ in range(config.num_gcn_layers)
+        ])
+        self.channel_embed_projection = nn.Linear(config.node_size, config.d_model)
 
         # ── LLM 加载（分支：chatglm / llama）──────────────────
         if self.llm_type == 'chatglm':
@@ -330,84 +313,42 @@ class Model(nn.Module):
 
         reprogram_dtype = self.reprogramming_layer.query_projection.weight.dtype
 
-        if self.config.gcn_after_reprogram:
-            # ── 新路径：one-hot → reprogram(逐通道) → GCN(d_llm) → LLM ──
-            # 先用 one-hot 通道身份做 Reprogram，避免 GCN 提前混通道导致同质化
-            eye = torch.eye(C, device=device, dtype=self.channel_embed_projection.weight.dtype)
-            node_init = self.channel_embed_projection(eye)         # (C, d_model)
+        # ── one-hot → reprogram(逐通道) → GCN(d_llm) → LLM ──
+        # 先用 one-hot 通道身份做 Reprogram，避免 GCN 提前混通道导致同质化
+        eye = torch.eye(C, device=device, dtype=self.channel_embed_projection.weight.dtype)
+        node_init = self.channel_embed_projection(eye)         # (C, d_model)
 
-            if self.config.use_channel_prototype:
-                A_we = self.channel_lora_A @ we.permute(1, 0)      # (r, d_llm)
-                chunks = []
-                for c in range(C):
-                    P_c = source_embeddings + self.channel_lora_B[c] @ A_we  # (S, d_llm) 通道 c 专属集合
-                    out_c = self.reprogramming_layer(
-                        node_init[c:c + 1].unsqueeze(0).to(dtype=reprogram_dtype),  # (1,1,d_model)
-                        P_c.to(dtype=reprogram_dtype),
-                        P_c.to(dtype=reprogram_dtype),
-                    )                                              # (1,1,d_llm)
-                    chunks.append(out_c.squeeze(0))                # (1, d_llm)
-                reprogrammed_channels = torch.cat(chunks, dim=0)   # (C, d_llm)
-            else:
-                reprogrammed_channels = self.reprogramming_layer(
-                    node_init.unsqueeze(1).to(dtype=reprogram_dtype),  # (C,1,d_model)
-                    source_embeddings.to(dtype=reprogram_dtype),
-                    source_embeddings.to(dtype=reprogram_dtype),
-                ).squeeze(1)                                        # (C, d_llm)
+        if self.config.use_channel_prototype:
+            A_we = self.channel_lora_A @ we.permute(1, 0)      # (r, d_llm)
+            chunks = []
+            for c in range(C):
+                P_c = source_embeddings + self.channel_lora_B[c] @ A_we  # (S, d_llm) 通道 c 专属集合
+                out_c = self.reprogramming_layer(
+                    node_init[c:c + 1].unsqueeze(0).to(dtype=reprogram_dtype),  # (1,1,d_model)
+                    P_c.to(dtype=reprogram_dtype),
+                    P_c.to(dtype=reprogram_dtype),
+                )                                              # (1,1,d_llm)
+                chunks.append(out_c.squeeze(0))                # (1, d_llm)
+            reprogrammed_channels = torch.cat(chunks, dim=0)   # (C, d_llm)
+        else:
+            reprogrammed_channels = self.reprogramming_layer(
+                node_init.unsqueeze(1).to(dtype=reprogram_dtype),  # (C,1,d_model)
+                source_embeddings.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype),
+            ).squeeze(1)                                        # (C, d_llm)
 
-            # GCN 逐窗口图卷积：窗口无关的通道嵌入 + 每窗口邻接
-            DFC_flat = DFC.reshape(B * T, C, C)
-            gcn_in = reprogrammed_channels.unsqueeze(0).expand(B * T, -1, -1)  # (B*T, C, d_llm)
+        # GCN 逐窗口图卷积：窗口无关的通道嵌入 + 每窗口邻接
+        DFC_flat = DFC.reshape(B * T, C, C)
+        gcn_in = reprogrammed_channels.unsqueeze(0).expand(B * T, -1, -1)  # (B*T, C, d_llm)
+        if self.config.use_gcn:
             gcn_out = gcn_in
             for layer in self.gcn_layers:
                 gcn_out = layer(gcn_out, DFC_flat)
                 gcn_out = F.gelu(gcn_out)
-            # 重组为时间优先序列（token 顺序：C0T0, C1T0, ... C18T0, C0T1, ...）
-            reprogrammed = gcn_out.reshape(B, T, C, -1).reshape(B, T * C, -1)  # (B, T*C, d_llm)
         else:
-            # ── 旧路径：one-hot → GCN(gcn_hidden) → node_projection → reprogram ──
-            DFC_flat = DFC.reshape(B * T, C, C)
-            adj_norm = DFC_flat
-
-            eye = torch.eye(C, device=device, dtype=self.channel_embed_projection.weight.dtype)
-            node_init = self.channel_embed_projection(eye)         # (C, gcn_hidden)
-            node_init = node_init.unsqueeze(0).expand(B * T, -1, -1)
-            gcn_out = node_init
-            for layer in self.gcn_layers:
-                gcn_out = layer(gcn_out, adj_norm)
-                gcn_out = F.gelu(gcn_out)
-
-            # (B*T, C, gcn_hidden) → (B, T, C, gcn_hidden) → (B, T*C, gcn_hidden)
-            # token order: C0T0, C1T0, ..., C18T0, C0T1, ..., C18T9
-            gcn_out = gcn_out.reshape(B, T, C, -1)
-            gcn_out = gcn_out.reshape(B, T * C, -1)
-
-            node_embeddings = self.node_projection(gcn_out)
-
-            if self.config.use_channel_prototype:
-                # A 投影到原型空间（共享，每 forward 一次），复用上方已 fp32 化的 we
-                A_we = self.channel_lora_A @ we.permute(1, 0)      # (r, d_llm)
-                reprogrammed_chunks = []
-                for c in range(C):
-                    node_c = node_embeddings[:, c::C, :]           # (B, T, d_model)
-                    P_c = source_embeddings + self.channel_lora_B[c] @ A_we  # (S, d_llm) 通道 c 专属集合
-                    out_c = self.reprogramming_layer(
-                        node_c.to(dtype=reprogram_dtype),
-                        P_c.to(dtype=reprogram_dtype),
-                        P_c.to(dtype=reprogram_dtype),
-                    )                                              # (B, T, d_llm)
-                    reprogrammed_chunks.append(out_c)
-                # 拼回时间优先顺序 index = t*C + c（与原来 token 顺序一致）
-                reprogrammed = torch.stack(reprogrammed_chunks, dim=0)  # (C, B, T, d_llm)
-                reprogrammed = reprogrammed.permute(1, 2, 0, 3)     # (B, T, C, d_llm)
-                reprogrammed = reprogrammed.reshape(B, T * C, -1)   # (B, T*C, d_llm)
-            else:
-                source_embeddings = source_embeddings.to(dtype=self.word_embeddings.dtype)
-                reprogrammed = self.reprogramming_layer(
-                    node_embeddings.to(dtype=reprogram_dtype),
-                    source_embeddings.to(dtype=reprogram_dtype),
-                    source_embeddings.to(dtype=reprogram_dtype),
-                )
+            gcn_out = gcn_in   # 不做图卷积，窗口间仅靠 LLM 位置编码区分
+        # 重组为时间优先序列（token 顺序：C0T0, C1T0, ... C18T0, C0T1, ...）
+        reprogrammed = gcn_out.reshape(B, T, C, -1).reshape(B, T * C, -1)  # (B, T*C, d_llm)
 
         reprogrammed = reprogrammed.to(dtype=torch.bfloat16)
 

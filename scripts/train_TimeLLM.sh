@@ -29,21 +29,22 @@ deepspeed --num_gpus=6 main.py \
     --num_heads 8 \
     --num_prototypes 1000 \
     --d_ff 128 \
-    --gcn_hidden 128 \
-    --num_gcn_layers 1 \
     --dropout 0.1 \
     --llm_type llama \
     --llm_path ./model/deepseek-r1-distill-llama-8B \
     --few_shot 0 \
     --few_shot_seed 42 \
     --pretrain_path "" \
+    --num_gcn_layers 1 \
     --use_task_prompt \
+    --use_lora \
+    --use_gc_lora \
     --lora_rank 16 \
     --lora_alpha 32 \
     --lora_dropout 0.1 \
-    --lora_target_modules "q_proj,v_proj" \
+    --lora_target_modules "o_proj" \
+    --use_channel_prototype \
     --channel_proto_rank 32 \
-    --gcn_after_reprogram \
     --deepspeed \
     --do_train \
     --do_evaluate \
@@ -59,6 +60,7 @@ deepspeed --num_gpus=6 main.py \
 #   --use_dataset_prompt \
 #   --use_task_prompt \
 #   --use_channel_prototype \
+#   --use_gcn \
 
         
 
