@@ -35,7 +35,6 @@ class TimeLLMConfig(BaseConfig):
                  d_ff=128,
                  num_prototypes=500,
                  num_gcn_layers=1,
-                 use_gcn=False,
                  dropout=0.1,
                  num_windows=10,
                  task_type='classification',
@@ -52,17 +51,13 @@ class TimeLLMConfig(BaseConfig):
                  lora_target_modules="q_proj,v_proj",
                  use_gc_lora=False,
                  lora_num_layers=-1,
-                 block_causal_mask=False,
-                 use_channel_prototype=False,
-                 channel_proto_rank=32,
-                 channel_proto_diversity_weight=0.0):
+                 block_causal_mask=False):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
         self.d_ff = d_ff
         self.num_prototypes = num_prototypes
         self.num_gcn_layers = num_gcn_layers
-        self.use_gcn = use_gcn
         self.dropout = dropout
         self.num_windows = num_windows
         self.task_type = task_type
@@ -80,9 +75,6 @@ class TimeLLMConfig(BaseConfig):
         self.use_gc_lora = use_gc_lora
         self.lora_num_layers = lora_num_layers
         self.block_causal_mask = block_causal_mask
-        self.use_channel_prototype = use_channel_prototype
-        self.channel_proto_rank = channel_proto_rank
-        self.channel_proto_diversity_weight = channel_proto_diversity_weight
 
 
 class ReprogrammingLayer(nn.Module):
@@ -100,21 +92,12 @@ class ReprogrammingLayer(nn.Module):
 
     def forward(self, target_embedding, source_embedding, value_embedding):
         B, L, _ = target_embedding.shape
+        S, _ = source_embedding.shape
         H = self.n_heads
 
         target_embedding = self.query_projection(target_embedding).view(B, L, H, -1)
-
-        # source/value 支持两种形状：
-        #   (S, d_llm)         —— 所有 query 共享同一套原型（原路径）
-        #   (B, S, d_llm)      —— 每个 query 通道各自一套原型（channel_prototype 向量化）
-        if source_embedding.dim() == 2:
-            S, _ = source_embedding.shape
-            source_embedding = self.key_projection(source_embedding).view(S, H, -1)
-            value_embedding = self.value_projection(value_embedding).view(S, H, -1)
-        else:
-            _, S, _ = source_embedding.shape
-            source_embedding = self.key_projection(source_embedding).view(B, S, H, -1)
-            value_embedding = self.value_projection(value_embedding).view(B, S, H, -1)
+        source_embedding = self.key_projection(source_embedding).view(S, H, -1)
+        value_embedding = self.value_projection(value_embedding).view(S, H, -1)
 
         out = self._reprogramming(target_embedding, source_embedding, value_embedding)
         out = out.reshape(B, L, -1)
@@ -124,14 +107,9 @@ class ReprogrammingLayer(nn.Module):
         B, L, H, E = target_embedding.shape
         scale = 1. / sqrt(E)
 
-        if source_embedding.dim() == 3:   # 共享 source: (S, H, E)
-            scores = torch.einsum("blhe,she->bhls", target_embedding, source_embedding)
-            A = self.dropout(torch.softmax(scale * scores, dim=-1))
-            reprogramming_embedding = torch.einsum("bhls,she->blhe", A, value_embedding)
-        else:                             # 每通道独立 source: (B, S, H, E)
-            scores = torch.einsum("blhe,bshe->bhls", target_embedding, source_embedding)
-            A = self.dropout(torch.softmax(scale * scores, dim=-1))
-            reprogramming_embedding = torch.einsum("bhls,bshe->blhe", A, value_embedding)
+        scores = torch.einsum("blhe,she->bhls", target_embedding, source_embedding)
+        A = self.dropout(torch.softmax(scale * scores, dim=-1))
+        reprogramming_embedding = torch.einsum("bhls,she->blhe", A, value_embedding)
 
         return reprogramming_embedding
 
@@ -149,9 +127,8 @@ class Model(nn.Module):
         self.llm_type = config.llm_type
         self.llm_path = config.llm_path
 
-        # 数据流：one-hot → reprogram(d_llm) → GCN(d_llm) → LLM
         self.gcn_layers = nn.ModuleList([
-            GCNLayer(self.d_llm, self.d_llm, dropout=config.dropout)
+            GCNLayer(self.d_model, self.d_model, dropout=config.dropout)
             for _ in range(config.num_gcn_layers)
         ])
         self.channel_embed_projection = nn.Linear(config.node_size, config.d_model)
@@ -219,23 +196,6 @@ class Model(nn.Module):
         self.word_embeddings = self._word_embeddings.weight
         self.vocab_size = self.word_embeddings.shape[0]
         self.mapping_layer = nn.Linear(self.vocab_size, self.num_prototypes)
-
-        # 通道专属原型集合：对 mapping_layer 做 LoRA 低秩分解，1 套共享 → 每通道 1 套
-        # W_c = W_map + B[c] @ A；P_c = P_shared + B[c] @ (A @ we)
-        if config.use_channel_prototype:
-            self.channel_proto_rank = config.channel_proto_rank
-            # A: 共享 down (r, vocab)，随机初始化
-            self.channel_lora_A = nn.Parameter(
-                torch.empty(config.channel_proto_rank, self.vocab_size))
-            nn.init.kaiming_uniform_(self.channel_lora_A)
-            # B: 每通道 up (C, S, r)，零初始化 → ΔW=0，初始即共享集合，平滑启动
-            self.channel_lora_B = nn.Parameter(
-                torch.zeros(config.node_size, config.num_prototypes,
-                            config.channel_proto_rank))
-        else:
-            self.channel_lora_A = None
-            self.channel_lora_B = None
-            self.channel_proto_rank = 0
 
         self.reprogramming_layer = ReprogrammingLayer(
             d_model=config.d_model,
@@ -326,47 +286,36 @@ class Model(nn.Module):
         B, T, C, _ = DFC.shape
         device = DFC.device
 
+        # ── 共享 GCN 逐窗口编码 ──
+        # (B, T, C, C) → (B*T, C, C)，每个窗口独立过同一个 GCN
+        DFC_flat = DFC.reshape(B * T, C, C)
+        adj_norm = DFC_flat
+
+        eye = torch.eye(C, device=device, dtype=self.channel_embed_projection.weight.dtype)
+        node_init = self.channel_embed_projection(eye)  # (C, d_model)
+        node_init = node_init.unsqueeze(0).expand(B * T, -1, -1)
+        gcn_out = node_init
+        for layer in self.gcn_layers:
+            gcn_out = layer(gcn_out, adj_norm)
+            gcn_out = F.gelu(gcn_out)
+
+        # 重组为时间优先序列
+        # (B*T, C, d_model) → (B, T, C, d_model) → (B, T*C, d_model)
+        gcn_out = gcn_out.reshape(B, T, C, -1)
+        gcn_out = gcn_out.reshape(B, T * C, -1)
+
         we = self.word_embeddings.permute(1, 0).to(
             dtype=self.mapping_layer.weight.dtype)
-        source_embeddings = self.mapping_layer(we).permute(1, 0)  # (S, d_llm) 共享 base 原型
+        source_embeddings = self.mapping_layer(we).permute(1, 0)
+        source_embeddings = source_embeddings.to(
+            dtype=self.word_embeddings.dtype)
 
         reprogram_dtype = self.reprogramming_layer.query_projection.weight.dtype
-
-        # ── one-hot → reprogram(逐通道) → GCN(d_llm) → LLM ──
-        # 先用 one-hot 通道身份做 Reprogram，避免 GCN 提前混通道导致同质化
-        eye = torch.eye(C, device=device, dtype=self.channel_embed_projection.weight.dtype)
-        node_init = self.channel_embed_projection(eye)         # (C, d_model)
-
-        if self.config.use_channel_prototype:
-            A_we = self.channel_lora_A @ we.permute(1, 0)      # (r, d_llm)
-            # 向量化：一次性算出所有通道专属原型 (C, S, d_llm)，批量做 cross-attention，
-            # 替代原先 for c in range(C) 的 19 次串行调用
-            delta = self.channel_lora_B @ A_we                 # (C, S, d_llm)
-            P_channels = source_embeddings.unsqueeze(0) + delta  # (C, S, d_llm)
-            reprogrammed_channels = self.reprogramming_layer(
-                node_init.unsqueeze(1).to(dtype=reprogram_dtype),  # (C, 1, d_model)
-                P_channels.to(dtype=reprogram_dtype),
-                P_channels.to(dtype=reprogram_dtype),
-            ).squeeze(1)                                        # (C, d_llm)
-        else:
-            reprogrammed_channels = self.reprogramming_layer(
-                node_init.unsqueeze(1).to(dtype=reprogram_dtype),  # (C,1,d_model)
-                source_embeddings.to(dtype=reprogram_dtype),
-                source_embeddings.to(dtype=reprogram_dtype),
-            ).squeeze(1)                                        # (C, d_llm)
-
-        # GCN 逐窗口图卷积：窗口无关的通道嵌入 + 每窗口邻接
-        DFC_flat = DFC.reshape(B * T, C, C)
-        gcn_in = reprogrammed_channels.unsqueeze(0).expand(B * T, -1, -1)  # (B*T, C, d_llm)
-        if self.config.use_gcn:
-            gcn_out = gcn_in
-            for layer in self.gcn_layers:
-                gcn_out = layer(gcn_out, DFC_flat)
-                gcn_out = F.gelu(gcn_out)
-        else:
-            gcn_out = gcn_in   # 不做图卷积，窗口间仅靠 LLM 位置编码区分
-        # 重组为时间优先序列（token 顺序：C0T0, C1T0, ... C18T0, C0T1, ...）
-        reprogrammed = gcn_out.reshape(B, T, C, -1).reshape(B, T * C, -1)  # (B, T*C, d_llm)
+        reprogrammed = self.reprogramming_layer(
+            gcn_out.to(dtype=reprogram_dtype),
+            source_embeddings.to(dtype=reprogram_dtype),
+            source_embeddings.to(dtype=reprogram_dtype),
+        )
 
         reprogrammed = reprogrammed.to(dtype=torch.bfloat16)
 
@@ -482,20 +431,6 @@ class Model(nn.Module):
             if labels.dim() > 1 and labels.shape[-1] > 1:
                 labels = labels.argmax(dim=-1)
             loss = F.cross_entropy(logits, labels)
-
-        # ── 通道原型多样性正则（Barlow-Twins / VICReg 风格协方差）──
-        # 仅当 use_channel_prototype 且 weight > 0 时生效，零开销
-        if (self.config.use_channel_prototype
-                and self.config.channel_proto_diversity_weight > 0.0):
-            proto_B = self.channel_lora_B              # (C, S, r)
-            Cc, Sr, rr = proto_B.shape                 # 注意勿覆盖 batch 变量 B
-            Bc = proto_B.reshape(Cc, Sr * rr)          # (C, S*r)
-            Bc = Bc - Bc.mean(dim=0, keepdim=True)     # 中心化
-            cov = (Bc @ Bc.t()) / (Sr * rr)            # (C, C)
-            off = (cov - torch.diag(cov.diag())).pow(2).mean()   # 非对角→0（去相关）
-            on = (cov.diag() - 1.0).pow(2).mean()                # 对角→1（防坍缩）
-            L_div = off + on
-            loss = loss + self.config.channel_proto_diversity_weight * L_div
 
         return ModelOutputs(
             logits=logits,

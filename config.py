@@ -58,7 +58,6 @@ def init_model_config(args, data_config: DataConfig):
             d_ff=args.d_ff,
             num_prototypes=args.num_prototypes,
             num_gcn_layers=args.num_gcn_layers,
-            use_gcn=args.use_gcn,
             dropout=args.dropout,
             num_windows=args.num_windows,
             task_type=data_config.task_type,
@@ -76,9 +75,6 @@ def init_model_config(args, data_config: DataConfig):
             use_gc_lora=args.use_gc_lora,
             lora_num_layers=args.lora_num_layers,
             block_causal_mask=args.block_causal_mask,
-            use_channel_prototype=args.use_channel_prototype,
-            channel_proto_rank=args.channel_proto_rank,
-            channel_proto_diversity_weight=args.channel_proto_diversity_weight,
         )
         model = Model(model_config)
     else:
@@ -165,17 +161,8 @@ def init_config():
                              help="Path to pretrained LLM directory")
     model_group.add_argument("--patch_stride", default=5, type=int, help="DFC temporal subsampling stride (TimeLLM v1 only)")
     model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
-    model_group.add_argument("--use_channel_prototype", action="store_true",
-                             help="TimeLLM: per-channel prototypes (shared base + channel bias)")
-    model_group.add_argument("--channel_proto_rank", default=32, type=int,
-                             help="Low-rank dim of per-channel prototype set (r)")
-    model_group.add_argument("--channel_proto_diversity_weight", default=0.0, type=float,
-                             help="Barlow-Twins/VICReg covariance regularization on "
-                                  "per-channel prototypes (0 = off, try 1e-3 ~ 1e-1)")
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
     model_group.add_argument("--num_gcn_layers", default=1, type=int, help="Number of GCN layers (TimeLLM)")
-    model_group.add_argument("--use_gcn", action="store_true",
-                             help="TimeLLM: apply GCN after reprogramming (default: off)")
     model_group.add_argument("--use_dataset_prompt", action="store_true",
                              help="TimeLLM: include dataset description prompt")
     model_group.add_argument("--use_task_prompt", action="store_true",

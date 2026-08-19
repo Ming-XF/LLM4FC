@@ -25,7 +25,7 @@ deepspeed --num_gpus=6 main.py \
     --dataset "$DATASET" \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
-    --d_model 64 \
+    --d_model 128 \
     --num_heads 8 \
     --d_ff 128 \
     --dropout 0.1 \
@@ -34,19 +34,14 @@ deepspeed --num_gpus=6 main.py \
     --few_shot 0 \
     --few_shot_seed 42 \
     --pretrain_path "" \
-    --num_gcn_layers 1 \
     --use_task_prompt \
-    --use_lora \
-    --use_gc_lora \
+    --num_gcn_layers 1 \
+    --num_prototypes 1000 \
     --lora_rank 128 \
     --lora_alpha 256 \
     --lora_dropout 0.1 \
     --lora_target_modules "v_proj,o_proj" \
     --lora_num_layers 1 \
-    --use_channel_prototype \
-    --channel_proto_diversity_weight 1 \
-    --channel_proto_rank 256 \
-    --num_prototypes 1000 \
     --deepspeed \
     --do_train \
     --do_evaluate \
@@ -61,8 +56,6 @@ deepspeed --num_gpus=6 main.py \
 #   --block_causal_mask \
 #   --use_dataset_prompt \
 #   --use_task_prompt \
-#   --use_channel_prototype \
-#   --use_gcn \
 
         
 

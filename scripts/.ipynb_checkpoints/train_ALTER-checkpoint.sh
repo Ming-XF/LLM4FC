@@ -13,14 +13,14 @@ DATASET=${1:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
 EARLY_STOP_METRIC=${2:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
 EARLY_STOP_MIN_DELTA=${3:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
 
-deepspeed --num_gpus=3 main.py \
+deepspeed --num_gpus=6 main.py \
     --model "ALTER" \
     --num_epochs 200 \
     --num_repeat 1 \
     --dataset "$DATASET" \
-    --few_shot 5 \
+    --few_shot 0 \
     --few_shot_seed 42 \
-    --pretrain_path "./output_dir/ALTER_AgeCAUEEG_train" \
+    --pretrain_path "" \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
     --num_heads 1 \
