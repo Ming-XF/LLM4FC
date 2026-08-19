@@ -54,7 +54,8 @@ class TimeLLMConfig(BaseConfig):
                  lora_num_layers=-1,
                  block_causal_mask=False,
                  use_channel_prototype=False,
-                 channel_proto_rank=32):
+                 channel_proto_rank=32,
+                 channel_proto_diversity_weight=0.0):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -81,6 +82,7 @@ class TimeLLMConfig(BaseConfig):
         self.block_causal_mask = block_causal_mask
         self.use_channel_prototype = use_channel_prototype
         self.channel_proto_rank = channel_proto_rank
+        self.channel_proto_diversity_weight = channel_proto_diversity_weight
 
 
 class ReprogrammingLayer(nn.Module):
@@ -98,12 +100,21 @@ class ReprogrammingLayer(nn.Module):
 
     def forward(self, target_embedding, source_embedding, value_embedding):
         B, L, _ = target_embedding.shape
-        S, _ = source_embedding.shape
         H = self.n_heads
 
         target_embedding = self.query_projection(target_embedding).view(B, L, H, -1)
-        source_embedding = self.key_projection(source_embedding).view(S, H, -1)
-        value_embedding = self.value_projection(value_embedding).view(S, H, -1)
+
+        # source/value 支持两种形状：
+        #   (S, d_llm)         —— 所有 query 共享同一套原型（原路径）
+        #   (B, S, d_llm)      —— 每个 query 通道各自一套原型（channel_prototype 向量化）
+        if source_embedding.dim() == 2:
+            S, _ = source_embedding.shape
+            source_embedding = self.key_projection(source_embedding).view(S, H, -1)
+            value_embedding = self.value_projection(value_embedding).view(S, H, -1)
+        else:
+            _, S, _ = source_embedding.shape
+            source_embedding = self.key_projection(source_embedding).view(B, S, H, -1)
+            value_embedding = self.value_projection(value_embedding).view(B, S, H, -1)
 
         out = self._reprogramming(target_embedding, source_embedding, value_embedding)
         out = out.reshape(B, L, -1)
@@ -113,9 +124,14 @@ class ReprogrammingLayer(nn.Module):
         B, L, H, E = target_embedding.shape
         scale = 1. / sqrt(E)
 
-        scores = torch.einsum("blhe,she->bhls", target_embedding, source_embedding)
-        A = self.dropout(torch.softmax(scale * scores, dim=-1))
-        reprogramming_embedding = torch.einsum("bhls,she->blhe", A, value_embedding)
+        if source_embedding.dim() == 3:   # 共享 source: (S, H, E)
+            scores = torch.einsum("blhe,she->bhls", target_embedding, source_embedding)
+            A = self.dropout(torch.softmax(scale * scores, dim=-1))
+            reprogramming_embedding = torch.einsum("bhls,she->blhe", A, value_embedding)
+        else:                             # 每通道独立 source: (B, S, H, E)
+            scores = torch.einsum("blhe,bshe->bhls", target_embedding, source_embedding)
+            A = self.dropout(torch.softmax(scale * scores, dim=-1))
+            reprogramming_embedding = torch.einsum("bhls,bshe->blhe", A, value_embedding)
 
         return reprogramming_embedding
 
@@ -323,16 +339,15 @@ class Model(nn.Module):
 
         if self.config.use_channel_prototype:
             A_we = self.channel_lora_A @ we.permute(1, 0)      # (r, d_llm)
-            chunks = []
-            for c in range(C):
-                P_c = source_embeddings + self.channel_lora_B[c] @ A_we  # (S, d_llm) 通道 c 专属集合
-                out_c = self.reprogramming_layer(
-                    node_init[c:c + 1].unsqueeze(0).to(dtype=reprogram_dtype),  # (1,1,d_model)
-                    P_c.to(dtype=reprogram_dtype),
-                    P_c.to(dtype=reprogram_dtype),
-                )                                              # (1,1,d_llm)
-                chunks.append(out_c.squeeze(0))                # (1, d_llm)
-            reprogrammed_channels = torch.cat(chunks, dim=0)   # (C, d_llm)
+            # 向量化：一次性算出所有通道专属原型 (C, S, d_llm)，批量做 cross-attention，
+            # 替代原先 for c in range(C) 的 19 次串行调用
+            delta = self.channel_lora_B @ A_we                 # (C, S, d_llm)
+            P_channels = source_embeddings.unsqueeze(0) + delta  # (C, S, d_llm)
+            reprogrammed_channels = self.reprogramming_layer(
+                node_init.unsqueeze(1).to(dtype=reprogram_dtype),  # (C, 1, d_model)
+                P_channels.to(dtype=reprogram_dtype),
+                P_channels.to(dtype=reprogram_dtype),
+            ).squeeze(1)                                        # (C, d_llm)
         else:
             reprogrammed_channels = self.reprogramming_layer(
                 node_init.unsqueeze(1).to(dtype=reprogram_dtype),  # (C,1,d_model)
@@ -467,6 +482,20 @@ class Model(nn.Module):
             if labels.dim() > 1 and labels.shape[-1] > 1:
                 labels = labels.argmax(dim=-1)
             loss = F.cross_entropy(logits, labels)
+
+        # ── 通道原型多样性正则（Barlow-Twins / VICReg 风格协方差）──
+        # 仅当 use_channel_prototype 且 weight > 0 时生效，零开销
+        if (self.config.use_channel_prototype
+                and self.config.channel_proto_diversity_weight > 0.0):
+            proto_B = self.channel_lora_B              # (C, S, r)
+            Cc, Sr, rr = proto_B.shape                 # 注意勿覆盖 batch 变量 B
+            Bc = proto_B.reshape(Cc, Sr * rr)          # (C, S*r)
+            Bc = Bc - Bc.mean(dim=0, keepdim=True)     # 中心化
+            cov = (Bc @ Bc.t()) / (Sr * rr)            # (C, C)
+            off = (cov - torch.diag(cov.diag())).pow(2).mean()   # 非对角→0（去相关）
+            on = (cov.diag() - 1.0).pow(2).mean()                # 对角→1（防坍缩）
+            L_div = off + on
+            loss = loss + self.config.channel_proto_diversity_weight * L_div
 
         return ModelOutputs(
             logits=logits,

@@ -27,7 +27,6 @@ deepspeed --num_gpus=6 main.py \
     --fc_keep_ratio 1.0 \
     --d_model 64 \
     --num_heads 8 \
-    --num_prototypes 1000 \
     --d_ff 128 \
     --dropout 0.1 \
     --llm_type llama \
@@ -39,13 +38,15 @@ deepspeed --num_gpus=6 main.py \
     --use_task_prompt \
     --use_lora \
     --use_gc_lora \
-    --lora_rank 256 \
-    --lora_alpha 512 \
+    --lora_rank 128 \
+    --lora_alpha 256 \
     --lora_dropout 0.1 \
     --lora_target_modules "v_proj,o_proj" \
     --lora_num_layers 1 \
     --use_channel_prototype \
-    --channel_proto_rank 32 \
+    --channel_proto_diversity_weight 1 \
+    --channel_proto_rank 256 \
+    --num_prototypes 1000 \
     --deepspeed \
     --do_train \
     --do_evaluate \
