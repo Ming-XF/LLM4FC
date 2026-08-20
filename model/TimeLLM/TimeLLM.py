@@ -52,7 +52,10 @@ class TimeLLMConfig(BaseConfig):
                  use_gc_lora=False,
                  lora_num_layers=-1,
                  block_causal_mask=False,
-                 token_order='time_first'):
+                 token_order='time_first',
+                 use_cvib=False,
+                 cvib_mode='vae',
+                 cvib_beta=1e-3):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -77,6 +80,9 @@ class TimeLLMConfig(BaseConfig):
         self.lora_num_layers = lora_num_layers
         self.block_causal_mask = block_causal_mask
         self.token_order = token_order
+        self.use_cvib = use_cvib
+        self.cvib_mode = cvib_mode
+        self.cvib_beta = cvib_beta
 
 
 class ReprogrammingLayer(nn.Module):
@@ -114,6 +120,27 @@ class ReprogrammingLayer(nn.Module):
         reprogramming_embedding = torch.einsum("bhls,she->blhe", A, value_embedding)
 
         return reprogramming_embedding
+
+
+class LabelEncoder(nn.Module):
+    """条件标签编码器：分类 -> Embedding，回归 -> 线性中心。
+
+    将标签 y 编码为 (B, d_model) 的类/值条件中心，供 CVIB 的
+    类条件先验 (vae) 或对比中心 (contrastive) 使用。
+    """
+
+    def __init__(self, task_type, output_dim, d_model):
+        super().__init__()
+        self.task_type = task_type
+        if task_type == 'classification':
+            self.emb = nn.Embedding(output_dim, d_model)
+        else:
+            self.emb = nn.Linear(1, d_model)
+
+    def forward(self, y):
+        if self.task_type == 'classification':
+            return self.emb(y)                    # (B, d_model)
+        return self.emb(y[:, None])               # (B, d_model)
 
 
 class Model(nn.Module):
@@ -206,6 +233,24 @@ class Model(nn.Module):
             attention_dropout=config.dropout,
         )
 
+        # ── CVIB：GCN 输出作为 z（分类与回归均支持）──────────
+        self.use_cvib = config.use_cvib
+        if config.use_cvib:
+            self.cvib_mode = config.cvib_mode
+            self.cvib_beta = config.cvib_beta
+            if config.cvib_mode == 'vae':
+                self.mu_head = nn.Linear(config.d_model, config.d_model)
+                self.logvar_head = nn.Linear(config.d_model, config.d_model)
+                self.label_encoder = LabelEncoder(
+                    config.task_type, config.output_dim, config.d_model)
+                self.label_logvar_encoder = LabelEncoder(
+                    config.task_type, config.output_dim, config.d_model)
+            elif config.cvib_mode == 'contrastive':
+                self.label_encoder = LabelEncoder(
+                    config.task_type, config.output_dim, config.d_model)
+            else:
+                raise ValueError(f"Unsupported cvib_mode: {config.cvib_mode}")
+
         # 节点初始特征用 one-hot → Linear 投影，训练中可学习
 
         self.head_nf = config.d_ff * config.node_size * config.num_windows
@@ -289,6 +334,68 @@ class Model(nn.Module):
         else:
             return torch.where(allowed, 0.0, float('-inf'))   # 0 = attend
 
+    def _normalize_label(self, labels, device):
+        """将 labels 归一化为 CVIB 所需的条件变量 y。
+
+        - 分类: one-hot -> argmax，否则取整 → long
+        - 回归: float，(B,1) -> squeeze
+        """
+        if self.task_type == 'regression':
+            y = labels.float()
+            if y.dim() > 1 and y.shape[-1] == 1:
+                y = y.squeeze(-1)
+        else:
+            y = labels
+            if y.dim() > 1 and y.shape[-1] > 1:
+                y = y.argmax(dim=-1)
+            y = y.long()
+        return y.to(device)
+
+    def _cvib_encode(self, gcn_out, labels, device):
+        """根据 cvib_mode 生成 z 与辅助损失。
+
+        Args:
+            gcn_out: (B, N, d_model) GCN 输出，作为 z 的基底
+            labels: 原始标签
+
+        Returns:
+            z: (B, N, d_model) 顶替 gcn_out 作为 reprogramming 的 query
+            aux: scalar tensor（仅训练时），否则 None
+        """
+        y = self._normalize_label(labels, device)
+        B, N, _ = gcn_out.shape
+
+        if self.cvib_mode == 'vae':
+            mu = self.mu_head(gcn_out)                      # (B, N, d)
+            logvar = self.logvar_head(gcn_out).clamp(-10.0, 10.0)
+            if self.training:
+                std = torch.exp(0.5 * logvar)
+                eps = torch.randn_like(std)
+                z = mu + std * eps
+                # 类条件先验 r(z|y) = N(mu_r, sigma_r^2)
+                mu_r = self.label_encoder(y).unsqueeze(1)              # (B, 1, d)
+                logvar_r = self.label_logvar_encoder(y).unsqueeze(1).clamp(-10.0, 10.0)
+                var = torch.exp(logvar)
+                var_r = torch.exp(logvar_r)
+                kl = 0.5 * (logvar_r - logvar - 1.0 + (var + (mu - mu_r) ** 2) / var_r)
+                aux = kl.mean()
+            else:
+                z = mu
+                aux = None
+        elif self.cvib_mode == 'contrastive':
+            z = gcn_out
+            aux = None
+            if self.training:
+                c_y = self.label_encoder(y)                            # (B, d)
+                z_norm = F.normalize(z, dim=-1)                        # (B, N, d)
+                c_norm = F.normalize(c_y, dim=-1)                      # (B, d)
+                cos = (z_norm * c_norm.unsqueeze(1)).sum(dim=-1)       # (B, N)
+                aux = (1.0 - cos).mean()                               # 标量，最小化
+        else:
+            raise ValueError(f"Unsupported cvib_mode: {self.cvib_mode}")
+
+        return z, aux
+
     def forward(self, DFC, SFC, labels, gender=None, age=None, education=None):
         B, T, C, _ = DFC.shape
         device = DFC.device
@@ -317,6 +424,13 @@ class Model(nn.Module):
             # Time-First: [t0c0, t0c1, ..., t_{T-1}c_{C-1}]
             gcn_out = gcn_out.reshape(B, T * C, -1)        # (B, T*C, d_model)
 
+        # ── CVIB：GCN 输出作为 z ──
+        cvib_aux = None
+        if self.config.use_cvib:
+            z, cvib_aux = self._cvib_encode(gcn_out, labels, device)
+        else:
+            z = gcn_out
+
         we = self.word_embeddings.permute(1, 0).to(
             dtype=self.mapping_layer.weight.dtype)
         source_embeddings = self.mapping_layer(we).permute(1, 0)
@@ -325,7 +439,7 @@ class Model(nn.Module):
 
         reprogram_dtype = self.reprogramming_layer.query_projection.weight.dtype
         reprogrammed = self.reprogramming_layer(
-            gcn_out.to(dtype=reprogram_dtype),
+            z.to(dtype=reprogram_dtype),
             source_embeddings.to(dtype=reprogram_dtype),
             source_embeddings.to(dtype=reprogram_dtype),
         )
@@ -445,6 +559,10 @@ class Model(nn.Module):
                 labels = labels.argmax(dim=-1)
             loss = F.cross_entropy(logits, labels)
 
+        # ── CVIB 辅助损失（仅训练时）──
+        if cvib_aux is not None:
+            loss = loss + self.config.cvib_beta * cvib_aux
+
         return ModelOutputs(
             logits=logits,
             loss=loss,
@@ -452,5 +570,6 @@ class Model(nn.Module):
                 'gcn_out': gcn_out,
                 'reprogrammed': reprogrammed,
                 'HL_patches': HL_patches,
+                'z': z,
             }
         )

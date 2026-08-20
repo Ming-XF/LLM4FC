@@ -36,8 +36,11 @@ deepspeed --num_gpus=6 main.py \
     --pretrain_path "" \
     --use_task_prompt \
     --num_gcn_layers 1 \
+    --use_cvib \
+    --cvib_mode contrastive \
+    --cvib_beta 1e-3 \
     --num_prototypes 1000 \
-    --token_order node_first \
+    --token_order time_first \
     --lora_rank 128 \
     --lora_alpha 256 \
     --lora_dropout 0.1 \
@@ -58,6 +61,9 @@ deepspeed --num_gpus=6 main.py \
 #   --use_dataset_prompt \
 #   --use_task_prompt \
 #   --token_order node_first \
+#   --use_cvib \
+#   --cvib_mode vae \
+#   --cvib_beta 1e-3 \
         
 
 

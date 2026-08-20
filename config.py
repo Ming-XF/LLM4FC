@@ -76,6 +76,9 @@ def init_model_config(args, data_config: DataConfig):
             lora_num_layers=args.lora_num_layers,
             block_causal_mask=args.block_causal_mask,
             token_order=args.token_order,
+            use_cvib=args.use_cvib,
+            cvib_mode=args.cvib_mode,
+            cvib_beta=args.cvib_beta,
         )
         model = Model(model_config)
     else:
@@ -191,6 +194,15 @@ def init_config():
                              choices=["time_first", "node_first"],
                              help="Patch token order into the LLM: "
                                   "time_first (default) / node_first")
+    model_group.add_argument("--use_cvib", action="store_true",
+                             help="CVIB: apply conditional compression to the "
+                                  "GCN output z (classification & regression)")
+    model_group.add_argument("--cvib_mode", default="vae", type=str,
+                             choices=["vae", "contrastive"],
+                             help="vae=stochastic z + KL loss; "
+                                  "contrastive=deterministic z + contrastive loss")
+    model_group.add_argument("--cvib_beta", default=1e-3, type=float,
+                             help="CVIB auxiliary loss weight (KL or contrastive)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
