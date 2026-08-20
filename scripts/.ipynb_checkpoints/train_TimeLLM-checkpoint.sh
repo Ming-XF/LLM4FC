@@ -37,6 +37,7 @@ deepspeed --num_gpus=6 main.py \
     --use_task_prompt \
     --num_gcn_layers 1 \
     --num_prototypes 1000 \
+    --token_order node_first \
     --lora_rank 128 \
     --lora_alpha 256 \
     --lora_dropout 0.1 \
@@ -56,7 +57,7 @@ deepspeed --num_gpus=6 main.py \
 #   --block_causal_mask \
 #   --use_dataset_prompt \
 #   --use_task_prompt \
-
+#   --token_order node_first \
         
 
 

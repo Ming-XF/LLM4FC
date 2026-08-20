@@ -75,6 +75,7 @@ def init_model_config(args, data_config: DataConfig):
             use_gc_lora=args.use_gc_lora,
             lora_num_layers=args.lora_num_layers,
             block_causal_mask=args.block_causal_mask,
+            token_order=args.token_order,
         )
         model = Model(model_config)
     else:
@@ -186,6 +187,10 @@ def init_config():
     model_group.add_argument("--block_causal_mask", action="store_true",
                              help="Enable block-causal attention mask "
                                   "(same-window bidirectional, cross-window causal)")
+    model_group.add_argument("--token_order", default="time_first", type=str,
+                             choices=["time_first", "node_first"],
+                             help="Patch token order into the LLM: "
+                                  "time_first (default) / node_first")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

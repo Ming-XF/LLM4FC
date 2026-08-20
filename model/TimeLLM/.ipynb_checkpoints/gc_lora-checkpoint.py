@@ -87,7 +87,6 @@ class GCLoRALinear(nn.Module):
         num_nodes: int = 19,
         num_windows: int = 10,
         use_graph_cond: bool = False,
-        token_order: str = 'time_first',
     ):
         super().__init__()
         d_in = base_linear.in_features
@@ -109,7 +108,6 @@ class GCLoRALinear(nn.Module):
         self.num_nodes = num_nodes
         self.num_windows = num_windows
         self.use_graph_cond = use_graph_cond
-        self.token_order = token_order
 
         # Runtime context — populated by Model.forward before each LLM call
         self.fc_adj: torch.Tensor | None = None   # (B, T, C, C)
@@ -148,13 +146,10 @@ class GCLoRALinear(nn.Module):
         x_patches = x[:, P:, :]                          # (B, T*C, d_in)
 
         # ── Reshape to (B, T, C, d_in) ──
-        # Token order (set by Model.forward):
-        #   time_first: C0T0, C1T0, ..., C18T0, C0T1, ..., C18T9
-        #   node_first: C0T0, C0T1, ..., C0T9, C1T0, ..., C18T9
-        if self.token_order == 'node_first':
-            x_2d = x_patches.reshape(B, C, T, d_in).permute(0, 2, 1, 3)  # (B, T, C, d_in)
-        else:
-            x_2d = x_patches.reshape(B, T, C, d_in)          # (B, T, C, d_in)
+        # Current token order is time-first:
+        #   C0T0, C1T0, ..., C18T0, C0T1, ..., C18T9
+        # So consecutive groups of C tokens belong to the same time window.
+        x_2d = x_patches.reshape(B, T, C, d_in)          # (B, T, C, d_in)
 
         # ── Cast to LoRA weight dtype ──
         # LLM hidden states are bfloat16, but DeepSpeed ZeRO-2 manages
@@ -185,11 +180,7 @@ class GCLoRALinear(nn.Module):
         delta = delta.to(dtype=result.dtype)
 
         # ── Flatten back to sequence ──
-        if self.token_order == 'node_first':
-            delta_flat = delta.permute(0, 2, 1, 3).reshape(
-                B, C * T, self.base_linear.out_features)
-        else:
-            delta_flat = delta.reshape(B, T * C, self.base_linear.out_features)
+        delta_flat = delta.reshape(B, T * C, self.base_linear.out_features)
         delta_full = torch.cat([
             torch.zeros(B, P, delta_flat.size(-1),
                        device=x.device, dtype=delta_flat.dtype),
@@ -214,7 +205,6 @@ def inject_lora_to_llm(
     num_windows: int = 10,
     use_graph_cond: bool = False,
     num_layers: int = -1,
-    token_order: str = 'time_first',
 ) -> int:
     """Replace selected Linear layers inside the LLM decoder stack with
     :class:`GCLoRALinear` wrappers.
@@ -245,8 +235,6 @@ def inject_lora_to_llm(
         Enable GC-LoRA (GCN between A and B).
     num_layers:
         Number of leading decoder layers to inject into (``-1`` = all layers).
-    token_order:
-        Patch token order into the LLM (``"time_first"`` or ``"node_first"``).
 
     Returns
     -------
@@ -292,7 +280,6 @@ def inject_lora_to_llm(
                     num_nodes=num_nodes,
                     num_windows=num_windows,
                     use_graph_cond=use_graph_cond,
-                    token_order=token_order,
                 )
                 setattr(container, target, wrapped)
                 n_injected += 1

@@ -51,7 +51,8 @@ class TimeLLMConfig(BaseConfig):
                  lora_target_modules="q_proj,v_proj",
                  use_gc_lora=False,
                  lora_num_layers=-1,
-                 block_causal_mask=False):
+                 block_causal_mask=False,
+                 token_order='time_first'):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -75,6 +76,7 @@ class TimeLLMConfig(BaseConfig):
         self.use_gc_lora = use_gc_lora
         self.lora_num_layers = lora_num_layers
         self.block_causal_mask = block_causal_mask
+        self.token_order = token_order
 
 
 class ReprogrammingLayer(nn.Module):
@@ -233,6 +235,7 @@ class Model(nn.Module):
                 num_windows=config.num_windows,
                 use_graph_cond=config.use_gc_lora,
                 num_layers=config.lora_num_layers,
+                token_order=config.token_order,
             )
             _log.info(
                 "Injected %s-LoRA into %d modules (%s), rank=%d, alpha=%.1f",
@@ -245,19 +248,22 @@ class Model(nn.Module):
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
     @staticmethod
-    def _create_block_causal_mask(S, P_skip, C, T, device, llm_type):
+    def _create_block_causal_mask(S, P_skip, C, T, device, llm_type, token_order):
         """构造 Block-Causal Attention Mask.
 
         - Prompt tokens (0:P_skip): 标准因果注意力
-        - Patch tokens: 同一时间窗口内 (每组 C 个) 双向可见，跨窗口因果
+        - Patch tokens: 同一 group 内双向可见，跨 group 因果
+          - time_first: group = 同一时间窗口 (每组 C 个通道)
+          - node_first: group = 同一节点 (每组 T 个时间窗口)
 
         Args:
             S: 总序列长度
             P_skip: prompt token 数量
-            C: 每窗口通道数 (19)
+            C: 通道数 (19)
             T: 时间窗口数 (10)
             llm_type: 'chatglm' -> bool mask (True=遮蔽, False=可见),
                       'llama' -> float mask (0=可见, -inf=遮蔽)
+            token_order: 'time_first' | 'node_first'
 
         Returns:
             (S, S) mask, dtype 与 llm_type 对应
@@ -268,14 +274,15 @@ class Model(nn.Module):
         # 标准因果: col <= row
         causal_allowed = (col_idx <= row_idx)
 
-        # 同一时间窗口内: 双向可见
-        # window_of[i] = 窗口编号 (0..T-1) for patch tokens, -1 for prompt
-        window_of = torch.full((S,), -1, dtype=torch.long, device=device)
-        window_of[P_skip:] = torch.arange(T * C, device=device) // C
-        same_window = (window_of.unsqueeze(1) == window_of.unsqueeze(0)) \
-                      & (window_of.unsqueeze(1) >= 0)
+        # 同一 group 内: 双向可见
+        # group_of[i] = group 编号 (0..num_groups-1) for patch tokens, -1 for prompt
+        group_size = C if token_order == 'time_first' else T
+        group_of = torch.full((S,), -1, dtype=torch.long, device=device)
+        group_of[P_skip:] = torch.arange(T * C, device=device) // group_size
+        same_group = (group_of.unsqueeze(1) == group_of.unsqueeze(0)) \
+                     & (group_of.unsqueeze(1) >= 0)
 
-        allowed = causal_allowed | same_window
+        allowed = causal_allowed | same_group
 
         if llm_type == 'chatglm':
             return ~allowed                     # True = 遮蔽
@@ -299,10 +306,16 @@ class Model(nn.Module):
             gcn_out = layer(gcn_out, adj_norm)
             gcn_out = F.gelu(gcn_out)
 
-        # 重组为时间优先序列
-        # (B*T, C, d_model) → (B, T, C, d_model) → (B, T*C, d_model)
+        # 重组为 patch 序列
+        # (B*T, C, d_model) → (B, T, C, d_model) → (B, T*C, d_model) 或 (B, C*T, d_model)
         gcn_out = gcn_out.reshape(B, T, C, -1)
-        gcn_out = gcn_out.reshape(B, T * C, -1)
+        if self.config.token_order == 'node_first':
+            # Node-First: [c0t0, c0t1, ..., c_{C-1}t_{T-1}]
+            gcn_out = gcn_out.permute(0, 2, 1, 3)          # (B, C, T, d_model)
+            gcn_out = gcn_out.reshape(B, C * T, -1)        # (B, C*T, d_model)
+        else:
+            # Time-First: [t0c0, t0c1, ..., t_{T-1}c_{C-1}]
+            gcn_out = gcn_out.reshape(B, T * C, -1)        # (B, T*C, d_model)
 
         we = self.word_embeddings.permute(1, 0).to(
             dtype=self.mapping_layer.weight.dtype)
@@ -344,7 +357,7 @@ class Model(nn.Module):
             # ── Block-Causal Mask (同窗口双向) 或 标准因果 ──
             if self.config.block_causal_mask:
                 causal_mask = self._create_block_causal_mask(
-                    S, P_skip, C, T, device, 'chatglm')
+                    S, P_skip, C, T, device, 'chatglm', self.config.token_order)
             else:
                 causal_mask = torch.triu(
                     torch.ones(S, S, dtype=torch.bool, device=device), diagonal=1)
@@ -392,7 +405,7 @@ class Model(nn.Module):
             # 启用 block-causal mask 时传入双向窗口 mask
             if self.config.block_causal_mask:
                 attn_mask_2d = self._create_block_causal_mask(
-                    S, P_skip, C, T, device, 'llama')
+                    S, P_skip, C, T, device, 'llama', self.config.token_order)
                 attention_mask = attn_mask_2d.unsqueeze(0).unsqueeze(0).expand(B, 1, -1, -1)
             else:
                 attention_mask = None
