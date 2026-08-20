@@ -366,30 +366,30 @@ class Model(nn.Module):
         B, N, _ = gcn_out.shape
 
         if self.cvib_mode == 'vae':
-            mu = self.mu_head(gcn_out)                      # (B, N, d)
-            logvar = self.logvar_head(gcn_out).clamp(-10.0, 10.0)
+            # subject 级对齐：先 pool，再进 mu/logvar 线性层
+            h = gcn_out.mean(dim=1)                          # (B, d)
+            mu = self.mu_head(h)                             # (B, d)
+            logvar = self.logvar_head(h).clamp(-10.0, 10.0)  # (B, d)
             if self.training:
-                std = torch.exp(0.5 * logvar)
-                eps = torch.randn_like(std)
-                z = mu + std * eps
-                # 类条件先验 r(z|y) = N(mu_r, sigma_r^2)
-                mu_r = self.label_encoder(y).unsqueeze(1)              # (B, 1, d)
-                logvar_r = self.label_logvar_encoder(y).unsqueeze(1).clamp(-10.0, 10.0)
+                # 类条件先验 r(z|y) = N(mu_r, sigma_r^2)，subject 级
+                mu_r = self.label_encoder(y)                 # (B, d)
+                logvar_r = self.label_logvar_encoder(y).clamp(-10.0, 10.0)  # (B, d)
                 var = torch.exp(logvar)
                 var_r = torch.exp(logvar_r)
                 kl = 0.5 * (logvar_r - logvar - 1.0 + (var + (mu - mu_r) ** 2) / var_r)
                 aux = kl.mean()
             else:
-                z = mu
                 aux = None
+            z = gcn_out                                       # query 保持节点级不变
         elif self.cvib_mode == 'contrastive':
             z = gcn_out
             aux = None
             if self.training:
                 c_y = self.label_encoder(y)                            # (B, d)
-                z_norm = F.normalize(z, dim=-1)                        # (B, N, d)
+                h = z.mean(dim=1)                                      # (B, d) subject 级 pooled
+                h_norm = F.normalize(h, dim=-1)                        # (B, d)
                 c_norm = F.normalize(c_y, dim=-1)                      # (B, d)
-                cos = (z_norm * c_norm.unsqueeze(1)).sum(dim=-1)       # (B, N)
+                cos = (h_norm * c_norm).sum(dim=-1)                    # (B,)  subject 级对齐
                 aux = (1.0 - cos).mean()                               # 标量，最小化
         else:
             raise ValueError(f"Unsupported cvib_mode: {self.cvib_mode}")

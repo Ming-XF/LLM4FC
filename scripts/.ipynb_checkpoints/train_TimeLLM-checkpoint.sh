@@ -37,7 +37,7 @@ deepspeed --num_gpus=6 main.py \
     --use_task_prompt \
     --num_gcn_layers 1 \
     --use_cvib \
-    --cvib_mode contrastive \
+    --cvib_mode vae \
     --cvib_beta 1e-3 \
     --num_prototypes 1000 \
     --token_order time_first \
