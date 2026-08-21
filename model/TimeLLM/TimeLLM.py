@@ -54,7 +54,6 @@ class TimeLLMConfig(BaseConfig):
                  block_causal_mask=False,
                  token_order='time_first',
                  use_cvib=False,
-                 cvib_mode='vae',
                  cvib_beta=1e-3):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
@@ -81,7 +80,6 @@ class TimeLLMConfig(BaseConfig):
         self.block_causal_mask = block_causal_mask
         self.token_order = token_order
         self.use_cvib = use_cvib
-        self.cvib_mode = cvib_mode
         self.cvib_beta = cvib_beta
 
 
@@ -126,7 +124,7 @@ class LabelEncoder(nn.Module):
     """条件标签编码器：分类 -> Embedding，回归 -> 线性中心。
 
     将标签 y 编码为 (B, d_model) 的类/值条件中心，供 CVIB 的
-    类条件先验 (vae) 或对比中心 (contrastive) 使用。
+    类条件先验 (vae) 使用。
     """
 
     def __init__(self, task_type, output_dim, d_model):
@@ -236,20 +234,13 @@ class Model(nn.Module):
         # ── CVIB：GCN 输出作为 z（分类与回归均支持）──────────
         self.use_cvib = config.use_cvib
         if config.use_cvib:
-            self.cvib_mode = config.cvib_mode
             self.cvib_beta = config.cvib_beta
-            if config.cvib_mode == 'vae':
-                self.mu_head = nn.Linear(config.d_model, config.d_model)
-                self.logvar_head = nn.Linear(config.d_model, config.d_model)
-                self.label_encoder = LabelEncoder(
-                    config.task_type, config.output_dim, config.d_model)
-                self.label_logvar_encoder = LabelEncoder(
-                    config.task_type, config.output_dim, config.d_model)
-            elif config.cvib_mode == 'contrastive':
-                self.label_encoder = LabelEncoder(
-                    config.task_type, config.output_dim, config.d_model)
-            else:
-                raise ValueError(f"Unsupported cvib_mode: {config.cvib_mode}")
+            self.mu_head = nn.Linear(config.d_model, config.d_model)
+            self.logvar_head = nn.Linear(config.d_model, config.d_model)
+            self.label_encoder = LabelEncoder(
+                config.task_type, config.output_dim, config.d_model)
+            self.label_logvar_encoder = LabelEncoder(
+                config.task_type, config.output_dim, config.d_model)
 
         # 节点初始特征用 one-hot → Linear 投影，训练中可学习
 
@@ -352,7 +343,7 @@ class Model(nn.Module):
         return y.to(device)
 
     def _cvib_encode(self, gcn_out, labels, device):
-        """根据 cvib_mode 生成 z 与辅助损失。
+        """CVIB (vae) 编码：生成 subject 级 KL 对齐的 z 与辅助损失。
 
         Args:
             gcn_out: (B, N, d_model) GCN 输出，作为 z 的基底
@@ -363,36 +354,22 @@ class Model(nn.Module):
             aux: scalar tensor（仅训练时），否则 None
         """
         y = self._normalize_label(labels, device)
-        B, N, _ = gcn_out.shape
 
-        if self.cvib_mode == 'vae':
-            # subject 级对齐：先 pool，再进 mu/logvar 线性层
-            h = gcn_out.mean(dim=1)                          # (B, d)
-            mu = self.mu_head(h)                             # (B, d)
-            logvar = self.logvar_head(h).clamp(-10.0, 10.0)  # (B, d)
-            if self.training:
-                # 类条件先验 r(z|y) = N(mu_r, sigma_r^2)，subject 级
-                mu_r = self.label_encoder(y)                 # (B, d)
-                logvar_r = self.label_logvar_encoder(y).clamp(-10.0, 10.0)  # (B, d)
-                var = torch.exp(logvar)
-                var_r = torch.exp(logvar_r)
-                kl = 0.5 * (logvar_r - logvar - 1.0 + (var + (mu - mu_r) ** 2) / var_r)
-                aux = kl.mean()
-            else:
-                aux = None
-            z = gcn_out                                       # query 保持节点级不变
-        elif self.cvib_mode == 'contrastive':
-            z = gcn_out
-            aux = None
-            if self.training:
-                c_y = self.label_encoder(y)                            # (B, d)
-                h = z.mean(dim=1)                                      # (B, d) subject 级 pooled
-                h_norm = F.normalize(h, dim=-1)                        # (B, d)
-                c_norm = F.normalize(c_y, dim=-1)                      # (B, d)
-                cos = (h_norm * c_norm).sum(dim=-1)                    # (B,)  subject 级对齐
-                aux = (1.0 - cos).mean()                               # 标量，最小化
+        # subject 级对齐：先 pool，再进 mu/logvar 线性层
+        h = gcn_out.mean(dim=1)                          # (B, d)
+        mu = self.mu_head(h)                             # (B, d)
+        logvar = self.logvar_head(h).clamp(-10.0, 10.0)  # (B, d)
+        if self.training:
+            # 类条件先验 r(z|y) = N(mu_r, sigma_r^2)，subject 级
+            mu_r = self.label_encoder(y)                 # (B, d)
+            logvar_r = self.label_logvar_encoder(y).clamp(-10.0, 10.0)  # (B, d)
+            var = torch.exp(logvar)
+            var_r = torch.exp(logvar_r)
+            kl = 0.5 * (logvar_r - logvar - 1.0 + (var + (mu - mu_r) ** 2) / var_r)
+            aux = kl.mean()
         else:
-            raise ValueError(f"Unsupported cvib_mode: {self.cvib_mode}")
+            aux = None
+        z = gcn_out                                       # query 保持节点级不变
 
         return z, aux
 

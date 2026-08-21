@@ -37,8 +37,7 @@ deepspeed --num_gpus=6 main.py \
     --use_task_prompt \
     --num_gcn_layers 1 \
     --use_cvib \
-    --cvib_mode vae \
-    --cvib_beta 0.1 \
+    --cvib_beta 0.01 \
     --num_prototypes 1000 \
     --token_order time_first \
     --lora_rank 128 \
@@ -62,7 +61,6 @@ deepspeed --num_gpus=6 main.py \
 #   --use_task_prompt \
 #   --token_order node_first \
 #   --use_cvib \
-#   --cvib_mode vae \
 #   --cvib_beta 1e-3 \
         
 
