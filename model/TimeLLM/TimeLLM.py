@@ -232,9 +232,7 @@ class Model(nn.Module):
         )
 
         # ── CVIB：GCN 输出作为 z（分类与回归均支持）──────────
-        self.use_cvib = config.use_cvib
         if config.use_cvib:
-            self.cvib_beta = config.cvib_beta
             self.mu_head = nn.Linear(config.d_model, config.d_model)
             self.logvar_head = nn.Linear(config.d_model, config.d_model)
             self.label_encoder = LabelEncoder(
@@ -342,36 +340,29 @@ class Model(nn.Module):
             y = y.long()
         return y.to(device)
 
-    def _cvib_encode(self, gcn_out, labels, device):
-        """CVIB (vae) 编码：生成 subject 级 KL 对齐的 z 与辅助损失。
+    def _cvib_kl(self, h, labels):
+        """CVIB 辅助损失：后验 q(z|x) 与类条件先验 r(z|y) 的 KL。
+
+        先验依赖标签，故仅训练时由调用方触发。
 
         Args:
-            gcn_out: (B, N, d_model) GCN 输出，作为 z 的基底
+            h: (B, d_model) subject 级 pooled 表征
             labels: 原始标签
 
         Returns:
-            z: (B, N, d_model) 顶替 gcn_out 作为 reprogramming 的 query
-            aux: scalar tensor（仅训练时），否则 None
+            scalar tensor
         """
-        y = self._normalize_label(labels, device)
+        y = self._normalize_label(labels, h.device)
 
-        # subject 级对齐：先 pool，再进 mu/logvar 线性层
-        h = gcn_out.mean(dim=1)                          # (B, d)
         mu = self.mu_head(h)                             # (B, d)
         logvar = self.logvar_head(h).clamp(-10.0, 10.0)  # (B, d)
-        if self.training:
-            # 类条件先验 r(z|y) = N(mu_r, sigma_r^2)，subject 级
-            mu_r = self.label_encoder(y)                 # (B, d)
-            logvar_r = self.label_logvar_encoder(y).clamp(-10.0, 10.0)  # (B, d)
-            var = torch.exp(logvar)
-            var_r = torch.exp(logvar_r)
-            kl = 0.5 * (logvar_r - logvar - 1.0 + (var + (mu - mu_r) ** 2) / var_r)
-            aux = kl.mean()
-        else:
-            aux = None
-        z = gcn_out                                       # query 保持节点级不变
-
-        return z, aux
+        # 类条件先验 r(z|y) = N(mu_r, sigma_r^2)，subject 级
+        mu_r = self.label_encoder(y)                     # (B, d)
+        logvar_r = self.label_logvar_encoder(y).clamp(-10.0, 10.0)  # (B, d)
+        var = torch.exp(logvar)
+        var_r = torch.exp(logvar_r)
+        kl = 0.5 * (logvar_r - logvar - 1.0 + (var + (mu - mu_r) ** 2) / var_r)
+        return kl.mean()
 
     def forward(self, DFC, SFC, labels, gender=None, age=None, education=None):
         B, T, C, _ = DFC.shape
@@ -401,12 +392,10 @@ class Model(nn.Module):
             # Time-First: [t0c0, t0c1, ..., t_{T-1}c_{C-1}]
             gcn_out = gcn_out.reshape(B, T * C, -1)        # (B, T*C, d_model)
 
-        # ── CVIB：GCN 输出作为 z ──
+        # ── CVIB 辅助损失（先验依赖标签，仅训练时计算）──
         cvib_aux = None
-        if self.config.use_cvib:
-            z, cvib_aux = self._cvib_encode(gcn_out, labels, device)
-        else:
-            z = gcn_out
+        if self.config.use_cvib and self.training:
+            cvib_aux = self._cvib_kl(gcn_out.mean(dim=1), labels)
 
         we = self.word_embeddings.permute(1, 0).to(
             dtype=self.mapping_layer.weight.dtype)
@@ -416,7 +405,7 @@ class Model(nn.Module):
 
         reprogram_dtype = self.reprogramming_layer.query_projection.weight.dtype
         reprogrammed = self.reprogramming_layer(
-            z.to(dtype=reprogram_dtype),
+            gcn_out.to(dtype=reprogram_dtype),
             source_embeddings.to(dtype=reprogram_dtype),
             source_embeddings.to(dtype=reprogram_dtype),
         )
@@ -547,6 +536,5 @@ class Model(nn.Module):
                 'gcn_out': gcn_out,
                 'reprogrammed': reprogrammed,
                 'HL_patches': HL_patches,
-                'z': z,
             }
         )
