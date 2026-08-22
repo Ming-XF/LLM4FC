@@ -32,22 +32,24 @@ Key runtime flags (defined in `config.py:init_config`):
 - `--do_parallel` uses `torch.nn.parallel.DistributedDataParallel` instead (init via `torchrun`/env vars).
 - `--few_shot 0` = use all data; `>0` = N subjects per class; `-1` = full-data finetune. Combined with `--pretrain_path` this triggers transfer-learning mode (zero-shot / few-shot) in `main.py:main`.
 - `--early_stop_metric`/`--early_stop_patience`/`--early_stop_min_delta` control val-based early stopping.
+- `--save_steps` controls checkpoint cadence; `--schedule cos` is the standard LR schedule (see `scripts/`).
+- Debug/utility flags: `--max_steps` limits steps per epoch (`-1` = full), `--drop_last` drops the last incomplete batch, `--standard_split` forces the 60/20/20 split even when `--num_repeat > 1`.
 
 ## Architecture
 
 The control flow is: `main.py:main` → `config.py:init_config` (argparse) → instantiate a `Trainer` subclass (`trainers.py`) → `DataConfig` + dataset → `config.py:init_model_config` builds the model → train/eval loop in `utils/trainer.py`.
 
-- **`utils/trainer.py`** — base `Trainer` class holds all training/evaluation logic: `train()`, `finetune()` (few-shot transfer), `evaluate()` (dispatches to `binary_evaluate` / `multiple_evaluate` / `regression_evaluate`), early stopping, `save_model()`/`load_model()`, and DeepSpeed/DDP/AMP dispatch (`_forward`, `_backward_and_step`). Subclasses in `trainers.py` mostly just override `prepare_inputs_kwargs(inputs)` to rename dataset fields for the model's `forward`.
+- **`utils/trainer.py`** — base `Trainer` class holds all training/evaluation logic: `train()`, `finetune()` (few-shot transfer), `evaluate()` (dispatches to `binary_evaluate` / `multiple_evaluate` / `regression_evaluate`), early stopping, `save_model()`/`load_model()`, and DeepSpeed/DDP/AMP dispatch (`_forward`, `_backward_and_step`). Subclasses in `trainers.py` mostly just override `prepare_inputs_kwargs(inputs)` to rename dataset fields for the model's `forward`. `GCDGCNTrainer` is the exception: it has a two-stage schedule (stage flips from `"pretrain"` to `"finetune"` at epoch 100) and overrides `train_epoch`/`_early_stop_enabled` accordingly.
 - **`config.py`** — two responsibilities: `init_config()` defines *all* CLI args, and `init_model_config(args, data_config)` is a big `if args.model == ...` factory that constructs each model's `*Config` + `Model`.
-- **`model/`** — one subdirectory per model. Each exports `Model` and a `<Name>Config` (subclass of `BaseConfig`). `model/base/` defines `BaseModel`, `BaseConfig`, and `ModelOutputs`. `model/__init__.py` imports everything so `from model import *` works.
+- **`model/`** — one subdirectory per model. Each exports `Model` and a `<Name>Config` (subclass of `BaseConfig`). `model/base/` defines `BaseModel`, `BaseConfig`, and `ModelOutputs`. `model/__init__.py` imports everything so `from model import *` works. (`BrainNetworkTransformer/` exports the `BNT` model.)
 - **`data/`** — `data_config.py` (`DataConfig`), `dataset.py` (`BaseDataset`), `dataloader.py` (three loaders: `init_StratifiedKFold_dataloader`, `init_distributed_dataloader`, `init_deepspeed_dataloader`), plus per-dataset modules (`beirut/`, `caueeg/`, `ds/`, `tuab/`, `tuep/`, `multidomain/`). Every dataset class is named `<DatasetName>Dataset` and registered in `data/__init__.py` so `eval(f"{args.dataset}Dataset")` resolves.
 - **`utils/`** — `optimizer.py`, `schedule.py`, `recorder.py`, `early_stopping.py`, `logger.py`.
 
 ### TimeLLM pipeline (`model/TimeLLM/TimeLLM.py`, the active model)
 
 1. `DFC` (B, T, C, C) is flattened to (B·T, C, C) and passed through a **shared per-window GCN** (`GCNLayer`: linear + `bmm(adj_norm, x)`) using one-hot channel embeddings as node init.
-2. Output is reshaped into a patch sequence (B, T·C, d_model) — ordering controlled by `token_order` (`time_first` default / `node_first`).
-3. Optional **CVIB** (`_cvib_encode`, gated by `--use_cvib`): `vae` mode adds subject-level KL vs. a label-conditioned prior; `contrastive` mode adds a cosine-alignment loss. Both return an auxiliary loss scaled by `cvib_beta`.
+2. Output is reshaped into a patch sequence (B, T·C, d_model) — ordering controlled by `token_order` (`time_first` default / `node_first`). `T` here is `--num_windows` (default 10), which also sizes the final flattened head (`head_nf = d_ff × node_size × num_windows`).
+3. Optional **CVIB** (`_cvib_encode`, gated by `--use_cvib`): `vae` mode adds subject-level KL vs. a label-conditioned prior; `contrastive` mode adds a cosine-alignment loss. Both return an auxiliary loss scaled by `cvib_beta`. (Note: git history shows the `contrastive` mode was removed in commit `c6f965b`; verify current behavior before relying on it.)
 4. `ReprogrammingLayer` cross-attends the patches against learnable text prototypes (word embeddings → `mapping_layer` → num_prototypes).
 5. Output is concatenated with prompt embeddings and run through the **frozen LLM**; only patch positions are projected by `output_projection` to logits.
 
@@ -56,12 +58,13 @@ Supporting modules: `model/TimeLLM/gc_lora.py` (LoRA + graph-conditioned GC-LoRA
 ## Key conventions
 
 - **Loss is computed inside `forward`.** Models return `ModelOutputs(logits=..., loss=..., hidden_state=...)`, not just logits; the trainer reads `outputs.loss` directly. Classification uses `cross_entropy`, regression uses `huber_loss(delta=1.0)`.
-- **Task type is set by each dataset's `load_data`**, which writes `data_config.task_type` and `data_config.output_dim` (1 → regression, ≥2 → classification). `DataConfig.is_classification`/`is_regression` are properties. Regression metrics are denormalized back to real units (years) using `dataset.label_min`/`label_max`.
+- **Task type is set by each dataset's `load_data`**, which writes `data_config.task_type` and `data_config.output_dim` (1 → regression, ≥2 → classification). `DataConfig.is_classification`/`is_regression` are properties.
+- **Age (regression) labels use fixed prior normalization bounds**, not data-fitted min/max: `AGE_LABEL_MIN=0.0` / `AGE_LABEL_MAX=100.0` in `data/preprocess.py`. Datasets normalize ages with `(label - 0) / 100` and store `self.label_min`/`self.label_max` from these constants (deliberately fixed to avoid test leakage and keep cross-domain units consistent for few-shot transfer). Regression metrics are denormalized back to years via `dataset.label_min`/`label_max`.
 - **Label format**: binary classification labels are one-hot `(B, 2)`; multi-class are class indices; regression are floats. `prepare_inputs_kwargs` and `_normalize_label` handle the conversions.
 - **Subject-grouped splits** prevent leakage. `BaseDataset._create_splits` uses `GroupKFold` when `num_repeat ≥ 2`, otherwise a 60/20/20 subject-level train/val/test split (fixed `random_state=42`). Few-shot samples subjects (not windows) per class via `episode_seed`.
 - **Checkpoints** are saved under `--model_dir` (default `output_dir/`) as `{model}-{task_id}.bin` (trainable params + buffers only) plus `config.json`. `load_model` **skips prompt-buffer keys** (`dataset_prompt_embeddings`, `task_prompt_embeddings`) so cross-dataset transfer keeps the target dataset's prompts.
 - **Mixed precision**: non-DeepSpeed runs use `torch.cuda.amp` (`GradScaler`); the LLM and its outputs are kept in bfloat16 (see the dtype conversions in `TimeLLM.py`).
-- **Reproducibility**: `main.py` hardcodes `set_seed(42)` and `torch.backends.cudnn.deterministic = True`; dataset splits also use seed 42. Few-shot episodes use `--few_shot_seed`.
+- **Reproducibility**: `main.py` hardcodes `set_seed(42)` and `torch.backends.cudnn.deterministic = True` (plus disabling Flash/Mem-efficient SDPA and setting `CUBLAS_WORKSPACE_CONFIG`); dataset splits also use seed 42. Few-shot episodes use `--few_shot_seed`.
 
 ## Data & model asset locations
 
@@ -69,3 +72,4 @@ Supporting modules: `model/TimeLLM/gc_lora.py` (LoRA + graph-conditioned GC-LoRA
 - LLM checkpoints are committed under `model/chatglm-6b/` and `model/deepseek-r1-distill-llama-8B/` (weights gitignored via `.gitignore`), selected by `--llm_type` / `--llm_path`.
 - Sibling reference repos exist at `/root/autodl-tmp/ChatGLM-6B/` and `/root/autodl-tmp/Time-LLM/` (upstream sources this project is derived from).
 - `log_dir/` holds training/few-shot/test logs; `output_dir/` holds saved checkpoints and `results.json`.
+- A project skill `.claude/skills/find-preprocess-params.md` documents the workflow for tuning `max_windows_per_subject` / `max_subjects` caps in dataset preprocessing scripts (`data/*/`), including the median-binarization fix required for regression (age) tasks.

@@ -65,6 +65,7 @@ def init_model_config(args, data_config: DataConfig):
             dataset_name=args.dataset,
             llm_type=args.llm_type,
             llm_path=args.llm_path,
+            llm_init=args.llm_init,
             use_dataset_prompt=args.use_dataset_prompt,
             use_task_prompt=args.use_task_prompt,
             use_lora=args.use_lora,
@@ -78,6 +79,9 @@ def init_model_config(args, data_config: DataConfig):
             token_order=args.token_order,
             use_cvib=args.use_cvib,
             cvib_beta=args.cvib_beta,
+            use_temporal_encoder=args.use_temporal_encoder,
+            temporal_heads=args.temporal_heads,
+            temporal_layers=args.temporal_layers,
         )
         model = Model(model_config)
     else:
@@ -162,6 +166,11 @@ def init_config():
                              help="LLM backbone: chatglm (default) or llama")
     model_group.add_argument("--llm_path", default="./model/chatglm-6b", type=str,
                              help="Path to pretrained LLM directory")
+    model_group.add_argument("--llm_init", default="pretrained", type=str,
+                             choices=["pretrained", "random"],
+                             help="LLM weight init for ablation: 'pretrained' (default) "
+                                  "or 'random' (same arch, randomly-initialized weights, "
+                                  "to test whether pretrained knowledge contributes)")
     model_group.add_argument("--patch_stride", default=5, type=int, help="DFC temporal subsampling stride (TimeLLM v1 only)")
     model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
@@ -198,6 +207,12 @@ def init_config():
                                   "GCN output z (classification & regression)")
     model_group.add_argument("--cvib_beta", default=1e-3, type=float,
                              help="CVIB auxiliary loss weight (KL)")
+    model_group.add_argument("--use_temporal_encoder", action="store_true",
+                             help="TimeLLM: per-node temporal self-attention after GCN")
+    model_group.add_argument("--temporal_heads", default=8, type=int,
+                             help="Temporal encoder attention heads (default 8)")
+    model_group.add_argument("--temporal_layers", default=1, type=int,
+                             help="Temporal encoder layers (default 1)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
@@ -254,5 +269,11 @@ def init_config():
         logging.getLogger(__name__).warning(
             "--use_gc_lora requires --use_lora; disabling GC-LoRA")
         args.use_gc_lora = False
+
+    # 时序编码器要求 d_model 可被 head 数整除
+    if args.use_temporal_encoder and args.d_model % args.temporal_heads != 0:
+        raise ValueError(
+            f"--use_temporal_encoder requires d_model ({args.d_model}) "
+            f"divisible by --temporal_heads ({args.temporal_heads})")
 
     return args

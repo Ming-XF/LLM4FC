@@ -34,8 +34,11 @@ deepspeed --num_gpus=6 main.py \
     --few_shot 0 \
     --few_shot_seed 42 \
     --pretrain_path "" \
+    --llm_init random \
     --use_task_prompt \
     --num_gcn_layers 1 \
+    --temporal_heads 8 \
+    --temporal_layers 1 \
     --use_cvib \
     --cvib_beta 0.01 \
     --num_prototypes 1000 \
@@ -62,7 +65,9 @@ deepspeed --num_gpus=6 main.py \
 #   --token_order node_first \
 #   --use_cvib \
 #   --cvib_beta 1e-3 \
-        
+#   --use_temporal_encoder \  # per-node temporal self-attention after GCN
+#   --llm_init pretrained \
+#   --llm_init random \
 
 
 

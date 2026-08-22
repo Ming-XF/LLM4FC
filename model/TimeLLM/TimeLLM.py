@@ -2,7 +2,7 @@ from math import sqrt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModel, AutoConfig
 from ..base import BaseConfig, ModelOutputs
 from .prompts import get_prompt_config
 from .gc_lora import (
@@ -54,7 +54,11 @@ class TimeLLMConfig(BaseConfig):
                  block_causal_mask=False,
                  token_order='time_first',
                  use_cvib=False,
-                 cvib_beta=1e-3):
+                 cvib_beta=1e-3,
+                 use_temporal_encoder=False,
+                 temporal_heads=8,
+                 temporal_layers=1,
+                 llm_init='pretrained'):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -68,6 +72,7 @@ class TimeLLMConfig(BaseConfig):
         self.dataset_name = dataset_name
         self.llm_type = llm_type
         self.llm_path = llm_path
+        self.llm_init = llm_init
         self.use_dataset_prompt = use_dataset_prompt
         self.use_task_prompt = use_task_prompt
         self.use_lora = use_lora
@@ -81,6 +86,9 @@ class TimeLLMConfig(BaseConfig):
         self.token_order = token_order
         self.use_cvib = use_cvib
         self.cvib_beta = cvib_beta
+        self.use_temporal_encoder = use_temporal_encoder
+        self.temporal_heads = temporal_heads
+        self.temporal_layers = temporal_layers
 
 
 class ReprogrammingLayer(nn.Module):
@@ -160,25 +168,55 @@ class Model(nn.Module):
         ])
         self.channel_embed_projection = nn.Linear(config.node_size, config.d_model)
 
+        # ── 逐节点时序编码器：每个 (样本, 通道) 在 T 上自注意力，共 B*C 个序列（默认关闭）──
+        if config.use_temporal_encoder:
+            temporal_layer = nn.TransformerEncoderLayer(
+                d_model=config.d_model,
+                nhead=config.temporal_heads,
+                dim_feedforward=4 * config.d_model,
+                dropout=config.dropout,
+                activation='gelu',
+                batch_first=True,
+            )
+            self.temporal_encoder = nn.TransformerEncoder(
+                temporal_layer, num_layers=config.temporal_layers)
+            # 正弦固定位置编码 (1, T, d_model)，广播到 B*C 条序列
+            self.register_buffer(
+                "temporal_pos",
+                self._sinusoidal_pos_encoding(config.num_windows, config.d_model),
+                persistent=False,
+            )
+        else:
+            self.temporal_encoder = None
+            self.temporal_pos = None
+
         # ── LLM 加载（分支：chatglm / llama）──────────────────
         if self.llm_type == 'chatglm':
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self.llm_path, trust_remote_code=True
             )
-            self.llm = AutoModel.from_pretrained(
-                self.llm_path, trust_remote_code=True
-            ).bfloat16()
+            if self.config.llm_init == 'random':
+                _llm_config = AutoConfig.from_pretrained(
+                    self.llm_path, trust_remote_code=True)
+                self.llm = AutoModel.from_config(
+                    _llm_config, trust_remote_code=True).bfloat16()
+            else:
+                self.llm = AutoModel.from_pretrained(
+                    self.llm_path, trust_remote_code=True
+                ).bfloat16()
             self.llm.transformer.gradient_checkpointing = False
             self.position_encoding_2d = self.llm.transformer.position_encoding_2d
             self._word_embeddings = self.llm.transformer.word_embeddings
             self._transformer = self.llm.transformer
         elif self.llm_type == 'llama':
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.llm_path
-            )
-            self.llm = AutoModel.from_pretrained(
-                self.llm_path, torch_dtype=torch.bfloat16
-            )
+            self.tokenizer = AutoTokenizer.from_pretrained(self.llm_path)
+            if self.config.llm_init == 'random':
+                _llm_config = AutoConfig.from_pretrained(self.llm_path)
+                self.llm = AutoModel.from_config(
+                    _llm_config, torch_dtype=torch.bfloat16)
+            else:
+                self.llm = AutoModel.from_pretrained(
+                    self.llm_path, torch_dtype=torch.bfloat16)
             self.llm.config.use_cache = False
             self.position_encoding_2d = False
             # AutoModel 返回 LlamaModel（无 .model 子模块），
@@ -280,6 +318,18 @@ class Model(nn.Module):
 
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+
+    @staticmethod
+    def _sinusoidal_pos_encoding(T, d_model):
+        """固定正弦位置编码 (1, T, d_model)。"""
+        position = torch.arange(T, dtype=torch.float32).unsqueeze(1)   # (T, 1)
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2, dtype=torch.float32)
+            * (-torch.log(torch.tensor(10000.0)) / d_model))           # (d_model/2,)
+        pe = torch.zeros(T, d_model)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        return pe.unsqueeze(0)                                          # (1, T, d_model)
 
     @staticmethod
     def _create_block_causal_mask(S, P_skip, C, T, device, llm_type, token_order):
@@ -384,6 +434,15 @@ class Model(nn.Module):
         # 重组为 patch 序列
         # (B*T, C, d_model) → (B, T, C, d_model) → (B, T*C, d_model) 或 (B, C*T, d_model)
         gcn_out = gcn_out.reshape(B, T, C, -1)
+
+        # ── 逐节点时序编码：每个 (样本, 通道) 独立在 T 上自注意力，共 B*C 个序列 ──
+        if self.config.use_temporal_encoder:
+            x = gcn_out.permute(0, 2, 1, 3).reshape(B * C, T, self.d_model)  # (B*C, T, d_model)
+            x = x + self.temporal_pos                                          # 正弦位置编码
+            x = self.temporal_encoder(x)                                       # (B*C, T, d_model)
+            x = x.reshape(B, C, T, self.d_model).permute(0, 2, 1, 3)          # (B, T, C, d_model)
+            gcn_out = gcn_out + x                                              # 加法残差
+
         if self.config.token_order == 'node_first':
             # Node-First: [c0t0, c0t1, ..., c_{C-1}t_{T-1}]
             gcn_out = gcn_out.permute(0, 2, 1, 3)          # (B, C, T, d_model)
