@@ -72,6 +72,7 @@ def init_model_config(args, data_config: DataConfig):
             age_head=args.age_head,
             age_bin_width=args.age_bin_width,
             emd_lambda=args.emd_lambda,
+            align_lambda=args.align_lambda,
             mv_consistency=args.mv_consistency,
             mv_lambda=args.mv_lambda,
         )
@@ -195,6 +196,10 @@ def init_config():
     model_group.add_argument("--emd_lambda", default=0.0, type=float,
                              help="Weight of the ordinal EMD loss for --age_head "
                                   "ordinal (0 = disabled)")
+    model_group.add_argument("--align_lambda", default=0.0, type=float,
+                             help="Weight of the semantic alignment loss pulling "
+                                  "the age-subspace projection toward the label's "
+                                  "age-bin prototype (0 = disabled)")
     model_group.add_argument("--mv_consistency", action="store_true",
                              help="E4: multi-view consistency between raw DFC and "
                                   "rank view at the soft-token level (source-only)")

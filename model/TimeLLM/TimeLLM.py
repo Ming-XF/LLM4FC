@@ -59,6 +59,7 @@ class TimeLLMConfig(BaseConfig):
                  age_head='linear',
                  age_bin_width=5,
                  emd_lambda=0.0,
+                 align_lambda=0.0,
                  mv_consistency=False,
                  mv_lambda=0.0):
         super().__init__(node_size=node_size, output_dim=output_dim)
@@ -81,6 +82,7 @@ class TimeLLMConfig(BaseConfig):
         self.age_head = age_head
         self.age_bin_width = age_bin_width
         self.emd_lambda = emd_lambda
+        self.align_lambda = align_lambda
         self.mv_consistency = mv_consistency
         self.mv_lambda = mv_lambda
 
@@ -279,8 +281,10 @@ class Model(nn.Module):
             with torch.no_grad():
                 self.age_projection.weight.copy_(W.t())
             self.register_buffer('age_bin_prototypes', E_white.to(torch.bfloat16))
-            # τ=10: 余弦量级 ~0.1 时 logits ~1，分布适度锐化且梯度可用
-            self.age_temperature = nn.Parameter(torch.tensor(10.0))
+            # 语义子空间上的线性读出（拟合无忧，替代易饱和的 softmax）
+            self.age_readout = nn.Linear(W.shape[1], 1, bias=True)
+            nn.init.normal_(self.age_readout.weight, std=0.01)
+            nn.init.zeros_(self.age_readout.bias)
             self.output_projection = None
         elif config.readout == 'answer_query':
             # Predict from the <answer> hidden state only instead of
@@ -452,16 +456,13 @@ class Model(nn.Module):
             # summarize the evidence into a single token before the head.
             h_answer = hidden[:, -1:, :]
             if self.use_ordinal_age_head:
-                # E3: h_answer 先投影到白化子空间，再与年龄区间原型
-                # （单位化）做点积 → 区间分布 → 期望年龄。
+                # E3v6: h_answer → 语义年龄子空间（可学习投影，L2 归一化）
+                # → 子空间内线性读出。对齐损失把投影拉向真实年龄 bin 方向。
                 # 显式转 fp32 避免 bf16 反向 dtype 不一致。
                 h_proj = self.age_projection(h_answer.float())
-                h_proj = F.normalize(h_proj, p=2, dim=-1)   # 约束 logits 量级
-                cos_sim = h_proj @ self.age_bin_prototypes.float().t()  # (B, K)
-                p = torch.softmax(
-                    self.age_temperature * cos_sim, dim=-1)
-                self._age_bin_probs = p
-                prediction = (p * self.age_bin_centers.float()).sum(dim=-1)
+                h_proj = F.normalize(h_proj, p=2, dim=-1)
+                self._h_age_proj = h_proj
+                prediction = self.age_readout(h_proj).squeeze(-1)
                 logits = prediction.unsqueeze(-1)
             else:
                 h_answer = h_answer.to(
@@ -478,16 +479,15 @@ class Model(nn.Module):
                 labels = labels.squeeze(-1)
             loss = F.huber_loss(
                 prediction, labels.float(), delta=1.0)
-            if self.use_ordinal_age_head and self.config.emd_lambda > 0:
-                # EMD (Wasserstein-1) 有序正则：预测区间分布与
-                # 标签 bin 的 CDF 差，约束相邻区间语义。
+            if self.use_ordinal_age_head and self.config.align_lambda > 0:
+                # 语义对齐：把 h 的语义子空间投影拉向真实年龄
+                # bin 的语言锚点方向（源域-only）。
                 bin_idx = (labels / self.age_bin_w).long().clamp(
                     0, self.n_age_bins - 1)
-                q = F.one_hot(bin_idx, self.n_age_bins).float()
-                cdf_p = self._age_bin_probs.cumsum(dim=-1)
-                cdf_q = q.cumsum(dim=-1)
-                emd = (cdf_p - cdf_q).abs().mean()
-                loss = loss + self.config.emd_lambda * emd
+                e_bin = self.age_bin_prototypes[bin_idx].float()   # (B, r)
+                cos = (self._h_age_proj * e_bin).sum(dim=-1)
+                align = (1 - cos).mean()
+                loss = loss + self.config.align_lambda * align
         else:
             if labels.dim() > 1 and labels.shape[-1] > 1:
                 labels = labels.argmax(dim=-1)
