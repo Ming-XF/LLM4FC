@@ -76,7 +76,7 @@ class GCDGCNTrainer(Trainer):
         return losses / len(loss_list)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TimeLLMTrainer — Time-LLM based SFC classification (single-stage, no LoRA)
+# TimeLLMTrainer — Time-LLM based DFC prediction with a frozen LLM
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TimeLLMTrainer(Trainer):

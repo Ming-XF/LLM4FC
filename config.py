@@ -66,22 +66,7 @@ def init_model_config(args, data_config: DataConfig):
             llm_type=args.llm_type,
             llm_path=args.llm_path,
             llm_init=args.llm_init,
-            use_dataset_prompt=args.use_dataset_prompt,
             use_task_prompt=args.use_task_prompt,
-            use_lora=args.use_lora,
-            lora_rank=args.lora_rank,
-            lora_alpha=args.lora_alpha,
-            lora_dropout=args.lora_dropout,
-            lora_target_modules=args.lora_target_modules,
-            use_gc_lora=args.use_gc_lora,
-            lora_num_layers=args.lora_num_layers,
-            block_causal_mask=args.block_causal_mask,
-            token_order=args.token_order,
-            use_cvib=args.use_cvib,
-            cvib_beta=args.cvib_beta,
-            use_temporal_encoder=args.use_temporal_encoder,
-            temporal_heads=args.temporal_heads,
-            temporal_layers=args.temporal_layers,
         )
         model = Model(model_config)
     else:
@@ -152,8 +137,6 @@ def init_config():
     model_group.add_argument("--abla_channel", default=-1, type=int, help="Channel Ablation EXP")
     model_group.add_argument("--abla_vae", default="n", type=str, help="Vae Ablation EXP")
     model_group.add_argument("--num_layers", default=2, type=int, help="")
-    model_group.add_argument("--num_node_temporal_layers", default=1, type=int, help="")
-    model_group.add_argument("--num_graph_temporal_layers", default=2, type=int, help="")
     model_group.add_argument("--attention_depth", default=2, type=int, help="")
     model_group.add_argument("--activation", default="gelu", type=str, help="")
     model_group.add_argument("--model_dir", default="output_dir", type=str, help="")
@@ -175,44 +158,9 @@ def init_config():
     model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
     model_group.add_argument("--num_gcn_layers", default=1, type=int, help="Number of GCN layers (TimeLLM)")
-    model_group.add_argument("--use_dataset_prompt", action="store_true",
-                             help="TimeLLM: include dataset description prompt")
     model_group.add_argument("--use_task_prompt", action="store_true",
                              help="TimeLLM: include task description prompt")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
-    # ── LoRA / GC-LoRA ──
-    model_group.add_argument("--use_lora", action="store_true",
-                             help="Enable LoRA fine-tuning on the LLM backbone")
-    model_group.add_argument("--lora_rank", default=16, type=int,
-                             help="LoRA rank r (default: 16)")
-    model_group.add_argument("--lora_alpha", default=32.0, type=float,
-                             help="LoRA scaling alpha (default: 32.0)")
-    model_group.add_argument("--lora_dropout", default=0.1, type=float,
-                             help="LoRA dropout rate (default: 0.1)")
-    model_group.add_argument("--lora_target_modules", default="q_proj,v_proj", type=str,
-                             help="Comma-separated target module names (default: q_proj,v_proj)")
-    model_group.add_argument("--use_gc_lora", action="store_true",
-                             help="Enable GC-LoRA (graph-conditioned LoRA; requires --use_lora)")
-    model_group.add_argument("--lora_num_layers", default=-1, type=int,
-                             help="Number of leading LLM layers to inject LoRA into (-1 = all layers)")
-    model_group.add_argument("--block_causal_mask", action="store_true",
-                             help="Enable block-causal attention mask "
-                                  "(same-window bidirectional, cross-window causal)")
-    model_group.add_argument("--token_order", default="time_first", type=str,
-                             choices=["time_first", "node_first"],
-                             help="Patch token order into the LLM: "
-                                  "time_first (default) / node_first")
-    model_group.add_argument("--use_cvib", action="store_true",
-                             help="CVIB: apply conditional compression to the "
-                                  "GCN output z (classification & regression)")
-    model_group.add_argument("--cvib_beta", default=1e-3, type=float,
-                             help="CVIB auxiliary loss weight (KL)")
-    model_group.add_argument("--use_temporal_encoder", action="store_true",
-                             help="TimeLLM: per-node temporal self-attention after GCN")
-    model_group.add_argument("--temporal_heads", default=8, type=int,
-                             help="Temporal encoder attention heads (default 8)")
-    model_group.add_argument("--temporal_layers", default=1, type=int,
-                             help="Temporal encoder layers (default 1)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
@@ -262,18 +210,5 @@ def init_config():
 
 
     args = parser.parse_args()
-
-    # GC-LoRA requires LoRA; silently correct misuse
-    if args.use_gc_lora and not args.use_lora:
-        import logging
-        logging.getLogger(__name__).warning(
-            "--use_gc_lora requires --use_lora; disabling GC-LoRA")
-        args.use_gc_lora = False
-
-    # 时序编码器要求 d_model 可被 head 数整除
-    if args.use_temporal_encoder and args.d_model % args.temporal_heads != 0:
-        raise ValueError(
-            f"--use_temporal_encoder requires d_model ({args.d_model}) "
-            f"divisible by --temporal_heads ({args.temporal_heads})")
 
     return args

@@ -895,8 +895,8 @@ class Trainer(object):
             json.dump(args_dict, f, indent=2)
         logger.info("Model saved to %s", path)
 
-    # 跨数据集加载时不应覆盖目标数据集的 prompt
-    _PROMPT_BUFFER_KEYS = {'dataset_prompt_embeddings', 'task_prompt_embeddings'}
+    # 跨数据集加载时不应覆盖目标任务的 prompt
+    _PROMPT_BUFFER_KEYS = {'task_prompt_embeddings'}
 
     def load_model(self, path=None):
         if path is None:
@@ -956,7 +956,7 @@ class Trainer(object):
                     missing.append(k)
 
         if n_skipped_prompt:
-            logger.info("  %d prompt-buffer key(s) skipped (kept target-dataset prompt)", n_skipped_prompt)
+            logger.info("  %d prompt-buffer key(s) skipped (kept target-task prompt)", n_skipped_prompt)
         n_loaded = len(saved_state) - len(unexpected) - n_skipped_prompt
         if missing:
             logger.info("  %d keys not in checkpoint (kept from init)", len(missing))

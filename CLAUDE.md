@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LLM4FC is a research codebase for EEG-based brain analysis using **Time-LLM-style reprogramming**: dynamic functional connectivity (DFC) is extracted from EEG, encoded by a GCN, then fed into a **frozen LLM** (ChatGLM-6B or DeepSeek-R1-Distill-Llama-8B) via cross-attention "reprogramming", followed by a linear classification/regression head. It also ships several baseline graph models (BNT, BrainNetCNN, ALTER, GCDGCN) under the same training harness.
 
-Tasks are either **classification** (disease: AD/MCI/SCD, seizure, abnormal EEG; gender) or **regression** (age prediction). The active research focus (per git history) is the TimeLLM model with LoRA/GC-LoRA and CVIB (conditional variational information bottleneck) extensions.
+Tasks are either **classification** (disease: AD/MCI/SCD, seizure, abnormal EEG; gender) or **regression** (age prediction). The active research focus is the streamlined TimeLLM path: GCN-based DFC encoding, cross-attention reprogramming, an optional task prompt, and a frozen LLM backbone.
 
 There is no test suite, linter, or dependency manifest (`requirements.txt`/`pyproject.toml`). Development is driven by running `main.py` directly.
 
@@ -48,21 +48,20 @@ The control flow is: `main.py:main` → `config.py:init_config` (argparse) → i
 ### TimeLLM pipeline (`model/TimeLLM/TimeLLM.py`, the active model)
 
 1. `DFC` (B, T, C, C) is flattened to (B·T, C, C) and passed through a **shared per-window GCN** (`GCNLayer`: linear + `bmm(adj_norm, x)`) using one-hot channel embeddings as node init.
-2. Output is reshaped into a patch sequence (B, T·C, d_model) — ordering controlled by `token_order` (`time_first` default / `node_first`). `T` here is `--num_windows` (default 10), which also sizes the final flattened head (`head_nf = d_ff × node_size × num_windows`).
-3. Optional **CVIB** (`_cvib_encode`, gated by `--use_cvib`): `vae` mode adds subject-level KL vs. a label-conditioned prior; `contrastive` mode adds a cosine-alignment loss. Both return an auxiliary loss scaled by `cvib_beta`. (Note: git history shows the `contrastive` mode was removed in commit `c6f965b`; verify current behavior before relying on it.)
-4. `ReprogrammingLayer` cross-attends the patches against learnable text prototypes (word embeddings → `mapping_layer` → num_prototypes).
-5. Output is concatenated with prompt embeddings and run through the **frozen LLM**; only patch positions are projected by `output_projection` to logits.
+2. Output is reshaped into a fixed time-first patch sequence (B, T·C, d_model). `T` is `--num_windows` (default 10), which also sizes the final flattened head (`head_nf = d_ff × node_size × num_windows`).
+3. `ReprogrammingLayer` cross-attends the patches against learnable text prototypes (word embeddings → `mapping_layer` → num_prototypes).
+4. Output is optionally concatenated with a task prompt and run through the **frozen LLM** using its standard causal mask; only patch positions are projected by `output_projection` to logits.
 
-Supporting modules: `model/TimeLLM/gc_lora.py` (LoRA + graph-conditioned GC-LoRA adapters injected into the LLM), `model/TimeLLM/prompts.py` (per-dataset text prompts, keyed by dataset name, fallback to CAUEEG).
+Supporting module: `model/TimeLLM/prompts.py` selects a task-only prompt from the dataset name.
 
 ## Key conventions
 
 - **Loss is computed inside `forward`.** Models return `ModelOutputs(logits=..., loss=..., hidden_state=...)`, not just logits; the trainer reads `outputs.loss` directly. Classification uses `cross_entropy`, regression uses `huber_loss(delta=1.0)`.
 - **Task type is set by each dataset's `load_data`**, which writes `data_config.task_type` and `data_config.output_dim` (1 → regression, ≥2 → classification). `DataConfig.is_classification`/`is_regression` are properties.
 - **Age (regression) labels use fixed prior normalization bounds**, not data-fitted min/max: `AGE_LABEL_MIN=0.0` / `AGE_LABEL_MAX=100.0` in `data/preprocess.py`. Datasets normalize ages with `(label - 0) / 100` and store `self.label_min`/`self.label_max` from these constants (deliberately fixed to avoid test leakage and keep cross-domain units consistent for few-shot transfer). Regression metrics are denormalized back to years via `dataset.label_min`/`label_max`.
-- **Label format**: binary classification labels are one-hot `(B, 2)`; multi-class are class indices; regression are floats. `prepare_inputs_kwargs` and `_normalize_label` handle the conversions.
+- **Label format**: binary classification labels are one-hot `(B, 2)`; multi-class are class indices; regression are floats. `prepare_inputs_kwargs` normalizes them for the active task.
 - **Subject-grouped splits** prevent leakage. `BaseDataset._create_splits` uses `GroupKFold` when `num_repeat ≥ 2`, otherwise a 60/20/20 subject-level train/val/test split (fixed `random_state=42`). Few-shot samples subjects (not windows) per class via `episode_seed`.
-- **Checkpoints** are saved under `--model_dir` (default `output_dir/`) as `{model}-{task_id}.bin` (trainable params + buffers only) plus `config.json`. `load_model` **skips prompt-buffer keys** (`dataset_prompt_embeddings`, `task_prompt_embeddings`) so cross-dataset transfer keeps the target dataset's prompts.
+- **Checkpoints** are saved under `--model_dir` (default `output_dir/`) as `{model}-{task_id}.bin` (trainable params + buffers only) plus `config.json`. `load_model` **skips the task prompt buffer** (`task_prompt_embeddings`) so cross-task transfer keeps the target task's prompt.
 - **Mixed precision**: non-DeepSpeed runs use `torch.cuda.amp` (`GradScaler`); the LLM and its outputs are kept in bfloat16 (see the dtype conversions in `TimeLLM.py`).
 - **Reproducibility**: `main.py` hardcodes `set_seed(42)` and `torch.backends.cudnn.deterministic = True` (plus disabling Flash/Mem-efficient SDPA and setting `CUBLAS_WORKSPACE_CONFIG`); dataset splits also use seed 42. Few-shot episodes use `--few_shot_seed`.
 
