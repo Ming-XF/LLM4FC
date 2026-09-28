@@ -437,11 +437,11 @@ class Model(nn.Module):
             # summarize the evidence into a single token before the head.
             h_answer = hidden[:, -1:, :]
             if self.use_ordinal_age_head:
-                # E3: 与年龄区间原型余弦匹配 → 区间分布 → 期望年龄
-                # 显式转 fp32：避免 fp32 温度项与 bf16 matmul 混合导致
-                # 反向 dtype 不一致。
-                h_norm = F.normalize(h_answer.float(), p=2, dim=-1)
-                cos_sim = h_norm @ self.age_bin_prototypes.float().t()  # (B, K)
+                # E3: 与年龄区间原型（单位化）做点积 → 区间分布 → 期望年龄。
+                # h_answer 不归一化：4096 维归一化余弦量级仅 ~0.02，
+                # softmax 梯度几乎为零；保留 |h| 使 logits 量级 ~1。
+                # 显式转 fp32 避免 bf16 反向 dtype 不一致。
+                cos_sim = h_answer.float() @ self.age_bin_prototypes.float().t()  # (B, K)
                 p = torch.softmax(
                     self.age_temperature * cos_sim, dim=-1)
                 self._age_bin_probs = p
