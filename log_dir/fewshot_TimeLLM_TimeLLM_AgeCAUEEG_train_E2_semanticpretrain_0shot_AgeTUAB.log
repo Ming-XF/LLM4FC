@@ -1,0 +1,101 @@
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS] command: main.py --local_rank=1 --model TimeLLM --num_epochs 30 --num_repeat 1 --save_steps 25 --schedule cos --early_stop_patience 20 --early_stop_metric MAE --dataset AgeTUAB --fc_threshold 0.0 --fc_keep_ratio 1.0 --prototype_mode semantic --d_model 128 --num_heads 8 --d_ff 128 --dropout 0.1 --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B --few_shot 0 --few_shot_seed 42 --pretrain_path ./output_dir/TimeLLM_AgeCAUEEG_train_E2_semantic --llm_init pretrained --use_task_prompt --readout answer_query --num_gcn_layers 1 --num_prototypes 1000 --deepspeed --do_train --do_evaluate --do_test
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS] command: main.py --local_rank=0 --model TimeLLM --num_epochs 30 --num_repeat 1 --save_steps 25 --schedule cos --early_stop_patience 20 --early_stop_metric MAE --dataset AgeTUAB --fc_threshold 0.0 --fc_keep_ratio 1.0 --prototype_mode semantic --d_model 128 --num_heads 8 --d_ff 128 --dropout 0.1 --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B --few_shot 0 --few_shot_seed 42 --pretrain_path ./output_dir/TimeLLM_AgeCAUEEG_train_E2_semantic --llm_init pretrained --use_task_prompt --readout answer_query --num_gcn_layers 1 --num_prototypes 1000 --deepspeed --do_train --do_evaluate --do_test
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   local_rank = 0
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   local_rank = 1
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   model = TimeLLM
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   model = TimeLLM
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   num_epochs = 30
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   num_epochs = 30
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   num_repeat = 1
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   num_repeat = 1
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   save_steps = 25
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   save_steps = 25
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   schedule = cos
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   schedule = cos
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   early_stop_patience = 20
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   early_stop_patience = 20
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   early_stop_metric = MAE
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   early_stop_metric = MAE
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   dataset = AgeTUAB
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   dataset = AgeTUAB
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   fc_threshold = 0.0
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   fc_threshold = 0.0
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   fc_keep_ratio = 1.0
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   fc_keep_ratio = 1.0
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   prototype_mode = semantic
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   prototype_mode = semantic
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   d_model = 128
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   d_model = 128
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   num_heads = 8
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   num_heads = 8
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   d_ff = 128
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   d_ff = 128
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   dropout = 0.1
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   dropout = 0.1
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   llm_type = llama
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   llm_type = llama
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   llm_path = ./model/deepseek-r1-distill-llama-8B
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   llm_path = ./model/deepseek-r1-distill-llama-8B
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   few_shot = 0
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   few_shot = 0
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   few_shot_seed = 42
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   few_shot_seed = 42
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   pretrain_path = ./output_dir/TimeLLM_AgeCAUEEG_train_E2_semantic
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   pretrain_path = ./output_dir/TimeLLM_AgeCAUEEG_train_E2_semantic
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   llm_init = pretrained
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   llm_init = pretrained
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   use_task_prompt = True
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   use_task_prompt = True
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   readout = answer_query
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   readout = answer_query
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   num_gcn_layers = 1
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   num_gcn_layers = 1
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   num_prototypes = 1000
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   num_prototypes = 1000
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   deepspeed = True
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   deepspeed = True
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   do_train = True
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   do_train = True
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   do_evaluate = True
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   do_evaluate = True
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   do_test = True
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS]   do_test = True
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS-effective] batch_size = 32 (from deepspeed/train.json)
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS-effective] batch_size = 32 (from deepspeed/train.json)
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS-effective] learning_rate = 0.0001 (from deepspeed/train.json)
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS-effective] learning_rate = 0.0001 (from deepspeed/train.json)
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS-effective] deepspeed_config = deepspeed/train.json
+09/29/2026 01:48:02 - INFO - utils.logger -   [ARGS-effective] deepspeed_config = deepspeed/train.json
+09/29/2026 01:48:02 - INFO - __main__ -   ########## zero-shot ##########
+09/29/2026 01:48:02 - INFO - __main__ -   ########## zero-shot ##########
+09/29/2026 01:49:09 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpd6e3ftlz/test.c -o /tmp/tmpd6e3ftlz/test.o
+09/29/2026 01:49:09 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpd6e3ftlz/test.o -laio -o /tmp/tmpd6e3ftlz/a.out
+09/29/2026 01:49:09 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpwpcev8g5/test.c -o /tmp/tmpwpcev8g5/test.o
+09/29/2026 01:49:09 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpwpcev8g5/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmpwpcev8g5/a.out
+09/29/2026 01:49:09 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpstdcjylw/test.c -o /tmp/tmpstdcjylw/test.o
+09/29/2026 01:49:09 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpstdcjylw/test.o -laio -o /tmp/tmpstdcjylw/a.out
+09/29/2026 01:49:09 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpy7j2tqt9/test.c -o /tmp/tmpy7j2tqt9/test.o
+09/29/2026 01:49:09 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpy7j2tqt9/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmpy7j2tqt9/a.out
+09/29/2026 01:51:37 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+09/29/2026 01:51:37 - INFO - utils.trainer -     582 keys not in checkpoint (kept from init)
+09/29/2026 01:51:37 - INFO - utils.trainer -   Model loaded from ./output_dir/TimeLLM_AgeCAUEEG_train_E2_semantic/TimeLLM-0.bin (18/19 keys)
+09/29/2026 01:51:37 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+09/29/2026 01:51:37 - INFO - utils.trainer -     582 keys not in checkpoint (kept from init)
+09/29/2026 01:51:37 - INFO - utils.trainer -   Model loaded from ./output_dir/TimeLLM_AgeCAUEEG_train_E2_semantic/TimeLLM-0.bin (18/19 keys)
+09/29/2026 01:51:37 - INFO - utils.trainer -   ***** Running regression evaluation on test0 dataset *****
+09/29/2026 01:51:47 - INFO - utils.trainer -   Loss: 0.02789
+09/29/2026 01:51:47 - INFO - utils.trainer -   MSE: 448.48755
+09/29/2026 01:51:47 - INFO - utils.trainer -   MAE: 17.60041
+09/29/2026 01:51:47 - INFO - utils.trainer -   RMSE: 21.17752
+09/29/2026 01:51:47 - INFO - utils.trainer -   R2: -0.39081
+09/29/2026 01:51:47 - INFO - utils.trainer -   PearsonR: -0.04585
+09/29/2026 01:51:47 - INFO - __main__ -   
+============================================================
+  Zero-shot (TimeLLM_AgeCAUEEG_train_E2_semantic → AgeTUAB)  seed=42
+============================================================
+09/29/2026 01:51:47 - INFO - __main__ -     Loss           : 0.0279
+09/29/2026 01:51:47 - INFO - __main__ -     MSE            : 448.4875
+09/29/2026 01:51:47 - INFO - __main__ -     MAE            : 17.6004
+09/29/2026 01:51:47 - INFO - __main__ -     RMSE           : 21.1775
+09/29/2026 01:51:47 - INFO - __main__ -     R2             : -0.3908
+09/29/2026 01:51:47 - INFO - __main__ -     PearsonR       : -0.0459

@@ -272,9 +272,13 @@ class Model(nn.Module):
             W = V[:r].t() / S[:r]                             # (d_llm, r)
             E_white = E_centered @ W                          # (K, r)
             E_white = F.normalize(E_white, p=2, dim=-1)
-            self.register_buffer('age_bin_whitening', W)
-            self.register_buffer(
-                'age_bin_prototypes', E_white.to(torch.bfloat16))
+            # 可学习投影：初始化=白化矩阵，把 h_answer 压到 19 维
+            # "语义年龄子空间"；瓶颈本身即正则（跨域更稳）。
+            self.age_projection = nn.Linear(
+                self.d_llm, W.shape[1], bias=False)
+            with torch.no_grad():
+                self.age_projection.weight.copy_(W.t())
+            self.register_buffer('age_bin_prototypes', E_white.to(torch.bfloat16))
             # τ=10: 余弦量级 ~0.1 时 logits ~1，分布适度锐化且梯度可用
             self.age_temperature = nn.Parameter(torch.tensor(10.0))
             self.output_projection = None
@@ -451,7 +455,7 @@ class Model(nn.Module):
                 # E3: h_answer 先投影到白化子空间，再与年龄区间原型
                 # （单位化）做点积 → 区间分布 → 期望年龄。
                 # 显式转 fp32 避免 bf16 反向 dtype 不一致。
-                h_proj = h_answer.float() @ self.age_bin_whitening
+                h_proj = self.age_projection(h_answer.float())
                 h_proj = F.normalize(h_proj, p=2, dim=-1)   # 约束 logits 量级
                 cos_sim = h_proj @ self.age_bin_prototypes.float().t()  # (B, K)
                 p = torch.softmax(
