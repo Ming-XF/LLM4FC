@@ -63,4 +63,16 @@
   原因：h 与原型双归一化后 4096 维余弦量级 ~0.02，softmax 梯度极弱
 - 修复：h_answer 不归一化（原型仍单位化），logits 量级 ~1，
   与线性头同尺度；dtype 修复（头计算显式 fp32）
-- 零样本未评估（源域未通过筛选即跳过）
+- v2(点积+EMD)/v3(白化)/v4(归一化)/v5(投影)/v6(19维瓶颈读出) 全部失败：
+  软最大化饱和或瓶颈容量不足，30 epoch 内源域无法拟合
+- v7（线性头 + h_answer 对齐 4096 维 bin 短语原型，λ=0.01）：
+  源域 best test MAE 7.96 / PearsonR 0.242（略低于基线 0.31，正则代价合理）
+  零样本：**MAE 16.51 / PearsonR 0.021**——MAE 迄今最低（标定改善），
+  但相关性仍≈0，无泛化信号，判负
+- checkpoint: output_dir/TimeLLM_AgeCAUEEG_train_E3v7_align/
+- 启示：单模块（输入/特征/输出侧）都无法撼动 PearsonR≈0；
+  后续转向组合与更强的方法级设计
+
+### #4 — E4：多视图一致性（待跑）
+- `--mv_consistency --mv_lambda 0.1`：原始 FC 与秩视图经共享 GCN+重编程层
+  的 soft token 语义一致（源域-only，不经过 LLM 二次前向）
