@@ -275,7 +275,8 @@ class Model(nn.Module):
             self.register_buffer('age_bin_whitening', W)
             self.register_buffer(
                 'age_bin_prototypes', E_white.to(torch.bfloat16))
-            self.age_temperature = nn.Parameter(torch.tensor(1.0))
+            # τ=10: 余弦量级 ~0.1 时 logits ~1，分布适度锐化且梯度可用
+            self.age_temperature = nn.Parameter(torch.tensor(10.0))
             self.output_projection = None
         elif config.readout == 'answer_query':
             # Predict from the <answer> hidden state only instead of
@@ -451,6 +452,7 @@ class Model(nn.Module):
                 # （单位化）做点积 → 区间分布 → 期望年龄。
                 # 显式转 fp32 避免 bf16 反向 dtype 不一致。
                 h_proj = h_answer.float() @ self.age_bin_whitening
+                h_proj = F.normalize(h_proj, p=2, dim=-1)   # 约束 logits 量级
                 cos_sim = h_proj @ self.age_bin_prototypes.float().t()  # (B, K)
                 p = torch.softmax(
                     self.age_temperature * cos_sim, dim=-1)
