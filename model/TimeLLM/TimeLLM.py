@@ -252,19 +252,29 @@ class Model(nn.Module):
             centers = (torch.arange(self.n_age_bins) + 0.5) * bin_w
             self.register_buffer(
                 'age_bin_centers', centers.to(torch.bfloat16))
+            # 数字主导的短短语：使数字 token 在 mean-pool 中占比更大，
+            # 相邻 bin 的 embedding 才可区分
             bin_embeds = []
             with torch.no_grad():
                 for k in range(self.n_age_bins):
                     lo = int(k * config.age_bin_width)
                     hi = int((k + 1) * config.age_bin_width)
-                    phrase = (f"an EEG pattern associated with age "
-                              f"{lo} to {hi}")
+                    phrase = f"age {lo} to {hi}"
                     ids = torch.tensor(self.tokenizer.encode(phrase))
                     emb = self._word_embeddings(ids).mean(dim=0)
-                    emb = F.normalize(emb, p=2, dim=-1)
                     bin_embeds.append(emb)
+            E = torch.stack(bin_embeds, dim=0).float()        # (K, d_llm)
+            # SVD 白化：去相关，使各 bin 原型方向可区分（保持语义张成子空间）
+            E_centered = E - E.mean(dim=0, keepdim=True)
+            _, S, V = torch.linalg.svd(E_centered, full_matrices=False)
+            keep = S > 1e-3 * S[0]                            # 防近零奇异值
+            r = int(min(self.n_age_bins - 1, keep.sum()))
+            W = V[:r].t() / S[:r]                             # (d_llm, r)
+            E_white = E_centered @ W                          # (K, r)
+            E_white = F.normalize(E_white, p=2, dim=-1)
+            self.register_buffer('age_bin_whitening', W)
             self.register_buffer(
-                'age_bin_prototypes', torch.stack(bin_embeds, dim=0))
+                'age_bin_prototypes', E_white.to(torch.bfloat16))
             self.age_temperature = nn.Parameter(torch.tensor(1.0))
             self.output_projection = None
         elif config.readout == 'answer_query':
@@ -437,11 +447,11 @@ class Model(nn.Module):
             # summarize the evidence into a single token before the head.
             h_answer = hidden[:, -1:, :]
             if self.use_ordinal_age_head:
-                # E3: 与年龄区间原型（单位化）做点积 → 区间分布 → 期望年龄。
-                # h_answer 不归一化：4096 维归一化余弦量级仅 ~0.02，
-                # softmax 梯度几乎为零；保留 |h| 使 logits 量级 ~1。
+                # E3: h_answer 先投影到白化子空间，再与年龄区间原型
+                # （单位化）做点积 → 区间分布 → 期望年龄。
                 # 显式转 fp32 避免 bf16 反向 dtype 不一致。
-                cos_sim = h_answer.float() @ self.age_bin_prototypes.float().t()  # (B, K)
+                h_proj = h_answer.float() @ self.age_bin_whitening
+                cos_sim = h_proj @ self.age_bin_prototypes.float().t()  # (B, K)
                 p = torch.softmax(
                     self.age_temperature * cos_sim, dim=-1)
                 self._age_bin_probs = p
