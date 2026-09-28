@@ -46,8 +46,17 @@
 - checkpoint: output_dir/TimeLLM_AgeCAUEEG_train_E1_rank/
 - 结论：E1 单独无效，放弃（秩视图仅保留给 E4 作一致性正则的辅助视图）
 
-### #2 — E2：语义原型库（实现完成，待跑）
+### #2 — E2：语义原型库（结果：负）
 - 新增 `--prototype_mode semantic`：45 个神经连接短语的冻结 LLM embedding
   作为 cross-attention 键值 + 可训练小残差；mapping_layer(vocab→1000) 不再创建
-- 修复 trainers.py 的 rank_normalize_dfc 导入路径
+- 筛选结果（30 epoch）：源域 best test MAE 7.98 / PearsonR 0.195
+  （基线同阶段 ~0.31，略弱但能学；显存 64.7GB，训练 62s/epoch）
+- 零样本：MAE 17.60 / PearsonR -0.046（基线 17.98/0.039）——无信号，判负
+- checkpoint: output_dir/TimeLLM_AgeCAUEEG_train_E2_semantic/
+- 启示：固定语义键值使源域略降，但跨域未改善——特征空间锚定还不够，
+  输出侧与输入侧仍需联合探索
+
+### #3 — E3：有序年龄原型头（待跑）
+- `--age_head ordinal --emd_lambda 0.1`：20 个年龄区间描述原型，
+  余弦匹配 + 期望年龄 + EMD 有序正则
 - 开始 30-epoch 筛选训练
