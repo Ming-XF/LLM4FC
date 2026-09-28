@@ -3,6 +3,7 @@ import os
 import numpy as np
 import torch
 
+from model.TimeLLM import rank_normalize_dfc
 from utils import *
 
 import pdb
@@ -114,28 +115,13 @@ class TimeLLMTrainer(Trainer):
         elif self.data_config.is_regression:
             labels = labels.float()
         dfc = inputs['DFC'].float().to(self.device)
-        if getattr(self.data_config, 'fc_rank_norm', False):
-            dfc = self._rank_normalize_dfc(dfc)
+        if (getattr(self.data_config, 'fc_rank_norm', False)
+                and not getattr(self.args, 'mv_consistency', False)):
+            # E1: 秩归一化输入（E4 多视图模式下由模型内部构造秩视图）
+            dfc = rank_normalize_dfc(dfc)
         kwargs = {
             "DFC": dfc,
             "SFC": inputs['correlation'].float().to(self.device),
             "labels": labels.to(self.device),
         }
         return kwargs
-
-    @staticmethod
-    def _rank_normalize_dfc(dfc):
-        """E1: 对每个 DFC 窗口矩阵做边秩变换并映射到 [-1, 1]。
-
-        分布无关（秩统计量），消除不同站点相关分布差异；
-        秩对称化保证 (i,j) 与 (j,i) 一致，对角元固定为 1。
-        """
-        B, W, N, _ = dfc.shape
-        flat = dfc.reshape(B, W, -1)                      # (B, W, N*N)
-        ranks = flat.argsort(dim=-1).argsort(dim=-1).float()
-        ranks = ranks.reshape(B, W, N, N)
-        ranks = (ranks + ranks.transpose(-1, -2)) / 2     # 对称化
-        ranks = ranks / (N * N - 1)                       # [0, 1]
-        ranks = ranks * 2 - 1                             # [-1, 1]
-        ranks[..., torch.arange(N), torch.arange(N)] = 1.0
-        return ranks

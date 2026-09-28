@@ -68,6 +68,12 @@ def init_model_config(args, data_config: DataConfig):
             llm_init=args.llm_init,
             use_task_prompt=args.use_task_prompt,
             readout=args.readout,
+            prototype_mode=args.prototype_mode,
+            age_head=args.age_head,
+            age_bin_width=args.age_bin_width,
+            emd_lambda=args.emd_lambda,
+            mv_consistency=args.mv_consistency,
+            mv_lambda=args.mv_lambda,
         )
         model = Model(model_config)
     else:
@@ -160,6 +166,12 @@ def init_config():
                                   "to test whether pretrained knowledge contributes)")
     model_group.add_argument("--patch_stride", default=5, type=int, help="DFC temporal subsampling stride (TimeLLM v1 only)")
     model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
+    model_group.add_argument("--prototype_mode", default="sparse", type=str,
+                             choices=["sparse", "semantic"],
+                             help="Prototype construction: 'sparse' = learned "
+                                  "vocab mixture (default); 'semantic' = fixed "
+                                  "LLM-encoded neural-connectivity phrases + "
+                                  "small trainable residual (E2)")
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
     model_group.add_argument("--num_gcn_layers", default=1, type=int, help="Number of GCN layers (TimeLLM)")
     model_group.add_argument("--use_task_prompt", action="store_true",
@@ -172,6 +184,22 @@ def init_config():
                                   "or 'answer_query' (append an <answer> token "
                                   "after the DFC patches and predict from its "
                                   "hidden state only)")
+    model_group.add_argument("--age_head", default="linear", type=str,
+                             choices=["linear", "ordinal"],
+                             help="Age regression head: 'linear' (default) or "
+                                  "'ordinal' (E3: cosine-match h_answer against "
+                                  "LLM-encoded age-bin descriptions, expected-age "
+                                  "readout; requires --readout answer_query)")
+    model_group.add_argument("--age_bin_width", default=5, type=int,
+                             help="Age bin width in years for --age_head ordinal")
+    model_group.add_argument("--emd_lambda", default=0.0, type=float,
+                             help="Weight of the ordinal EMD loss for --age_head "
+                                  "ordinal (0 = disabled)")
+    model_group.add_argument("--mv_consistency", action="store_true",
+                             help="E4: multi-view consistency between raw DFC and "
+                                  "rank view at the soft-token level (source-only)")
+    model_group.add_argument("--mv_lambda", default=0.1, type=float,
+                             help="Weight of the multi-view consistency loss")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

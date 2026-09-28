@@ -6,7 +6,24 @@ import torch.nn.functional as F
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 
 from ..base import BaseConfig, ModelOutputs
-from .prompts import get_prompt_config
+from .prompts import NEURAL_SEMANTIC_PROTOTYPES, get_prompt_config
+
+
+def rank_normalize_dfc(dfc):
+    """E1: 对每个 DFC 窗口矩阵做边秩变换并映射到 [-1, 1]。
+
+    分布无关（秩统计量），消除不同站点相关分布差异；
+    秩对称化保证 (i,j) 与 (j,i) 一致，对角元固定为 1。
+    """
+    B, W, N, _ = dfc.shape
+    flat = dfc.reshape(B, W, -1)                      # (B, W, N*N)
+    ranks = flat.argsort(dim=-1).argsort(dim=-1).float()
+    ranks = ranks.reshape(B, W, N, N)
+    ranks = (ranks + ranks.transpose(-1, -2)) / 2     # 对称化
+    ranks = ranks / (N * N - 1)                       # [0, 1]
+    ranks = ranks * 2 - 1                             # [-1, 1]
+    ranks[..., torch.arange(N), torch.arange(N)] = 1.0
+    return ranks
 
 
 class GCNLayer(nn.Module):
@@ -37,7 +54,13 @@ class TimeLLMConfig(BaseConfig):
                  llm_path='./model/chatglm-6b',
                  use_task_prompt=False,
                  llm_init='pretrained',
-                 readout='flatten'):
+                 readout='flatten',
+                 prototype_mode='sparse',
+                 age_head='linear',
+                 age_bin_width=5,
+                 emd_lambda=0.0,
+                 mv_consistency=False,
+                 mv_lambda=0.0):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -54,6 +77,12 @@ class TimeLLMConfig(BaseConfig):
         self.llm_init = llm_init
         self.use_task_prompt = use_task_prompt
         self.readout = readout
+        self.prototype_mode = prototype_mode
+        self.age_head = age_head
+        self.age_bin_width = age_bin_width
+        self.emd_lambda = emd_lambda
+        self.mv_consistency = mv_consistency
+        self.mv_lambda = mv_lambda
 
 
 class ReprogrammingLayer(nn.Module):
@@ -180,8 +209,27 @@ class Model(nn.Module):
 
         self.word_embeddings = self._word_embeddings.weight
         self.vocab_size = self.word_embeddings.shape[0]
-        self.mapping_layer = nn.Linear(
-            self.vocab_size, self.num_prototypes)
+
+        if config.prototype_mode == 'semantic':
+            # E2: 语义原型库。固定 LLM 编码的神经连接短语 embedding
+            # 作为 cross-attention 键值，外加小残差提供灵活性。
+            self.mapping_layer = None
+            phrase_embeds = []
+            with torch.no_grad():
+                for phrase in NEURAL_SEMANTIC_PROTOTYPES:
+                    ids = torch.tensor(self.tokenizer.encode(phrase))
+                    emb = self._word_embeddings(ids).mean(dim=0)
+                    phrase_embeds.append(emb)
+            fixed = torch.stack(phrase_embeds, dim=0)          # (P, d_llm)
+            self.register_buffer('semantic_prototypes', fixed)
+            self.prototype_residual = nn.Parameter(
+                torch.zeros(fixed.shape[0], fixed.shape[1]))
+        else:
+            self.mapping_layer = nn.Linear(
+                self.vocab_size, self.num_prototypes)
+            self.semantic_prototypes = None
+            self.prototype_residual = None
+
         self.reprogramming_layer = ReprogrammingLayer(
             d_model=config.d_model,
             n_heads=config.n_heads,
@@ -190,7 +238,36 @@ class Model(nn.Module):
         )
 
         self.task_type = config.task_type
-        if config.readout == 'answer_query':
+        self.use_ordinal_age_head = (
+            config.task_type == 'regression'
+            and config.readout == 'answer_query'
+            and config.age_head == 'ordinal')
+        if self.use_ordinal_age_head:
+            # E3: 有序年龄区间原型头。年龄区间描述的冻结 LLM embedding
+            # 作为输出原型，h_answer 与各原型余弦匹配 → 区间分布 →
+            # 期望年龄。输出空间锚定在语言语义上。
+            bin_w = config.age_bin_width / 100.0             # 归一化年龄空间
+            self.age_bin_w = bin_w
+            self.n_age_bins = int(round(1.0 / bin_w))
+            centers = (torch.arange(self.n_age_bins) + 0.5) * bin_w
+            self.register_buffer(
+                'age_bin_centers', centers.to(torch.bfloat16))
+            bin_embeds = []
+            with torch.no_grad():
+                for k in range(self.n_age_bins):
+                    lo = int(k * config.age_bin_width)
+                    hi = int((k + 1) * config.age_bin_width)
+                    phrase = (f"an EEG pattern associated with age "
+                              f"{lo} to {hi}")
+                    ids = torch.tensor(self.tokenizer.encode(phrase))
+                    emb = self._word_embeddings(ids).mean(dim=0)
+                    emb = F.normalize(emb, p=2, dim=-1)
+                    bin_embeds.append(emb)
+            self.register_buffer(
+                'age_bin_prototypes', torch.stack(bin_embeds, dim=0))
+            self.age_temperature = nn.Parameter(torch.tensor(1.0))
+            self.output_projection = None
+        elif config.readout == 'answer_query':
             # Predict from the <answer> hidden state only instead of
             # flattening all T*C patch hidden states.
             self.output_projection = nn.Sequential(
@@ -231,12 +308,18 @@ class Model(nn.Module):
         # [t0c0, t0c1, ..., t0c(C-1), t1c0, ..., t(T-1)c(C-1)].
         gcn_out = gcn_out.reshape(B, T * C, -1)
 
-        word_embeddings = self.word_embeddings.permute(1, 0).to(
-            dtype=self.mapping_layer.weight.dtype)
-        source_embeddings = self.mapping_layer(
-            word_embeddings).permute(1, 0)
-        source_embeddings = source_embeddings.to(
-            dtype=self.word_embeddings.dtype)
+        if self.config.prototype_mode == 'semantic':
+            # 固定语义原型 + 小残差（训练中保持语言锚点）
+            source_embeddings = (self.semantic_prototypes
+                                 + self.prototype_residual).to(
+                dtype=self.word_embeddings.dtype)
+        else:
+            word_embeddings = self.word_embeddings.permute(1, 0).to(
+                dtype=self.mapping_layer.weight.dtype)
+            source_embeddings = self.mapping_layer(
+                word_embeddings).permute(1, 0)
+            source_embeddings = source_embeddings.to(
+                dtype=self.word_embeddings.dtype)
 
         reprogram_dtype = \
             self.reprogramming_layer.query_projection.weight.dtype
@@ -245,6 +328,27 @@ class Model(nn.Module):
             source_embeddings.to(dtype=reprogram_dtype),
             source_embeddings.to(dtype=reprogram_dtype),
         ).to(dtype=torch.bfloat16)
+
+        # E4: 多视图语义一致性。同一 DFC 的秩视图通过共享 GCN +
+        # 重编程层，约束两视图 soft token 的语义表示一致（源域-only，
+        # 不使用目标数据）。
+        mv_loss = None
+        if self.config.mv_consistency and self.training:
+            dfc_rank = rank_normalize_dfc(DFC).to(
+                dtype=self.channel_embed_projection.weight.dtype)
+            rank_flat = dfc_rank.reshape(B * T, C, C)
+            gcn_rank = node_init.unsqueeze(0).expand(B * T, -1, -1)
+            for layer in self.gcn_layers:
+                gcn_rank = F.gelu(layer(gcn_rank, rank_flat))
+            gcn_rank = gcn_rank.reshape(B, T * C, -1)
+            reprogrammed_rank = self.reprogramming_layer(
+                gcn_rank.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype),
+            ).to(dtype=torch.bfloat16)
+            cos_sim = F.cosine_similarity(
+                reprogrammed, reprogrammed_rank, dim=-1)
+            mv_loss = self.config.mv_lambda * (1 - cos_sim.mean())
 
         start_tag = self.start_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
         end_tag = self.end_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
@@ -331,9 +435,20 @@ class Model(nn.Module):
             # Read only the last <answer> token: under the causal mask it
             # attends to the prompt and every DFC patch, so the LLM must
             # summarize the evidence into a single token before the head.
-            h_answer = hidden[:, -1:, :].to(
-                dtype=self.output_projection[0].weight.dtype)
-            logits = self.output_projection(h_answer).squeeze(1)
+            h_answer = hidden[:, -1:, :]
+            if self.use_ordinal_age_head:
+                # E3: 与年龄区间原型余弦匹配 → 区间分布 → 期望年龄
+                h_norm = F.normalize(h_answer, p=2, dim=-1)
+                cos_sim = h_norm @ self.age_bin_prototypes.t()      # (B, K)
+                p = torch.softmax(
+                    self.age_temperature * cos_sim, dim=-1)
+                self._age_bin_probs = p
+                prediction = (p * self.age_bin_centers).sum(dim=-1)
+                logits = prediction.unsqueeze(-1)
+            else:
+                h_answer = h_answer.to(
+                    dtype=self.output_projection[0].weight.dtype)
+                logits = self.output_projection(h_answer).squeeze(1)
         else:
             hidden_patches = hidden[:, prompt_length:, :self.config.d_ff].to(
                 dtype=self.output_projection[1].weight.dtype)
@@ -345,10 +460,23 @@ class Model(nn.Module):
                 labels = labels.squeeze(-1)
             loss = F.huber_loss(
                 prediction, labels.float(), delta=1.0)
+            if self.use_ordinal_age_head and self.config.emd_lambda > 0:
+                # EMD (Wasserstein-1) 有序正则：预测区间分布与
+                # 标签 bin 的 CDF 差，约束相邻区间语义。
+                bin_idx = (labels / self.age_bin_w).long().clamp(
+                    0, self.n_age_bins - 1)
+                q = F.one_hot(bin_idx, self.n_age_bins).float()
+                cdf_p = self._age_bin_probs.cumsum(dim=-1)
+                cdf_q = q.cumsum(dim=-1)
+                emd = (cdf_p - cdf_q).abs().mean()
+                loss = loss + self.config.emd_lambda * emd
         else:
             if labels.dim() > 1 and labels.shape[-1] > 1:
                 labels = labels.argmax(dim=-1)
             loss = F.cross_entropy(logits, labels)
+
+        if mv_loss is not None:
+            loss = loss + mv_loss
 
         hidden_state = {
             'gcn_out': gcn_out,
