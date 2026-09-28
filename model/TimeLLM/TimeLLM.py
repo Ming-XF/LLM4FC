@@ -367,6 +367,7 @@ class Model(nn.Module):
         # (--no_patches: 纯语言通路，跳过全部可学习图编码，序列只含
         #  prompt + 确定性证据文本)
         if self.config.no_patches:
+            gcn_out = None
             reprogrammed = None
             mv_loss = None
         else:
