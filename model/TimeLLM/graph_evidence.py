@@ -47,8 +47,10 @@ def compute_graph_evidence(dfc):
     """对 (B, W, C, C) DFC 计算确定性图统计量并量化为证据描述。
 
     Returns:
-        (B,) list，每个元素为 5 个证据词（strength, inter, frontal,
-        variability, trend），对应 _EVIDENCE_TEMPLATES 的槽位。
+        levels: (B,) list，每个元素为 6 个证据词（strength, inter,
+            frontal, variability, trend, asymmetry）。
+        stats:  (B, 6) 连续统计量（按名义尺度重缩放，供 --stat_vector
+            直接拼入读出层输入，保留可迁移的连续信号）。
     """
     B, W, C, _ = dfc.shape
     device = dfc.device
@@ -119,7 +121,17 @@ def compute_graph_evidence(dfc):
             strength_labels[b], inter_labels[b], front_labels[b],
             var_labels[b], trend_words[int(trend_idx[b])], asym_labels[b],
         ])
-    return levels
+
+    # 连续统计量按名义尺度重缩放（~单位量级，供线性头学习）
+    stats = torch.stack([
+        strength / 0.3,
+        inter_ratio,
+        front_ratio,
+        variability / 0.05,
+        trend_norm / 0.05,
+        asym / 0.05,
+    ], dim=-1)                                                 # (B, 6)
+    return levels, stats
 
 
 # ── 证据句模板（槽位词均为 llama 词表的单 token，保证定长；

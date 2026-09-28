@@ -77,6 +77,7 @@ def init_model_config(args, data_config: DataConfig):
             mv_lambda=args.mv_lambda,
             graph_evidence=args.graph_evidence,
             no_patches=args.no_patches,
+            stat_vector=args.stat_vector,
         )
         model = Model(model_config)
     else:
@@ -220,6 +221,11 @@ def init_config():
                                   "reprogrammed patches entirely, sequence is "
                                   "[prompt][evidence text] only (requires "
                                   "--readout evidence_query)")
+    model_group.add_argument("--stat_vector", action="store_true",
+                             help="E8: concatenate the continuous graph "
+                                  "statistics to the evidence-pooled states "
+                                  "before the readout head (preserves the "
+                                  "transferable continuous signal)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

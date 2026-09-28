@@ -64,7 +64,8 @@ class TimeLLMConfig(BaseConfig):
                  mv_consistency=False,
                  mv_lambda=0.0,
                  graph_evidence=False,
-                 no_patches=False):
+                 no_patches=False,
+                 stat_vector=False):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -90,6 +91,7 @@ class TimeLLMConfig(BaseConfig):
         self.mv_lambda = mv_lambda
         self.graph_evidence = graph_evidence
         self.no_patches = no_patches
+        self.stat_vector = stat_vector
 
 
 class ReprogrammingLayer(nn.Module):
@@ -339,8 +341,11 @@ class Model(nn.Module):
             # Predict from the <answer> hidden state only (answer_query)
             # or from the LLM-contextualized evidence-text states
             # (evidence_query, E6) instead of flattening all patches.
+            # --stat_vector: 连续图统计量直接拼入读出输入，保留可迁移
+            # 的连续信号（量化文本会丢失跨域信号，见 WORK.md 诊断）。
+            in_dim = self.d_llm + (6 if config.stat_vector else 0)
             self.output_projection = nn.Sequential(
-                nn.Linear(self.d_llm, config.output_dim),
+                nn.Linear(in_dim, config.output_dim),
                 nn.Dropout(config.dropout),
             )
         else:
@@ -433,8 +438,9 @@ class Model(nn.Module):
 
         # E5: 确定性图证据文本 token（在 DFC patches 之后、<answer> 之前）
         evidence_embeds = None
+        evidence_stats = None
         if self.config.graph_evidence:
-            levels_all = compute_graph_evidence(DFC)
+            levels_all, evidence_stats = compute_graph_evidence(DFC)
             evidence_ids = []
             for levels in levels_all:
                 ids = []
@@ -553,6 +559,11 @@ class Model(nn.Module):
             h_ev = hidden[:, ev_start:ev_start + evidence_embeds.shape[1]]
             h_ev = h_ev.mean(dim=1).to(
                 dtype=self.output_projection[0].weight.dtype)
+            if self.config.stat_vector:
+                h_ev = torch.cat(
+                    [h_ev, evidence_stats.to(
+                        dtype=self.output_projection[0].weight.dtype)],
+                    dim=-1)
             logits = self.output_projection(h_ev).squeeze(1)
         else:
             hidden_patches = hidden[:, prompt_length:, :self.config.d_ff].to(
