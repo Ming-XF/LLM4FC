@@ -38,7 +38,16 @@
 
 ## 提交日志
 
-### #1 — E1：FC 秩归一化输入（待跑）
-- 新增 `--fc_rank_norm` 参数（config.py / data_config.py / trainers.py）
-- TimeLLMTrainer 对 DFC 每个窗口矩阵做边秩变换并映射到 [-1,1]
-- 实验脚本加入该开关，开始 30-epoch 筛选训练
+### #1 — E1：FC 秩归一化输入（结果：负）
+- 新增 `--fc_rank_norm` 参数；TimeLLMTrainer 对 DFC 每个窗口做边秩变换 → [-1,1]
+- 筛选结果（30 epoch，早停于 28）：源域 best test MAE 8.14 / **PearsonR -0.0035**
+  （基线 7.70 / 0.309）——秩变换破坏 GCN 对相关强度的利用，源域即损坏
+- 零样本：MAE 17.20 / PearsonR 0.0755（基线 17.98 / 0.039），仍≈随机，无信号
+- checkpoint: output_dir/TimeLLM_AgeCAUEEG_train_E1_rank/
+- 结论：E1 单独无效，放弃（秩视图仅保留给 E4 作一致性正则的辅助视图）
+
+### #2 — E2：语义原型库（实现完成，待跑）
+- 新增 `--prototype_mode semantic`：45 个神经连接短语的冻结 LLM embedding
+  作为 cross-attention 键值 + 可训练小残差；mapping_layer(vocab→1000) 不再创建
+- 修复 trainers.py 的 rank_normalize_dfc 导入路径
+- 开始 30-epoch 筛选训练
