@@ -84,7 +84,9 @@ class TimeLLMTrainer(Trainer):
 
     Architecture: DFC → shared GCN per-window → (B, T*C, 128)
     → Reprogramming (cross-attention to text prototypes) → frozen LLM
-    → Flatten → classifier.
+    → readout → classifier.
+    Readout: 'flatten' (default, all T*C patch hidden states) or
+    'answer_query' (trailing <answer> token hidden state only).
 
     Supports: Single GPU (AMP), Multi-GPU DDP, DeepSpeed ZeRO-2
     """

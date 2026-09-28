@@ -1,0 +1,264 @@
+核心问题不是 LLM 不够大，而是当前 GCN 输出的 soft token、词表映射原型和最终 flatten head 都由源数据集监督形成，与语言语义缺少稳定对应。冻结 LLM 更像一个复杂 Transformer，而不是在利用其预训练知识。
+
+我建议把主线做成“神经语义证据重编程”：让 DFC 先转换成跨数据集稳定、具有语言语义的证据，再由 LLM 聚合并通过语义原型完成预测。
+
+| 优先级 | 模块 | 核心改动 | 疾病零样本 | 年龄零样本 |
+|---|---|---|---|---|
+| 1 | Answer Query Readout | 将 `<answer>` token 放在所有 DFC token 后，只读取它的隐藏状态，替换当前 flatten 全部 190 个 patch 的分类头 | 高潜力 | 高潜力 |
+| 2 | 语义类别/年龄原型头 | 用类别描述或年龄区间描述的 LLM embedding 作为输出原型，改为余弦匹配 | 高潜力 | 高潜力 |
+| 3 | 神经语义原型库 | 用解剖、拓扑和动态 FC 短语替换当前任意词表混合原型 | 高潜力 | 中高潜力 |
+| 4 | Anatomy-aware Channel Token | 用通道名称、半球和脑区描述的 LLM embedding 初始化节点 | 中等 | 中等 |
+| 5 | Graph-to-Text 双流 | 将稳健图统计量转换成结构化文本，与 GCN soft token 一同送入 LLM | 高潜力 | 高潜力 |
+| 6 | 多视图语义一致性 | 对同一样本不同 DFC 表示约束 answer embedding 和预测一致 | 中高潜力 | 高潜力 |
+| 7 | Task Prompt Ensemble | 训练时随机使用等价任务描述，测试时多个 prompt 集成 | 中等 | 中等 |
+| 8 | 多源 episodic DG | 多数据集轮流作为伪目标域，训练共享语义空间 | 很高，但改变实验设定 | 很高，但改变实验设定 |
+
+## 1. Answer Query：最应该先改
+
+当前 head：
+
+```text
+190 个 patch hidden state -> flatten -> Linear
+```
+
+它的问题是：
+
+- 强依赖固定通道数、窗口数和 token 位置；
+- 每一个位置都能学到源数据集特征；
+- LLM 没有真正执行“总结证据并回答”。
+
+建议改成：
+
+```text
+[task prompt]
+[DFC soft tokens]
+[structured evidence tokens]
+<answer>
+    ↓
+h_answer
+    ↓
+semantic prediction head
+```
+
+因果 LLM 中，最后的 `<answer>` 可以看到全部 DFC token。只使用 `h_answer` 预测，可以显著减少源数据集位置模式的过拟合，也允许未来改变窗口数。
+
+建议 CLI：
+
+```bash
+--readout answer_query
+```
+
+## 2. 用语义原型替换普通 Linear 输出头
+
+### 疾病预测
+
+为每一类提供严格匹配标签定义的描述，例如：
+
+```text
+A cognitively normal control subject.
+A subject with Alzheimer-related cognitive impairment.
+```
+
+用冻结 LLM 编码这些描述，得到类别原型 \(e_k\)：
+
+```text
+logit_k = temperature * cosine(W h_answer, e_k)
+```
+
+这样目标标签不再只是任意的类别编号 `0/1`，而是与语言空间中的疾病语义对齐。
+
+注意：CAUEEG↔DS 只有在二者疾病定义兼容时才适合这样迁移。TUAB 异常、TUEP 癫痫和痴呆不能被统称为同一个“disease”零样本任务。
+
+### 年龄预测
+
+不建议直接让 LLM 输出一个浮点数。建议做有序年龄原型：
+
+```text
+"an EEG pattern associated with age 0–5"
+"an EEG pattern associated with age 5–10"
+...
+"an EEG pattern associated with age 95–100"
+```
+
+输出年龄区间分布，再计算期望年龄：
+
+\[
+\hat y=\sum_k p_k c_k
+\]
+
+同时使用 Huber、ordinal/EMD 和单调性约束。这通常比源域拟合的单一回归 Linear 更容易跨域。
+
+建议 CLI：
+
+```bash
+--prediction_head semantic_prototype
+--age_head ordinal
+--age_bin_width 5
+```
+
+## 3. 神经语义原型库
+
+当前 `mapping_layer` 将整个词表 embedding 混合成可训练原型，这些原型未必保留任何语言含义，很容易成为源数据集专用参数。
+
+可以将它替换为一组由冻结 LLM 编码的可解释短语：
+
+- `left frontal connectivity`
+- `inter-hemispheric coupling`
+- `frontotemporal connectivity`
+- `high network segregation`
+- `globally reduced connectivity`
+- `stable connectivity over time`
+- `increasing temporal variability`
+- `strong hemispheric asymmetry`
+
+GCN token 只对这些神经语义原型做 cross-attention。可以允许一个很小的可训练 residual，但保留固定文本原型作为锚点。
+
+这会比通用词表的 1000 个任意混合原型更像真正的“EEG→语言空间重编程”。
+
+## 4. 解剖语义节点初始化
+
+当前 GCN 从 one-hot 通道身份开始，`Fp1` 和 `Fp2` 只被视作两个任意编号。
+
+可以使用以下描述的 LLM embedding：
+
+```text
+Fp1: left prefrontal EEG electrode
+F3: left frontal EEG electrode
+T4: right temporal EEG electrode
+```
+
+节点初始化改为：
+
+```text
+fixed anatomical embedding + small learnable residual
+```
+
+这样模型天然知道：
+
+- 左右半球对应关系；
+- frontal、temporal、central 等脑区；
+- 同源通道之间的关系。
+
+同时必须保证所有数据集被重排到统一的 19 通道顺序。
+
+## 5. Graph-to-Text 双流
+
+这是我认为最有论文创新性的方向。
+
+除了 GCN soft token，再从每个样本确定性提取跨域图证据：
+
+- 全局正/负连接强度；
+- 半球内与半球间连接；
+- frontal/temporal/parietal 区域连接；
+- 网络稀疏度、聚集性、模块化；
+- 时间窗口间稳定性；
+- 连接变化趋势；
+- 左右不对称程度。
+
+将数值按固定物理范围或样本内 rank 离散化：
+
+```text
+Inter-hemispheric connectivity is low.
+Frontal connectivity is moderately high.
+Temporal variability is high.
+Connectivity decreases across windows.
+```
+
+然后使用：
+
+```text
+task prompt + GCN soft tokens + graph evidence text + <answer>
+```
+
+不要使用目标数据集统计量划分 high/low；应使用相关系数固定范围、样本内 rank 或仅在源训练集确定的阈值，避免目标域泄漏。
+
+还可以在源域增加对齐损失：
+
+\[
+L_{\text{align}}=
+1-\cos(h_{\text{DFC}},h_{\text{caption}})
+\]
+
+这相当于用自动生成的图描述监督 EEG→语言空间的映射，不需要额外人工标签。
+
+## 6. 多视图语义一致性
+
+对同一个 DFC 构造保持标签不变的视图：
+
+- 原始相关矩阵；
+- Fisher-Z 表示；
+- 样本内 edge-rank 表示；
+- 轻微 edge dropout；
+- 通道 masking；
+- 时间窗口 masking；
+- 合理范围内的连接噪声。
+
+要求：
+
+```text
+prediction(x) ≈ prediction(augment(x))
+h_answer(x) ≈ h_answer(augment(x))
+```
+
+总体损失可以是：
+
+\[
+L=L_{\text{task}}
++\lambda_{\text{sem}}L_{\text{align}}
++\lambda_{\text{cons}}JS(p(x),p(x'))
++\lambda_{\text{emb}}(1-\cos(h,h'))
+\]
+
+它不使用目标数据，是严格 source-only 零样本泛化方法。
+
+## 7. Task Prompt Ensemble
+
+保留 task prompt，但不要恢复 dataset prompt。为同一任务设计多个语义等价描述：
+
+```text
+Estimate the subject's chronological age from EEG connectivity.
+Infer age-related patterns from dynamic functional connectivity.
+Predict chronological age using the provided EEG network evidence.
+```
+
+训练时随机选择，测试时平均不同 prompt 的输出。这样可以防止 bridge 过拟合某一个 prompt embedding。
+
+疾病 prompt 必须描述准确疾病概念，避免现在过于模糊的 `target condition`。
+
+## 推荐形成一个完整方法
+
+可以命名为：
+
+**Neuro-Semantic Evidence Reprogramming, NSER**
+
+```text
+DFC
+ ├─ GCN with anatomical channel embeddings
+ │    └─ soft EEG tokens
+ └─ invariant graph statistics
+      └─ structured evidence text
+             ↓
+ task-semantic prototypes + EEG tokens + evidence + <answer>
+             ↓
+       frozen pretrained LLM
+             ↓
+          h_answer
+       ├─ disease text prototypes
+       └─ ordinal age prototypes
+```
+
+## 实验顺序
+
+建议不要一次加入全部模块：
+
+1. `pretrained LLM + answer query`
+2. `+ semantic disease/age head`
+3. `+ anatomical channel embedding`
+4. `+ neuro-semantic prototype bank`
+5. `+ graph-to-text`
+6. `+ multi-view consistency`
+7. 最后才做多源 episodic DG
+
+其中第 1、2 项是结构性修复；第 3、4、5 项才是比较有创新性的 LLM 泛化设计。
+
+另外，当前脚本仍使用 `--llm_init random`。任何“LLM 预训练提升泛化”的实验都必须以 `--llm_init pretrained` 为主设置，并保留 random、无 LLM、小型 Transformer 三个对照，否则无法证明收益来自 LLM 的预训练知识。

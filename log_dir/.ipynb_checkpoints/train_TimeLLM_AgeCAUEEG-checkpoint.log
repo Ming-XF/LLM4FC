@@ -1,0 +1,109 @@
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS] command: main.py --local_rank=0 --model TimeLLM --num_epochs 200 --num_repeat 1 --save_steps 25 --schedule cos --early_stop_patience 10 --early_stop_min_delta 0.1 --early_stop_metric MAE --dataset AgeCAUEEG --fc_threshold 0.0 --fc_keep_ratio 1.0 --d_model 128 --num_heads 8 --d_ff 128 --dropout 0.1 --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B --few_shot 0 --few_shot_seed 42 --pretrain_path  --llm_init pretrained --use_task_prompt --readout answer_query --num_gcn_layers 1 --num_prototypes 1000 --deepspeed --do_train --do_evaluate --do_test
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   project = 
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   wandb_entity = cwg
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   log_dir = ./log_dir
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   model = TimeLLM
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   num_repeat = 1
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   visualize = False
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   append = 
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   dataset = AgeCAUEEG
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   data_processors = 0
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   train_set = 0.6
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   val_set = 0.2
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   few_shot = 0
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   few_shot_seed = 42
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   batch_size = 32
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   num_workers = 5
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   num_epochs = 200
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   drop_last = False
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   frequency = 500
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   D = 2
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   F1 = 8
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   p1 = 4
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   p2 = 8
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   fc_threshold = 0.0
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   fc_keep_ratio = 1.0
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   d_model = 128
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   k = 5
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   num_kernels = 5
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   sparsity = 0.7
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   dynamic_stride = 1
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   hidden_dim = 1024
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   num_heads = 8
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   abla_channel = -1
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   abla_vae = n
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   num_layers = 2
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   attention_depth = 2
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   activation = gelu
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   model_dir = output_dir
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   dropout = 0.1
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   distill = False
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   initializer = None
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   integration = None
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   llm_type = llama
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   llm_path = ./model/deepseek-r1-distill-llama-8B
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   llm_init = pretrained
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   patch_stride = 5
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   num_prototypes = 1000
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   d_ff = 128
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   num_gcn_layers = 1
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   use_task_prompt = True
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   num_windows = 10
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   readout = answer_query
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   max_steps = -1
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   pretrain_path = 
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   do_train = True
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   do_parallel = False
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   deepspeed = True
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   deepspeed_config = deepspeed/train.json
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   local_rank = 0
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   device = cuda
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   save_steps = 25
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   epsilon_ls = 0
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   alpha = 1.0
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   beta = 1.0
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   early_stop_patience = 10
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   early_stop_min_delta = 0.1
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   early_stop_metric = MAE
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   standard_split = False
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   optimizer = Adam
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   learning_rate = 0.0001
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   target_learning_rate = 1e-05
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   max_learning_rate = 0.001
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   beta1 = 0.9
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   beta2 = 0.98
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   epsilon = 1e-09
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   schedule = cos
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   warmup_steps = 400
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   weight_decay = 0.0001
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   eps = 1e-08
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   no_weight_decay = False
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   match_rule = None
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   except_rule = None
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   do_evaluate = True
+09/28/2026 22:01:26 - INFO - utils.logger -   [ARGS]   do_test = True
+09/28/2026 22:01:26 - INFO - __main__ -   ########## Repeat:0 ##########
+09/28/2026 22:01:26 - INFO - utils.trainer -   ***** Running training *****
+09/28/2026 22:01:26 - INFO - utils.trainer -     Num examples = 61
+09/28/2026 22:01:26 - INFO - utils.trainer -     Num Epochs = 200
+09/28/2026 22:01:26 - INFO - utils.trainer -     Total train batch size = 32
+09/28/2026 22:01:26 - INFO - utils.trainer -     warmup steps = 400
+09/28/2026 22:01:26 - INFO - utils.trainer -     Total optimization steps = 12200
+09/28/2026 22:01:26 - INFO - utils.trainer -     Save steps = 25
+09/28/2026 22:02:34 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/28/2026 22:02:41 - INFO - utils.trainer -   Loss: 0.01376
+09/28/2026 22:02:41 - INFO - utils.trainer -   MSE: 146.22098
+09/28/2026 22:02:41 - INFO - utils.trainer -   MAE: 10.03004
+09/28/2026 22:02:41 - INFO - utils.trainer -   RMSE: 12.09219
+09/28/2026 22:02:41 - INFO - utils.trainer -   R2: -0.32376
+09/28/2026 22:02:41 - INFO - utils.trainer -   PearsonR: 0.01960
+09/28/2026 22:02:42 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train
+09/28/2026 22:02:42 - INFO - utils.trainer -   Best model saved (val_MAE=10.0300)
+09/28/2026 22:02:42 - INFO - utils.trainer -   Epoch: 1, Loss: 0.08466, Val loss: 0.01376, Val MAE: 10.0300, Best val MAE: 10.0300, No improve: 0/10, Time: 67.5s
+09/28/2026 22:03:49 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/28/2026 22:03:56 - INFO - utils.trainer -   Loss: 0.01050
+09/28/2026 22:03:56 - INFO - utils.trainer -   MSE: 112.02078
+09/28/2026 22:03:56 - INFO - utils.trainer -   MAE: 8.47118
+09/28/2026 22:03:56 - INFO - utils.trainer -   RMSE: 10.58399
+09/28/2026 22:03:56 - INFO - utils.trainer -   R2: -0.01414
+09/28/2026 22:03:56 - INFO - utils.trainer -   PearsonR: -0.00835

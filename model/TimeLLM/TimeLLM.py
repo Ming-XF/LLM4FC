@@ -36,7 +36,8 @@ class TimeLLMConfig(BaseConfig):
                  llm_type='chatglm',
                  llm_path='./model/chatglm-6b',
                  use_task_prompt=False,
-                 llm_init='pretrained'):
+                 llm_init='pretrained',
+                 readout='flatten'):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -52,6 +53,7 @@ class TimeLLMConfig(BaseConfig):
         self.llm_path = llm_path
         self.llm_init = llm_init
         self.use_task_prompt = use_task_prompt
+        self.readout = readout
 
 
 class ReprogrammingLayer(nn.Module):
@@ -162,6 +164,20 @@ class Model(nn.Module):
         self.register_buffer("end_tag_embeddings", end_tag_embeds)
         self.P_end = end_tag_embeds.shape[0]
 
+        # Answer-query readout: a trailing <answer> token whose hidden state
+        # summarizes all DFC patches. May span several sub-tokens; the readout
+        # is the last one (it attends to the whole sequence under the causal
+        # mask). Not created for the default flatten readout.
+        if config.readout == 'answer_query':
+            answer_tag_ids = self.tokenizer.encode("<answer>")
+            with torch.no_grad():
+                answer_tag_embeds = self._word_embeddings(
+                    torch.tensor(answer_tag_ids))
+            self.register_buffer("answer_tag_embeddings", answer_tag_embeds)
+            self.P_answer = answer_tag_embeds.shape[0]
+        else:
+            self.P_answer = 0
+
         self.word_embeddings = self._word_embeddings.weight
         self.vocab_size = self.word_embeddings.shape[0]
         self.mapping_layer = nn.Linear(
@@ -173,13 +189,21 @@ class Model(nn.Module):
             attention_dropout=config.dropout,
         )
 
-        self.head_nf = config.d_ff * config.node_size * config.num_windows
         self.task_type = config.task_type
-        self.output_projection = nn.Sequential(
-            nn.Flatten(start_dim=1),
-            nn.Linear(self.head_nf, config.output_dim),
-            nn.Dropout(config.dropout),
-        )
+        if config.readout == 'answer_query':
+            # Predict from the <answer> hidden state only instead of
+            # flattening all T*C patch hidden states.
+            self.output_projection = nn.Sequential(
+                nn.Linear(self.d_llm, config.output_dim),
+                nn.Dropout(config.dropout),
+            )
+        else:
+            self.head_nf = config.d_ff * config.node_size * config.num_windows
+            self.output_projection = nn.Sequential(
+                nn.Flatten(start_dim=1),
+                nn.Linear(self.head_nf, config.output_dim),
+                nn.Dropout(config.dropout),
+            )
 
         for param in self.llm.parameters():
             param.requires_grad = False
@@ -235,6 +259,11 @@ class Model(nn.Module):
         prompt_parts.append(end_tag)
         prompt_length += self.P_end
         prompt_parts.append(reprogrammed.to(dtype=task_prompt.dtype))
+        if self.config.readout == 'answer_query':
+            # [task prompt] [DFC soft tokens] <answer>
+            answer_tag = self.answer_tag_embeddings.unsqueeze(0).expand(
+                B, -1, -1).to(dtype=task_prompt.dtype)
+            prompt_parts.append(answer_tag)
 
         inputs_embeds = torch.cat(prompt_parts, dim=1)
         sequence_length = inputs_embeds.shape[1]
@@ -252,11 +281,19 @@ class Model(nn.Module):
                 sequence_length, dtype=torch.long, device=device
             ).unsqueeze(0).repeat(B, 1)
             if self.position_encoding_2d:
-                block_pos = torch.cat([
+                block_parts = [
                     torch.arange(
                         prompt_length, dtype=torch.long, device=device),
                     torch.arange(T * C, dtype=torch.long, device=device),
-                ]).unsqueeze(0).repeat(B, 1)
+                ]
+                if self.config.readout == 'answer_query':
+                    # The <answer> tokens form their own block after the DFC
+                    # patches; block positions restart per block (ChatGLM 2D
+                    # rotary position encoding).
+                    block_parts.append(
+                        torch.arange(self.P_answer, dtype=torch.long,
+                                     device=device))
+                block_pos = torch.cat(block_parts).unsqueeze(0).repeat(B, 1)
                 position_ids = torch.stack((global_pos, block_pos), dim=1)
             else:
                 position_ids = global_pos
@@ -290,9 +327,17 @@ class Model(nn.Module):
             )
             hidden = transformer_outputs[0]
 
-        hidden_patches = hidden[:, prompt_length:, :self.config.d_ff].to(
-            dtype=self.output_projection[1].weight.dtype)
-        logits = self.output_projection(hidden_patches)
+        if self.config.readout == 'answer_query':
+            # Read only the last <answer> token: under the causal mask it
+            # attends to the prompt and every DFC patch, so the LLM must
+            # summarize the evidence into a single token before the head.
+            h_answer = hidden[:, -1:, :].to(
+                dtype=self.output_projection[0].weight.dtype)
+            logits = self.output_projection(h_answer).squeeze(1)
+        else:
+            hidden_patches = hidden[:, prompt_length:, :self.config.d_ff].to(
+                dtype=self.output_projection[1].weight.dtype)
+            logits = self.output_projection(hidden_patches)
 
         if self.task_type == 'regression':
             prediction = logits.squeeze(-1)
@@ -305,12 +350,17 @@ class Model(nn.Module):
                 labels = labels.argmax(dim=-1)
             loss = F.cross_entropy(logits, labels)
 
+        hidden_state = {
+            'gcn_out': gcn_out,
+            'reprogrammed': reprogrammed,
+        }
+        if self.config.readout == 'answer_query':
+            hidden_state['HL_answer'] = h_answer.squeeze(1)
+        else:
+            hidden_state['HL_patches'] = hidden_patches
+
         return ModelOutputs(
             logits=logits,
             loss=loss,
-            hidden_state={
-                'gcn_out': gcn_out,
-                'reprogrammed': reprogrammed,
-                'HL_patches': hidden_patches,
-            },
+            hidden_state=hidden_state,
         )

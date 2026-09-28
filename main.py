@@ -130,14 +130,11 @@ def main(args):
                             f'_{args.dataset}.log')
             init_logger(log_file)
 
-            if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
-                if args.few_shot == -1:
-                    logger.info(f"{'#'*10} full-data finetune {'#'*10}")
-                else:
-                    logger.info(f"{'#'*10} few-shot seed={episode_seed} {'#'*10}")
-
             if is_zero_shot:
                 # Zero-shot: 不加 few-shot 采样，直接加载预训练模型评估
+                if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                    log_args(args)
+                    logger.info(f"{'#'*10} zero-shot {'#'*10}")
                 trainer = eval(args.model + 'Trainer')(
                     args, local_rank=local_rank, task_id=0)
                 trainer.load_model(path=args.pretrain_path)
@@ -157,6 +154,13 @@ def main(args):
                             f"{finetune_ds_path}, using original: {ds_path}")
                 else:
                     args.learning_rate = 1e-5
+                # 先应用 finetune 配置覆盖，再记录参数，保证日志为实际生效值
+                if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                    log_args(args)
+                    if args.few_shot == -1:
+                        logger.info(f"{'#'*10} full-data finetune {'#'*10}")
+                    else:
+                        logger.info(f"{'#'*10} few-shot seed={episode_seed} {'#'*10}")
                 trainer = eval(args.model + 'Trainer')(
                     args, local_rank=local_rank, task_id=0,
                     episode_seed=episode_seed)
@@ -212,6 +216,7 @@ def main(args):
                 else:
                     init_logger(f'{args.log_dir}/train_{args.model}{args.append}_{args.dataset}.log')
                 if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                    log_args(args)
                     logger.info(f"{'#'*10} Repeat:{i} {'#'*10}")
                 trainer.train()
                 all_episode_results.append(trainer.best_result)
@@ -238,6 +243,7 @@ def main(args):
             trainer = eval(args.model + 'Trainer')(args)
             init_logger(f'{args.log_dir}/test_{args.model}{args.append}'
                         f'_zero-shot_{args.dataset}.log')
+            log_args(args)
             trainer.load_model(path=args.pretrain_path)
             trainer.model.eval()
             trainer.evaluate()
@@ -245,6 +251,7 @@ def main(args):
             trainer = eval(args.model + 'Trainer')(args)
             init_logger(f'{args.log_dir}/test_{args.model}{args.append}'
                         f'_{args.dataset}.log')
+            log_args(args)
             trainer.load_model()
             trainer.evaluate()
 

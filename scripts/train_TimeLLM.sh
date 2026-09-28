@@ -1,26 +1,24 @@
 #!/bin/bash
 #
-# TimeLLM training script
-# Usage: ./scripts/train_TimeLLM.sh <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>
+# TimeLLM training script (flatten readout; --llm_init random 作为随机初始化对照)
+# Usage: ./scripts/train_TimeLLM.sh   (dataset / early-stop 参数在脚本内部配置)
 #
-# Examples:
-#   ./scripts/train_TimeLLM.sh DiseaseBeirut   AUC   0.001
-#   ./scripts/train_TimeLLM.sh GenderDS        AUC   0.001
-#   ./scripts/train_TimeLLM.sh AgeTUAB         MAE   0.1
+# Datasets:  DiseaseBeirut / GenderDS  (AUC, 0.001)
+#            AgeCAUEEG / AgeTUAB      (MAE, 0.1)
 #
 
-DATASET=${1:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
-EARLY_STOP_METRIC=${2:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
-EARLY_STOP_MIN_DELTA=${3:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
+# ── 实验参数（在脚本内部配置，不再从命令行传入）──
+DATASET="AgeCAUEEG"              # 数据集: DiseaseBeirut/GenderDS/AgeCAUEEG/AgeTUAB 等
+EARLY_STOP_METRIC="MAE"          # 早停指标: AUC(分类) / MAE(回归)
+PRETRAIN_PATH=""                 # 零样本评估: "./output_dir/TimeLLM_AgeCAUEEG_train"
 
-deepspeed --num_gpus=6 main.py \
+deepspeed --num_gpus=2 main.py \
     --model "TimeLLM" \
     --num_epochs 200 \
     --num_repeat 1 \
     --save_steps 25 \
     --schedule 'cos' \
-    --early_stop_patience 10 \
-    --early_stop_min_delta "$EARLY_STOP_MIN_DELTA" \
+    --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
     --fc_threshold 0.0 \
@@ -33,7 +31,7 @@ deepspeed --num_gpus=6 main.py \
     --llm_path ./model/deepseek-r1-distill-llama-8B \
     --few_shot 0 \
     --few_shot_seed 42 \
-    --pretrain_path "" \
+    --pretrain_path "$PRETRAIN_PATH" \
     --llm_init random \
     --use_task_prompt \
     --num_gcn_layers 1 \

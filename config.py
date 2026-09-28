@@ -67,6 +67,7 @@ def init_model_config(args, data_config: DataConfig):
             llm_path=args.llm_path,
             llm_init=args.llm_init,
             use_task_prompt=args.use_task_prompt,
+            readout=args.readout,
         )
         model = Model(model_config)
     else:
@@ -161,6 +162,13 @@ def init_config():
     model_group.add_argument("--use_task_prompt", action="store_true",
                              help="TimeLLM: include task description prompt")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
+    model_group.add_argument("--readout", default="flatten", type=str,
+                             choices=["flatten", "answer_query"],
+                             help="TimeLLM readout: 'flatten' (flatten all T*C "
+                                  "patch hidden states into one Linear, default) "
+                                  "or 'answer_query' (append an <answer> token "
+                                  "after the DFC patches and predict from its "
+                                  "hidden state only)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
@@ -179,7 +187,7 @@ def init_config():
     train_group.add_argument("--beta", default=1., type=float, help="")
     train_group.add_argument("--early_stop_patience", default=20, type=int,
                              help="Early stopping patience (epochs, 0 = disabled)")
-    train_group.add_argument("--early_stop_min_delta", default=0.001, type=float,
+    train_group.add_argument("--early_stop_min_delta", default=0.0, type=float,
                              help="Minimum improvement to reset patience")
     train_group.add_argument("--early_stop_metric", default="Loss", type=str,
                              help="Metric to monitor for early stopping (Accuracy / AUC / Loss)")
