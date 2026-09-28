@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch
 
-from model.TimeLLM import rank_normalize_dfc
+from model.TimeLLM.TimeLLM import rank_normalize_dfc
 from utils import *
 
 import pdb
