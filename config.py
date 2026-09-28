@@ -126,6 +126,9 @@ def init_config():
                                   help="FC sparsification: edges with |value| < threshold are set to 0")
     preprocess_group.add_argument("--fc_keep_ratio", default=1.0, type=float,
                                   help="FC sparsification: top-K ratio of edges to keep by absolute value (1.0 = keep all)")
+    preprocess_group.add_argument("--fc_rank_norm", action="store_true",
+                                  help="E1: rank-normalize each DFC window's edges to [-1,1] "
+                                       "(distribution-free input, site-invariant)")
 
     model_group = parser.add_argument_group(title="model", description="")
     model_group.add_argument("--d_model", default=4, type=int, help="")
