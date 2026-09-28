@@ -438,12 +438,14 @@ class Model(nn.Module):
             h_answer = hidden[:, -1:, :]
             if self.use_ordinal_age_head:
                 # E3: 与年龄区间原型余弦匹配 → 区间分布 → 期望年龄
-                h_norm = F.normalize(h_answer, p=2, dim=-1)
-                cos_sim = h_norm @ self.age_bin_prototypes.t()      # (B, K)
+                # 显式转 fp32：避免 fp32 温度项与 bf16 matmul 混合导致
+                # 反向 dtype 不一致。
+                h_norm = F.normalize(h_answer.float(), p=2, dim=-1)
+                cos_sim = h_norm @ self.age_bin_prototypes.float().t()  # (B, K)
                 p = torch.softmax(
                     self.age_temperature * cos_sim, dim=-1)
                 self._age_bin_probs = p
-                prediction = (p * self.age_bin_centers).sum(dim=-1)
+                prediction = (p * self.age_bin_centers.float()).sum(dim=-1)
                 logits = prediction.unsqueeze(-1)
             else:
                 h_answer = h_answer.to(
