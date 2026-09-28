@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 
 from ..base import BaseConfig, ModelOutputs
+from .graph_evidence import _EVIDENCE_TEMPLATES, compute_graph_evidence
 from .prompts import NEURAL_SEMANTIC_PROTOTYPES, get_prompt_config
 
 
@@ -61,7 +62,8 @@ class TimeLLMConfig(BaseConfig):
                  emd_lambda=0.0,
                  align_lambda=0.0,
                  mv_consistency=False,
-                 mv_lambda=0.0):
+                 mv_lambda=0.0,
+                 graph_evidence=False):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -85,6 +87,7 @@ class TimeLLMConfig(BaseConfig):
         self.align_lambda = align_lambda
         self.mv_consistency = mv_consistency
         self.mv_lambda = mv_lambda
+        self.graph_evidence = graph_evidence
 
 
 class ReprogrammingLayer(nn.Module):
@@ -208,6 +211,22 @@ class Model(nn.Module):
             self.P_answer = answer_tag_embeds.shape[0]
         else:
             self.P_answer = 0
+
+        # E5: 图证据句模板（前缀/槽位词/后缀的 token id）。
+        # 槽位词需为单 token，保证证据序列定长（无需 padding/掩码）。
+        self.evidence_templates = None
+        if config.graph_evidence:
+            self.evidence_templates = []
+            for prefix, words, suffix in _EVIDENCE_TEMPLATES:
+                p_ids = self.tokenizer.encode(prefix, add_special_tokens=False)
+                s_ids = self.tokenizer.encode(suffix, add_special_tokens=False)
+                w_ids = {}
+                for w in words:
+                    ids = self.tokenizer.encode(w, add_special_tokens=False)
+                    assert len(ids) == 1, \
+                        f"evidence word '{w}' is not a single token"
+                    w_ids[w] = ids[0]
+                self.evidence_templates.append((p_ids, w_ids, s_ids))
 
         self.word_embeddings = self._word_embeddings.weight
         self.vocab_size = self.word_embeddings.shape[0]
@@ -396,6 +415,21 @@ class Model(nn.Module):
         task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(
             B, -1, -1)
 
+        # E5: 确定性图证据文本 token（在 DFC patches 之后、<answer> 之前）
+        evidence_embeds = None
+        if self.config.graph_evidence:
+            levels_all = compute_graph_evidence(DFC)
+            evidence_ids = []
+            for levels in levels_all:
+                ids = []
+                for (prefix, wmap, suffix), lv in zip(
+                        self.evidence_templates, levels):
+                    ids += prefix + [wmap[lv]] + suffix
+                evidence_ids.append(ids)
+            ids_t = torch.tensor(evidence_ids, device=device, dtype=torch.long)
+            with torch.no_grad():
+                evidence_embeds = self._word_embeddings(ids_t)
+
         prompt_parts = [start_tag]
         prompt_length = self.P_start
         if self.config.use_task_prompt:
@@ -404,6 +438,9 @@ class Model(nn.Module):
         prompt_parts.append(end_tag)
         prompt_length += self.P_end
         prompt_parts.append(reprogrammed.to(dtype=task_prompt.dtype))
+        if evidence_embeds is not None:
+            # [task prompt] [DFC soft tokens] [graph evidence text] <answer>
+            prompt_parts.append(evidence_embeds)
         if self.config.readout == 'answer_query':
             # [task prompt] [DFC soft tokens] <answer>
             answer_tag = self.answer_tag_embeddings.unsqueeze(0).expand(

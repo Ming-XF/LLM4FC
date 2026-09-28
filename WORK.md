@@ -73,6 +73,19 @@
 - 启示：单模块（输入/特征/输出侧）都无法撼动 PearsonR≈0；
   后续转向组合与更强的方法级设计
 
-### #4 — E4：多视图一致性（待跑）
+### #4 — E4：多视图一致性（结果：负）
 - `--mv_consistency --mv_lambda 0.1`：原始 FC 与秩视图经共享 GCN+重编程层
   的 soft token 语义一致（源域-only，不经过 LLM 二次前向）
+- 筛选结果（30 epoch）：源域 best test MAE 8.00 / PearsonR 0.153
+- 零样本：MAE 17.66 / PearsonR -0.031——无信号，判负
+- checkpoint: output_dir/TimeLLM_AgeCAUEEG_train_E4_mv/
+
+**单模块阶段小结（E1-E4 全部判负）**：零样本 PearsonR 全部在 ±0.08 内，
+单点修复（输入/特征/输出/正则任一层面）无法撼动跨域失效。
+
+### #5 — E5：Graph-to-Text 确定性图证据（待跑）
+- `--graph_evidence`：每样本 5 条确定性图统计证据（总强度/半球间耦合/
+  额叶连通/时间变异性/变化趋势）量化成自然语言，以冻结 LLM embedding
+  文本 token 形式插在 DFC patches 与 <answer> 之间
+- 证据生成完全无源域监督参数（源域-free），语言锚定，构造上跨域稳定
+- 槽位词均为 llama 单 token（定长证据序列，无需掩码）

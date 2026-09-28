@@ -75,6 +75,7 @@ def init_model_config(args, data_config: DataConfig):
             align_lambda=args.align_lambda,
             mv_consistency=args.mv_consistency,
             mv_lambda=args.mv_lambda,
+            graph_evidence=args.graph_evidence,
         )
         model = Model(model_config)
     else:
@@ -205,6 +206,10 @@ def init_config():
                                   "rank view at the soft-token level (source-only)")
     model_group.add_argument("--mv_lambda", default=0.1, type=float,
                              help="Weight of the multi-view consistency loss")
+    model_group.add_argument("--graph_evidence", action="store_true",
+                             help="E5: append deterministic graph-statistics "
+                                  "evidence as natural-language tokens before "
+                                  "the <answer> token (source-free)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
