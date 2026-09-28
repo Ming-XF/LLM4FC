@@ -42,7 +42,7 @@ deepspeed --num_gpus=2 main.py \
     --pretrain_path "$PRETRAIN_PATH" \
     --llm_init pretrained \
     --use_task_prompt \
-    --readout answer_query \
+    --readout evidence_query \
     --num_gcn_layers 1 \
     --num_prototypes 1000 \
     --deepspeed \

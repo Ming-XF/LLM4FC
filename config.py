@@ -180,12 +180,16 @@ def init_config():
                              help="TimeLLM: include task description prompt")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
     model_group.add_argument("--readout", default="flatten", type=str,
-                             choices=["flatten", "answer_query"],
+                             choices=["flatten", "answer_query",
+                                      "evidence_query"],
                              help="TimeLLM readout: 'flatten' (flatten all T*C "
-                                  "patch hidden states into one Linear, default) "
-                                  "or 'answer_query' (append an <answer> token "
+                                  "patch hidden states into one Linear, default), "
+                                  "'answer_query' (append an <answer> token "
                                   "after the DFC patches and predict from its "
-                                  "hidden state only)")
+                                  "hidden state only), or 'evidence_query' "
+                                  "(E6: mean-pool the LLM-contextualized "
+                                  "graph-evidence token states; requires "
+                                  "--graph_evidence)")
     model_group.add_argument("--age_head", default="linear", type=str,
                              choices=["linear", "ordinal"],
                              help="Age regression head: 'linear' (default) or "

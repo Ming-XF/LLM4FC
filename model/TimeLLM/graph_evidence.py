@@ -80,6 +80,20 @@ def compute_graph_evidence(dfc):
         post_mw = edge_mean(post_m).mean(-1)
         inter_ratio = inter_mw / (intra_mw + 1e-6)
         front_ratio = front_mw / (post_mw + 1e-6)
+        # 半球不对称：左右半球内部边强度的差异
+        L_m = torch.zeros(C, device=device, dtype=torch.bool)
+        R_m = torch.zeros(C, device=device, dtype=torch.bool)
+        L_m[_CH_LEFT] = True
+        R_m[_CH_RIGHT] = True
+        left_mask = (torch.triu(torch.ones(C, C, device=device,
+                                          dtype=torch.bool), diagonal=1)
+                     & L_m[:, None] & L_m[None, :]).unsqueeze(0)
+        right_mask = (torch.triu(torch.ones(C, C, device=device,
+                                           dtype=torch.bool), diagonal=1)
+                      & R_m[:, None] & R_m[None, :]).unsqueeze(0)
+        left_mw = (abs_dfc * left_mask).sum((-1, -2)) / left_mask.sum()
+        right_mw = (abs_dfc * right_mask).sum((-1, -2)) / right_mask.sum()
+        asym = (left_mw - right_mw).abs().mean(-1)                      # (B,)
 
         # ── 量化（相关值是尺度无关的，固定阈值跨站点可解释）──
         strength_labels = _quantize(
@@ -90,6 +104,8 @@ def compute_graph_evidence(dfc):
             front_ratio, [0.7, 1.0], ['low', 'mid', 'high'])
         var_labels = _quantize(
             variability, [0.02, 0.05], ['low', 'mid', 'high'])
+        asym_labels = _quantize(
+            asym, [0.02, 0.05], ['small', 'mid', 'large'])
         trend_idx = torch.where(
             trend_norm > 0.02, torch.full_like(trend_norm, 2, dtype=torch.long),
             torch.where(trend_norm < -0.02,
@@ -101,16 +117,18 @@ def compute_graph_evidence(dfc):
     for b in range(B):
         levels.append([
             strength_labels[b], inter_labels[b], front_labels[b],
-            var_labels[b], trend_words[int(trend_idx[b])],
+            var_labels[b], trend_words[int(trend_idx[b])], asym_labels[b],
         ])
     return levels
 
 
-# ── 证据句模板（槽位词均为 llama 词表的单 token，保证定长）──
+# ── 证据句模板（槽位词均为 llama 词表的单 token，保证定长；
+#    固定前缀/后缀可多 token，不影响定长）──
 _EVIDENCE_TEMPLATES = [
     ("Overall connectivity strength is ", ["low", "mid", "high"], "."),
     (" Inter-hemispheric coupling is ", ["weak", "mid", "strong"], "."),
     (" Frontal connectivity is ", ["low", "mid", "high"], "."),
     (" Temporal variability is ", ["low", "mid", "high"], "."),
     (" Connectivity ", ["down", "flat", "up"], " across windows."),
+    (" Hemispheric asymmetry is ", ["small", "mid", "large"], "."),
 ]

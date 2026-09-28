@@ -212,6 +212,9 @@ class Model(nn.Module):
         else:
             self.P_answer = 0
 
+        if config.readout == 'evidence_query' and not config.graph_evidence:
+            raise ValueError(
+                "--readout evidence_query requires --graph_evidence")
         # E5: 图证据句模板（前缀/槽位词/后缀的 token id）。
         # 槽位词需为单 token，保证证据序列定长（无需 padding/掩码）。
         self.evidence_templates = None
@@ -327,9 +330,10 @@ class Model(nn.Module):
             nn.init.normal_(self.age_readout.weight, std=0.01)
             nn.init.zeros_(self.age_readout.bias)
             self.output_projection = None
-        elif config.readout == 'answer_query':
-            # Predict from the <answer> hidden state only instead of
-            # flattening all T*C patch hidden states.
+        elif config.readout in ('answer_query', 'evidence_query'):
+            # Predict from the <answer> hidden state only (answer_query)
+            # or from the LLM-contextualized evidence-text states
+            # (evidence_query, E6) instead of flattening all patches.
             self.output_projection = nn.Sequential(
                 nn.Linear(self.d_llm, config.output_dim),
                 nn.Dropout(config.dropout),
@@ -527,6 +531,15 @@ class Model(nn.Module):
                 h_answer = h_answer.to(
                     dtype=self.output_projection[0].weight.dtype)
                 logits = self.output_projection(h_answer).squeeze(1)
+        elif self.config.readout == 'evidence_query':
+            # E6: 从证据文本 token 位置读出。证据状态是冻结 LLM 对
+            # 确定性图证据文本的上下文化表示（含前面 DFC patches 的
+            # 因果注意力影响），均值池化后送入线性头。
+            ev_start = prompt_length + T * C
+            h_ev = hidden[:, ev_start:ev_start + evidence_embeds.shape[1]]
+            h_ev = h_ev.mean(dim=1).to(
+                dtype=self.output_projection[0].weight.dtype)
+            logits = self.output_projection(h_ev).squeeze(1)
         else:
             hidden_patches = hidden[:, prompt_length:, :self.config.d_ff].to(
                 dtype=self.output_projection[1].weight.dtype)
@@ -571,6 +584,8 @@ class Model(nn.Module):
         }
         if self.config.readout == 'answer_query':
             hidden_state['HL_answer'] = h_answer.squeeze(1)
+        elif self.config.readout == 'evidence_query':
+            hidden_state['HL_evidence'] = h_ev
         else:
             hidden_state['HL_patches'] = hidden_patches
 
