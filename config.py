@@ -76,6 +76,7 @@ def init_model_config(args, data_config: DataConfig):
             mv_consistency=args.mv_consistency,
             mv_lambda=args.mv_lambda,
             graph_evidence=args.graph_evidence,
+            no_patches=args.no_patches,
         )
         model = Model(model_config)
     else:
@@ -214,6 +215,11 @@ def init_config():
                              help="E5: append deterministic graph-statistics "
                                   "evidence as natural-language tokens before "
                                   "the <answer> token (source-free)")
+    model_group.add_argument("--no_patches", action="store_true",
+                             help="E7: pure-language pathway — drop the GCN/"
+                                  "reprogrammed patches entirely, sequence is "
+                                  "[prompt][evidence text] only (requires "
+                                  "--readout evidence_query)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

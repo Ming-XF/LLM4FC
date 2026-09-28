@@ -63,7 +63,8 @@ class TimeLLMConfig(BaseConfig):
                  align_lambda=0.0,
                  mv_consistency=False,
                  mv_lambda=0.0,
-                 graph_evidence=False):
+                 graph_evidence=False,
+                 no_patches=False):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -88,6 +89,7 @@ class TimeLLMConfig(BaseConfig):
         self.mv_consistency = mv_consistency
         self.mv_lambda = mv_lambda
         self.graph_evidence = graph_evidence
+        self.no_patches = no_patches
 
 
 class ReprogrammingLayer(nn.Module):
@@ -215,6 +217,9 @@ class Model(nn.Module):
         if config.readout == 'evidence_query' and not config.graph_evidence:
             raise ValueError(
                 "--readout evidence_query requires --graph_evidence")
+        if config.no_patches and config.readout != 'evidence_query':
+            raise ValueError(
+                "--no_patches requires --readout evidence_query")
         # E5: 图证据句模板（前缀/槽位词/后缀的 token id）。
         # 槽位词需为单 token，保证证据序列定长（无需 padding/掩码）。
         self.evidence_templates = None
@@ -359,60 +364,66 @@ class Model(nn.Module):
 
         # Shared GCN over each DFC window. The raw signed DFC is used as the
         # adjacency; no additional graph normalization is applied here.
-        DFC_flat = DFC.reshape(B * T, C, C)
-        eye = torch.eye(
-            C, device=device,
-            dtype=self.channel_embed_projection.weight.dtype)
-        node_init = self.channel_embed_projection(eye)
-        gcn_out = node_init.unsqueeze(0).expand(B * T, -1, -1)
-        for layer in self.gcn_layers:
-            gcn_out = F.gelu(layer(gcn_out, DFC_flat))
-
-        # Fixed time-first order:
-        # [t0c0, t0c1, ..., t0c(C-1), t1c0, ..., t(T-1)c(C-1)].
-        gcn_out = gcn_out.reshape(B, T * C, -1)
-
-        if self.config.prototype_mode == 'semantic':
-            # 固定语义原型 + 小残差（训练中保持语言锚点）
-            source_embeddings = (self.semantic_prototypes
-                                 + self.prototype_residual).to(
-                dtype=self.word_embeddings.dtype)
+        # (--no_patches: 纯语言通路，跳过全部可学习图编码，序列只含
+        #  prompt + 确定性证据文本)
+        if self.config.no_patches:
+            reprogrammed = None
+            mv_loss = None
         else:
-            word_embeddings = self.word_embeddings.permute(1, 0).to(
-                dtype=self.mapping_layer.weight.dtype)
-            source_embeddings = self.mapping_layer(
-                word_embeddings).permute(1, 0)
-            source_embeddings = source_embeddings.to(
-                dtype=self.word_embeddings.dtype)
-
-        reprogram_dtype = \
-            self.reprogramming_layer.query_projection.weight.dtype
-        reprogrammed = self.reprogramming_layer(
-            gcn_out.to(dtype=reprogram_dtype),
-            source_embeddings.to(dtype=reprogram_dtype),
-            source_embeddings.to(dtype=reprogram_dtype),
-        ).to(dtype=torch.bfloat16)
-
-        # E4: 多视图语义一致性。同一 DFC 的秩视图通过共享 GCN +
-        # 重编程层，约束两视图 soft token 的语义表示一致（源域-only，
-        # 不使用目标数据）。
-        mv_loss = None
-        if self.config.mv_consistency and self.training:
-            dfc_rank = rank_normalize_dfc(DFC).to(
+            DFC_flat = DFC.reshape(B * T, C, C)
+            eye = torch.eye(
+                C, device=device,
                 dtype=self.channel_embed_projection.weight.dtype)
-            rank_flat = dfc_rank.reshape(B * T, C, C)
-            gcn_rank = node_init.unsqueeze(0).expand(B * T, -1, -1)
+            node_init = self.channel_embed_projection(eye)
+            gcn_out = node_init.unsqueeze(0).expand(B * T, -1, -1)
             for layer in self.gcn_layers:
-                gcn_rank = F.gelu(layer(gcn_rank, rank_flat))
-            gcn_rank = gcn_rank.reshape(B, T * C, -1)
-            reprogrammed_rank = self.reprogramming_layer(
-                gcn_rank.to(dtype=reprogram_dtype),
+                gcn_out = F.gelu(layer(gcn_out, DFC_flat))
+
+            # Fixed time-first order:
+            # [t0c0, t0c1, ..., t0c(C-1), t1c0, ..., t(T-1)c(C-1)].
+            gcn_out = gcn_out.reshape(B, T * C, -1)
+
+            if self.config.prototype_mode == 'semantic':
+                # 固定语义原型 + 小残差（训练中保持语言锚点）
+                source_embeddings = (self.semantic_prototypes
+                                     + self.prototype_residual).to(
+                    dtype=self.word_embeddings.dtype)
+            else:
+                word_embeddings = self.word_embeddings.permute(1, 0).to(
+                    dtype=self.mapping_layer.weight.dtype)
+                source_embeddings = self.mapping_layer(
+                    word_embeddings).permute(1, 0)
+                source_embeddings = source_embeddings.to(
+                    dtype=self.word_embeddings.dtype)
+
+            reprogram_dtype = \
+                self.reprogramming_layer.query_projection.weight.dtype
+            reprogrammed = self.reprogramming_layer(
+                gcn_out.to(dtype=reprogram_dtype),
                 source_embeddings.to(dtype=reprogram_dtype),
                 source_embeddings.to(dtype=reprogram_dtype),
             ).to(dtype=torch.bfloat16)
-            cos_sim = F.cosine_similarity(
-                reprogrammed, reprogrammed_rank, dim=-1)
-            mv_loss = self.config.mv_lambda * (1 - cos_sim.mean())
+
+            # E4: 多视图语义一致性。同一 DFC 的秩视图通过共享 GCN +
+            # 重编程层，约束两视图 soft token 的语义表示一致（源域-only，
+            # 不使用目标数据）。
+            mv_loss = None
+            if self.config.mv_consistency and self.training:
+                dfc_rank = rank_normalize_dfc(DFC).to(
+                    dtype=self.channel_embed_projection.weight.dtype)
+                rank_flat = dfc_rank.reshape(B * T, C, C)
+                gcn_rank = node_init.unsqueeze(0).expand(B * T, -1, -1)
+                for layer in self.gcn_layers:
+                    gcn_rank = F.gelu(layer(gcn_rank, rank_flat))
+                gcn_rank = gcn_rank.reshape(B, T * C, -1)
+                reprogrammed_rank = self.reprogramming_layer(
+                    gcn_rank.to(dtype=reprogram_dtype),
+                    source_embeddings.to(dtype=reprogram_dtype),
+                    source_embeddings.to(dtype=reprogram_dtype),
+                ).to(dtype=torch.bfloat16)
+                cos_sim = F.cosine_similarity(
+                    reprogrammed, reprogrammed_rank, dim=-1)
+                mv_loss = self.config.mv_lambda * (1 - cos_sim.mean())
 
         start_tag = self.start_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
         end_tag = self.end_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
@@ -441,7 +452,8 @@ class Model(nn.Module):
             prompt_length += self.P_task
         prompt_parts.append(end_tag)
         prompt_length += self.P_end
-        prompt_parts.append(reprogrammed.to(dtype=task_prompt.dtype))
+        if reprogrammed is not None:
+            prompt_parts.append(reprogrammed.to(dtype=task_prompt.dtype))
         if evidence_embeds is not None:
             # [task prompt] [DFC soft tokens] [graph evidence text] <answer>
             prompt_parts.append(evidence_embeds)
@@ -535,7 +547,8 @@ class Model(nn.Module):
             # E6: 从证据文本 token 位置读出。证据状态是冻结 LLM 对
             # 确定性图证据文本的上下文化表示（含前面 DFC patches 的
             # 因果注意力影响），均值池化后送入线性头。
-            ev_start = prompt_length + T * C
+            ev_start = prompt_length + (
+                T * C if reprogrammed is not None else 0)
             h_ev = hidden[:, ev_start:ev_start + evidence_embeds.shape[1]]
             h_ev = h_ev.mean(dim=1).to(
                 dtype=self.output_projection[0].weight.dtype)

@@ -31,6 +31,7 @@ deepspeed --num_gpus=2 main.py \
     --fc_threshold 0.0 \
     --fc_keep_ratio 1.0 \
     --graph_evidence \
+    --no_patches \
     --d_model 128 \
     --num_heads 8 \
     --d_ff 128 \

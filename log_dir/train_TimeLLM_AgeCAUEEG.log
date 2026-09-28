@@ -3706,3 +3706,633 @@
 09/29/2026 05:51:22 - INFO - utils.trainer -     PearsonR: 0.15314
 09/29/2026 05:51:23 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train/final-epoch-30
 09/29/2026 05:51:23 - INFO - utils.trainer -   Final model saved at epoch 30
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS] command: main.py --local_rank=0 --model TimeLLM --num_epochs 30 --num_repeat 1 --save_steps 25 --schedule cos --early_stop_patience 20 --early_stop_metric MAE --dataset AgeCAUEEG --fc_threshold 0.0 --fc_keep_ratio 1.0 --graph_evidence --d_model 128 --num_heads 8 --d_ff 128 --dropout 0.1 --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B --few_shot 0 --few_shot_seed 42 --pretrain_path  --llm_init pretrained --use_task_prompt --readout answer_query --num_gcn_layers 1 --num_prototypes 1000 --deepspeed --do_train --do_evaluate --do_test
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   local_rank = 0
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   model = TimeLLM
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   num_epochs = 30
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   num_repeat = 1
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   save_steps = 25
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   schedule = cos
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   early_stop_patience = 20
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   early_stop_metric = MAE
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   dataset = AgeCAUEEG
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   fc_threshold = 0.0
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   fc_keep_ratio = 1.0
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   graph_evidence = True
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   d_model = 128
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   num_heads = 8
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   d_ff = 128
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   dropout = 0.1
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   llm_type = llama
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   llm_path = ./model/deepseek-r1-distill-llama-8B
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   few_shot = 0
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   few_shot_seed = 42
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   pretrain_path = 
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   llm_init = pretrained
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   use_task_prompt = True
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   readout = answer_query
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   num_gcn_layers = 1
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   num_prototypes = 1000
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   deepspeed = True
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   do_train = True
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   do_evaluate = True
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS]   do_test = True
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS-effective] batch_size = 32 (from deepspeed/train.json)
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS-effective] learning_rate = 0.0001 (from deepspeed/train.json)
+09/29/2026 05:55:03 - INFO - utils.logger -   [ARGS-effective] deepspeed_config = deepspeed/train.json
+09/29/2026 05:55:03 - INFO - __main__ -   ########## Repeat:0 ##########
+09/29/2026 05:55:03 - INFO - utils.trainer -   ***** Running training *****
+09/29/2026 05:55:03 - INFO - utils.trainer -     Num examples = 61
+09/29/2026 05:55:03 - INFO - utils.trainer -     Num Epochs = 30
+09/29/2026 05:55:03 - INFO - utils.trainer -     Total train batch size = 32
+09/29/2026 05:55:03 - INFO - utils.trainer -     warmup steps = 400
+09/29/2026 05:55:03 - INFO - utils.trainer -     Total optimization steps = 1830
+09/29/2026 05:55:03 - INFO - utils.trainer -     Save steps = 25
+09/29/2026 05:56:24 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 05:56:34 - INFO - utils.trainer -   Loss: 0.01848
+09/29/2026 05:56:34 - INFO - utils.trainer -   MSE: 196.33470
+09/29/2026 05:56:34 - INFO - utils.trainer -   MAE: 11.77100
+09/29/2026 05:56:34 - INFO - utils.trainer -   RMSE: 14.01195
+09/29/2026 05:56:34 - INFO - utils.trainer -   R2: -0.77745
+09/29/2026 05:56:34 - INFO - utils.trainer -   PearsonR: 0.24500
+09/29/2026 05:56:34 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train
+09/29/2026 05:56:34 - INFO - utils.trainer -   Best model saved (val_MAE=11.7710)
+09/29/2026 05:56:34 - INFO - utils.trainer -   Epoch: 1, Loss: 0.07963, Val loss: 0.01848, Val MAE: 11.7710, Best val MAE: 11.7710, No improve: 0/20, Time: 81.4s
+09/29/2026 05:57:55 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 05:58:05 - INFO - utils.trainer -   Loss: 0.01044
+09/29/2026 05:58:05 - INFO - utils.trainer -   MSE: 111.25034
+09/29/2026 05:58:05 - INFO - utils.trainer -   MAE: 8.55340
+09/29/2026 05:58:05 - INFO - utils.trainer -   RMSE: 10.54753
+09/29/2026 05:58:05 - INFO - utils.trainer -   R2: -0.00717
+09/29/2026 05:58:05 - INFO - utils.trainer -   PearsonR: 0.19476
+09/29/2026 05:58:08 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train
+09/29/2026 05:58:08 - INFO - utils.trainer -   Best model saved (val_MAE=8.5534)
+09/29/2026 05:58:08 - INFO - utils.trainer -   Epoch: 2, Loss: 0.03349, Val loss: 0.01044, Val MAE: 8.5534, Best val MAE: 8.5534, No improve: 0/20, Time: 81.1s
+09/29/2026 05:59:29 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 05:59:39 - INFO - utils.trainer -   Loss: 0.01076
+09/29/2026 05:59:39 - INFO - utils.trainer -   MSE: 114.62476
+09/29/2026 05:59:39 - INFO - utils.trainer -   MAE: 8.65395
+09/29/2026 05:59:39 - INFO - utils.trainer -   RMSE: 10.70630
+09/29/2026 05:59:39 - INFO - utils.trainer -   R2: -0.03771
+09/29/2026 05:59:39 - INFO - utils.trainer -   PearsonR: 0.21248
+09/29/2026 05:59:39 - INFO - utils.trainer -   Epoch: 3, Loss: 0.03137, Val loss: 0.01076, Val MAE: 8.6539, Best val MAE: 8.5534, No improve: 1/20, Time: 81.5s
+09/29/2026 06:01:01 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:01:10 - INFO - utils.trainer -   Loss: 0.01261
+09/29/2026 06:01:10 - INFO - utils.trainer -   MSE: 134.16896
+09/29/2026 06:01:10 - INFO - utils.trainer -   MAE: 9.56553
+09/29/2026 06:01:10 - INFO - utils.trainer -   RMSE: 11.58313
+09/29/2026 06:01:10 - INFO - utils.trainer -   R2: -0.21465
+09/29/2026 06:01:10 - INFO - utils.trainer -   PearsonR: 0.22438
+09/29/2026 06:01:10 - INFO - utils.trainer -   Epoch: 4, Loss: 0.03013, Val loss: 0.01261, Val MAE: 9.5655, Best val MAE: 8.5534, No improve: 2/20, Time: 81.6s
+09/29/2026 06:02:31 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:02:41 - INFO - utils.trainer -   Loss: 0.02172
+09/29/2026 06:02:41 - INFO - utils.trainer -   MSE: 230.75264
+09/29/2026 06:02:41 - INFO - utils.trainer -   MAE: 12.90528
+09/29/2026 06:02:41 - INFO - utils.trainer -   RMSE: 15.19054
+09/29/2026 06:02:41 - INFO - utils.trainer -   R2: -1.08904
+09/29/2026 06:02:41 - INFO - utils.trainer -   PearsonR: 0.22129
+09/29/2026 06:02:41 - INFO - utils.trainer -   Epoch: 5, Loss: 0.03372, Val loss: 0.02172, Val MAE: 12.9053, Best val MAE: 8.5534, No improve: 3/20, Time: 81.3s
+09/29/2026 06:04:02 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:04:11 - INFO - utils.trainer -   Loss: 0.01110
+09/29/2026 06:04:11 - INFO - utils.trainer -   MSE: 118.72871
+09/29/2026 06:04:11 - INFO - utils.trainer -   MAE: 8.44292
+09/29/2026 06:04:11 - INFO - utils.trainer -   RMSE: 10.89627
+09/29/2026 06:04:11 - INFO - utils.trainer -   R2: -0.07487
+09/29/2026 06:04:11 - INFO - utils.trainer -   PearsonR: 0.18203
+09/29/2026 06:04:14 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train
+09/29/2026 06:04:14 - INFO - utils.trainer -   Best model saved (val_MAE=8.4429)
+09/29/2026 06:04:14 - INFO - utils.trainer -   Epoch: 6, Loss: 0.03354, Val loss: 0.01110, Val MAE: 8.4429, Best val MAE: 8.4429, No improve: 0/20, Time: 81.2s
+09/29/2026 06:05:35 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:05:45 - INFO - utils.trainer -   Loss: 0.02412
+09/29/2026 06:05:45 - INFO - utils.trainer -   MSE: 256.19528
+09/29/2026 06:05:45 - INFO - utils.trainer -   MAE: 13.72906
+09/29/2026 06:05:45 - INFO - utils.trainer -   RMSE: 16.00610
+09/29/2026 06:05:45 - INFO - utils.trainer -   R2: -1.31937
+09/29/2026 06:05:45 - INFO - utils.trainer -   PearsonR: 0.23180
+09/29/2026 06:05:45 - INFO - utils.trainer -   Epoch: 7, Loss: 0.03324, Val loss: 0.02412, Val MAE: 13.7291, Best val MAE: 8.4429, No improve: 1/20, Time: 81.1s
+09/29/2026 06:07:06 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:07:15 - INFO - utils.trainer -   Loss: 0.01025
+09/29/2026 06:07:15 - INFO - utils.trainer -   MSE: 109.22357
+09/29/2026 06:07:15 - INFO - utils.trainer -   MAE: 8.49195
+09/29/2026 06:07:15 - INFO - utils.trainer -   RMSE: 10.45101
+09/29/2026 06:07:15 - INFO - utils.trainer -   R2: 0.01118
+09/29/2026 06:07:15 - INFO - utils.trainer -   PearsonR: 0.23312
+09/29/2026 06:07:15 - INFO - utils.trainer -   Epoch: 8, Loss: 0.03220, Val loss: 0.01025, Val MAE: 8.4919, Best val MAE: 8.4429, No improve: 2/20, Time: 81.1s
+09/29/2026 06:08:36 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:08:46 - INFO - utils.trainer -   Loss: 0.01228
+09/29/2026 06:08:46 - INFO - utils.trainer -   MSE: 130.60878
+09/29/2026 06:08:46 - INFO - utils.trainer -   MAE: 9.42213
+09/29/2026 06:08:46 - INFO - utils.trainer -   RMSE: 11.42842
+09/29/2026 06:08:46 - INFO - utils.trainer -   R2: -0.18242
+09/29/2026 06:08:46 - INFO - utils.trainer -   PearsonR: 0.24278
+09/29/2026 06:08:46 - INFO - utils.trainer -   Epoch: 9, Loss: 0.03410, Val loss: 0.01228, Val MAE: 9.4221, Best val MAE: 8.4429, No improve: 3/20, Time: 81.1s
+09/29/2026 06:10:07 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:10:16 - INFO - utils.trainer -   Loss: 0.01163
+09/29/2026 06:10:16 - INFO - utils.trainer -   MSE: 123.83147
+09/29/2026 06:10:16 - INFO - utils.trainer -   MAE: 9.12296
+09/29/2026 06:10:16 - INFO - utils.trainer -   RMSE: 11.12796
+09/29/2026 06:10:16 - INFO - utils.trainer -   R2: -0.12106
+09/29/2026 06:10:16 - INFO - utils.trainer -   PearsonR: 0.25684
+09/29/2026 06:10:16 - INFO - utils.trainer -   Epoch: 10, Loss: 0.03408, Val loss: 0.01163, Val MAE: 9.1230, Best val MAE: 8.4429, No improve: 4/20, Time: 81.2s
+09/29/2026 06:11:37 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:11:46 - INFO - utils.trainer -   Loss: 0.00985
+09/29/2026 06:11:46 - INFO - utils.trainer -   MSE: 105.19790
+09/29/2026 06:11:46 - INFO - utils.trainer -   MAE: 8.10824
+09/29/2026 06:11:46 - INFO - utils.trainer -   RMSE: 10.25660
+09/29/2026 06:11:46 - INFO - utils.trainer -   R2: 0.04763
+09/29/2026 06:11:46 - INFO - utils.trainer -   PearsonR: 0.24516
+09/29/2026 06:11:50 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train
+09/29/2026 06:11:50 - INFO - utils.trainer -   Best model saved (val_MAE=8.1082)
+09/29/2026 06:11:50 - INFO - utils.trainer -   Epoch: 11, Loss: 0.03159, Val loss: 0.00985, Val MAE: 8.1082, Best val MAE: 8.1082, No improve: 0/20, Time: 81.0s
+09/29/2026 06:13:11 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:13:20 - INFO - utils.trainer -   Loss: 0.01483
+09/29/2026 06:13:20 - INFO - utils.trainer -   MSE: 157.75630
+09/29/2026 06:13:20 - INFO - utils.trainer -   MAE: 10.46269
+09/29/2026 06:13:20 - INFO - utils.trainer -   RMSE: 12.56011
+09/29/2026 06:13:20 - INFO - utils.trainer -   R2: -0.42819
+09/29/2026 06:13:20 - INFO - utils.trainer -   PearsonR: 0.21399
+09/29/2026 06:13:20 - INFO - utils.trainer -   Epoch: 12, Loss: 0.03144, Val loss: 0.01483, Val MAE: 10.4627, Best val MAE: 8.1082, No improve: 1/20, Time: 81.1s
+09/29/2026 06:14:41 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:14:50 - INFO - utils.trainer -   Loss: 0.01046
+09/29/2026 06:14:50 - INFO - utils.trainer -   MSE: 111.44814
+09/29/2026 06:14:50 - INFO - utils.trainer -   MAE: 8.57655
+09/29/2026 06:14:50 - INFO - utils.trainer -   RMSE: 10.55690
+09/29/2026 06:14:50 - INFO - utils.trainer -   R2: -0.00896
+09/29/2026 06:14:50 - INFO - utils.trainer -   PearsonR: 0.23966
+09/29/2026 06:14:50 - INFO - utils.trainer -   Epoch: 13, Loss: 0.03114, Val loss: 0.01046, Val MAE: 8.5766, Best val MAE: 8.1082, No improve: 2/20, Time: 81.1s
+09/29/2026 06:16:11 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:16:21 - INFO - utils.trainer -   Loss: 0.01148
+09/29/2026 06:16:21 - INFO - utils.trainer -   MSE: 122.25741
+09/29/2026 06:16:21 - INFO - utils.trainer -   MAE: 9.05702
+09/29/2026 06:16:21 - INFO - utils.trainer -   RMSE: 11.05701
+09/29/2026 06:16:21 - INFO - utils.trainer -   R2: -0.10681
+09/29/2026 06:16:21 - INFO - utils.trainer -   PearsonR: 0.23132
+09/29/2026 06:16:21 - INFO - utils.trainer -   Epoch: 14, Loss: 0.03181, Val loss: 0.01148, Val MAE: 9.0570, Best val MAE: 8.1082, No improve: 3/20, Time: 81.1s
+09/29/2026 06:17:42 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:17:51 - INFO - utils.trainer -   Loss: 0.02113
+09/29/2026 06:17:51 - INFO - utils.trainer -   MSE: 224.60413
+09/29/2026 06:17:51 - INFO - utils.trainer -   MAE: 12.74993
+09/29/2026 06:17:51 - INFO - utils.trainer -   RMSE: 14.98680
+09/29/2026 06:17:51 - INFO - utils.trainer -   R2: -1.03337
+09/29/2026 06:17:51 - INFO - utils.trainer -   PearsonR: 0.27401
+09/29/2026 06:17:51 - INFO - utils.trainer -   Epoch: 15, Loss: 0.02962, Val loss: 0.02113, Val MAE: 12.7499, Best val MAE: 8.1082, No improve: 4/20, Time: 81.0s
+09/29/2026 06:19:12 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:19:21 - INFO - utils.trainer -   Loss: 0.01407
+09/29/2026 06:19:21 - INFO - utils.trainer -   MSE: 149.59584
+09/29/2026 06:19:21 - INFO - utils.trainer -   MAE: 10.12547
+09/29/2026 06:19:21 - INFO - utils.trainer -   RMSE: 12.23094
+09/29/2026 06:19:21 - INFO - utils.trainer -   R2: -0.35431
+09/29/2026 06:19:21 - INFO - utils.trainer -   PearsonR: 0.24511
+09/29/2026 06:19:21 - INFO - utils.trainer -   Epoch: 16, Loss: 0.03391, Val loss: 0.01407, Val MAE: 10.1255, Best val MAE: 8.1082, No improve: 5/20, Time: 81.0s
+09/29/2026 06:20:42 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:20:51 - INFO - utils.trainer -   Loss: 0.01036
+09/29/2026 06:20:51 - INFO - utils.trainer -   MSE: 110.37487
+09/29/2026 06:20:51 - INFO - utils.trainer -   MAE: 8.56270
+09/29/2026 06:20:51 - INFO - utils.trainer -   RMSE: 10.50595
+09/29/2026 06:20:51 - INFO - utils.trainer -   R2: 0.00076
+09/29/2026 06:20:51 - INFO - utils.trainer -   PearsonR: 0.30285
+09/29/2026 06:20:51 - INFO - utils.trainer -   Epoch: 17, Loss: 0.03080, Val loss: 0.01036, Val MAE: 8.5627, Best val MAE: 8.1082, No improve: 6/20, Time: 81.1s
+09/29/2026 06:22:13 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:22:22 - INFO - utils.trainer -   Loss: 0.01119
+09/29/2026 06:22:22 - INFO - utils.trainer -   MSE: 118.94999
+09/29/2026 06:22:22 - INFO - utils.trainer -   MAE: 8.85593
+09/29/2026 06:22:22 - INFO - utils.trainer -   RMSE: 10.90642
+09/29/2026 06:22:22 - INFO - utils.trainer -   R2: -0.07687
+09/29/2026 06:22:22 - INFO - utils.trainer -   PearsonR: 0.21261
+09/29/2026 06:22:22 - INFO - utils.trainer -   Epoch: 18, Loss: 0.02919, Val loss: 0.01119, Val MAE: 8.8559, Best val MAE: 8.1082, No improve: 7/20, Time: 81.2s
+09/29/2026 06:23:43 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:23:52 - INFO - utils.trainer -   Loss: 0.01031
+09/29/2026 06:23:52 - INFO - utils.trainer -   MSE: 110.32044
+09/29/2026 06:23:52 - INFO - utils.trainer -   MAE: 8.25162
+09/29/2026 06:23:52 - INFO - utils.trainer -   RMSE: 10.50335
+09/29/2026 06:23:52 - INFO - utils.trainer -   R2: 0.00125
+09/29/2026 06:23:52 - INFO - utils.trainer -   PearsonR: 0.31720
+09/29/2026 06:23:52 - INFO - utils.trainer -   Epoch: 19, Loss: 0.03025, Val loss: 0.01031, Val MAE: 8.2516, Best val MAE: 8.1082, No improve: 8/20, Time: 81.1s
+09/29/2026 06:25:13 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:25:23 - INFO - utils.trainer -   Loss: 0.01150
+09/29/2026 06:25:23 - INFO - utils.trainer -   MSE: 122.28763
+09/29/2026 06:25:23 - INFO - utils.trainer -   MAE: 9.12208
+09/29/2026 06:25:23 - INFO - utils.trainer -   RMSE: 11.05837
+09/29/2026 06:25:23 - INFO - utils.trainer -   R2: -0.10709
+09/29/2026 06:25:23 - INFO - utils.trainer -   PearsonR: 0.30740
+09/29/2026 06:25:23 - INFO - utils.trainer -   Epoch: 20, Loss: 0.03026, Val loss: 0.01150, Val MAE: 9.1221, Best val MAE: 8.1082, No improve: 9/20, Time: 81.4s
+09/29/2026 06:26:44 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:26:53 - INFO - utils.trainer -   Loss: 0.01452
+09/29/2026 06:26:53 - INFO - utils.trainer -   MSE: 154.29111
+09/29/2026 06:26:53 - INFO - utils.trainer -   MAE: 10.37472
+09/29/2026 06:26:53 - INFO - utils.trainer -   RMSE: 12.42140
+09/29/2026 06:26:53 - INFO - utils.trainer -   R2: -0.39682
+09/29/2026 06:26:53 - INFO - utils.trainer -   PearsonR: 0.29603
+09/29/2026 06:26:53 - INFO - utils.trainer -   Epoch: 21, Loss: 0.03006, Val loss: 0.01452, Val MAE: 10.3747, Best val MAE: 8.1082, No improve: 10/20, Time: 81.2s
+09/29/2026 06:28:14 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:28:23 - INFO - utils.trainer -   Loss: 0.00949
+09/29/2026 06:28:23 - INFO - utils.trainer -   MSE: 101.24124
+09/29/2026 06:28:23 - INFO - utils.trainer -   MAE: 8.16323
+09/29/2026 06:28:23 - INFO - utils.trainer -   RMSE: 10.06187
+09/29/2026 06:28:23 - INFO - utils.trainer -   R2: 0.08345
+09/29/2026 06:28:23 - INFO - utils.trainer -   PearsonR: 0.32031
+09/29/2026 06:28:23 - INFO - utils.trainer -   Epoch: 22, Loss: 0.02880, Val loss: 0.00949, Val MAE: 8.1632, Best val MAE: 8.1082, No improve: 11/20, Time: 81.1s
+09/29/2026 06:29:44 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:29:53 - INFO - utils.trainer -   Loss: 0.01096
+09/29/2026 06:29:53 - INFO - utils.trainer -   MSE: 116.71973
+09/29/2026 06:29:53 - INFO - utils.trainer -   MAE: 8.92003
+09/29/2026 06:29:53 - INFO - utils.trainer -   RMSE: 10.80369
+09/29/2026 06:29:53 - INFO - utils.trainer -   R2: -0.05668
+09/29/2026 06:29:53 - INFO - utils.trainer -   PearsonR: 0.32329
+09/29/2026 06:29:53 - INFO - utils.trainer -   Epoch: 23, Loss: 0.03304, Val loss: 0.01096, Val MAE: 8.9200, Best val MAE: 8.1082, No improve: 12/20, Time: 81.0s
+09/29/2026 06:31:15 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:31:24 - INFO - utils.trainer -   Loss: 0.00926
+09/29/2026 06:31:24 - INFO - utils.trainer -   MSE: 98.72229
+09/29/2026 06:31:24 - INFO - utils.trainer -   MAE: 8.03384
+09/29/2026 06:31:24 - INFO - utils.trainer -   RMSE: 9.93591
+09/29/2026 06:31:24 - INFO - utils.trainer -   R2: 0.10625
+09/29/2026 06:31:24 - INFO - utils.trainer -   PearsonR: 0.34531
+09/29/2026 06:31:27 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train
+09/29/2026 06:31:27 - INFO - utils.trainer -   Best model saved (val_MAE=8.0338)
+09/29/2026 06:31:27 - INFO - utils.trainer -   Epoch: 24, Loss: 0.03180, Val loss: 0.00926, Val MAE: 8.0338, Best val MAE: 8.0338, No improve: 0/20, Time: 81.1s
+09/29/2026 06:32:48 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:32:57 - INFO - utils.trainer -   Loss: 0.01064
+09/29/2026 06:32:57 - INFO - utils.trainer -   MSE: 113.22185
+09/29/2026 06:32:57 - INFO - utils.trainer -   MAE: 8.74347
+09/29/2026 06:32:57 - INFO - utils.trainer -   RMSE: 10.64058
+09/29/2026 06:32:57 - INFO - utils.trainer -   R2: -0.02501
+09/29/2026 06:32:57 - INFO - utils.trainer -   PearsonR: 0.34395
+09/29/2026 06:32:59 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train/checkpoint-epoch-25
+09/29/2026 06:32:59 - INFO - utils.trainer -   Checkpoint saved at epoch 25
+09/29/2026 06:32:59 - INFO - utils.trainer -   Epoch: 25, Loss: 0.02776, Val loss: 0.01064, Val MAE: 8.7435, Best val MAE: 8.0338, No improve: 1/20, Time: 81.1s
+09/29/2026 06:34:21 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:34:30 - INFO - utils.trainer -   Loss: 0.01073
+09/29/2026 06:34:30 - INFO - utils.trainer -   MSE: 114.14754
+09/29/2026 06:34:30 - INFO - utils.trainer -   MAE: 8.86370
+09/29/2026 06:34:30 - INFO - utils.trainer -   RMSE: 10.68398
+09/29/2026 06:34:30 - INFO - utils.trainer -   R2: -0.03339
+09/29/2026 06:34:30 - INFO - utils.trainer -   PearsonR: 0.34080
+09/29/2026 06:34:30 - INFO - utils.trainer -   Epoch: 26, Loss: 0.02953, Val loss: 0.01073, Val MAE: 8.8637, Best val MAE: 8.0338, No improve: 2/20, Time: 81.2s
+09/29/2026 06:35:51 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:36:00 - INFO - utils.trainer -   Loss: 0.01214
+09/29/2026 06:36:00 - INFO - utils.trainer -   MSE: 129.06636
+09/29/2026 06:36:00 - INFO - utils.trainer -   MAE: 9.45299
+09/29/2026 06:36:00 - INFO - utils.trainer -   RMSE: 11.36074
+09/29/2026 06:36:00 - INFO - utils.trainer -   R2: -0.16846
+09/29/2026 06:36:00 - INFO - utils.trainer -   PearsonR: 0.36251
+09/29/2026 06:36:00 - INFO - utils.trainer -   Epoch: 27, Loss: 0.02965, Val loss: 0.01214, Val MAE: 9.4530, Best val MAE: 8.0338, No improve: 3/20, Time: 81.0s
+09/29/2026 06:37:21 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:37:31 - INFO - utils.trainer -   Loss: 0.01058
+09/29/2026 06:37:31 - INFO - utils.trainer -   MSE: 112.56803
+09/29/2026 06:37:31 - INFO - utils.trainer -   MAE: 8.74785
+09/29/2026 06:37:31 - INFO - utils.trainer -   RMSE: 10.60981
+09/29/2026 06:37:31 - INFO - utils.trainer -   R2: -0.01909
+09/29/2026 06:37:31 - INFO - utils.trainer -   PearsonR: 0.34740
+09/29/2026 06:37:31 - INFO - utils.trainer -   Epoch: 28, Loss: 0.03117, Val loss: 0.01058, Val MAE: 8.7478, Best val MAE: 8.0338, No improve: 4/20, Time: 81.2s
+09/29/2026 06:38:53 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:39:03 - INFO - utils.trainer -   Loss: 0.00953
+09/29/2026 06:39:03 - INFO - utils.trainer -   MSE: 101.49557
+09/29/2026 06:39:03 - INFO - utils.trainer -   MAE: 8.24858
+09/29/2026 06:39:03 - INFO - utils.trainer -   RMSE: 10.07450
+09/29/2026 06:39:03 - INFO - utils.trainer -   R2: 0.08115
+09/29/2026 06:39:03 - INFO - utils.trainer -   PearsonR: 0.35520
+09/29/2026 06:39:03 - INFO - utils.trainer -   Epoch: 29, Loss: 0.03080, Val loss: 0.00953, Val MAE: 8.2486, Best val MAE: 8.0338, No improve: 5/20, Time: 81.5s
+09/29/2026 06:40:24 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:40:34 - INFO - utils.trainer -   Loss: 0.01083
+09/29/2026 06:40:34 - INFO - utils.trainer -   MSE: 115.17425
+09/29/2026 06:40:34 - INFO - utils.trainer -   MAE: 8.87736
+09/29/2026 06:40:34 - INFO - utils.trainer -   RMSE: 10.73193
+09/29/2026 06:40:34 - INFO - utils.trainer -   R2: -0.04269
+09/29/2026 06:40:34 - INFO - utils.trainer -   PearsonR: 0.34441
+09/29/2026 06:40:34 - INFO - utils.trainer -   Epoch: 30, Loss: 0.02959, Val loss: 0.01083, Val MAE: 8.8774, Best val MAE: 8.0338, No improve: 6/20, Time: 81.6s
+09/29/2026 06:40:34 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+09/29/2026 06:40:34 - INFO - utils.trainer -     582 keys not in checkpoint (kept from init)
+09/29/2026 06:40:34 - INFO - utils.trainer -   Model loaded from output_dir/TimeLLM_AgeCAUEEG_train/TimeLLM-0.bin (18/19 keys)
+09/29/2026 06:40:34 - INFO - utils.trainer -   ***** Running regression evaluation on test0 dataset *****
+09/29/2026 06:40:34 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+09/29/2026 06:40:34 - INFO - utils.trainer -     582 keys not in checkpoint (kept from init)
+09/29/2026 06:40:34 - INFO - utils.trainer -   Model loaded from output_dir/TimeLLM_AgeCAUEEG_train/TimeLLM-0.bin (18/19 keys)
+09/29/2026 06:40:44 - INFO - utils.trainer -   Loss: 0.00905
+09/29/2026 06:40:44 - INFO - utils.trainer -   MSE: 96.44527
+09/29/2026 06:40:44 - INFO - utils.trainer -   MAE: 8.05795
+09/29/2026 06:40:44 - INFO - utils.trainer -   RMSE: 9.82066
+09/29/2026 06:40:44 - INFO - utils.trainer -   R2: 0.03960
+09/29/2026 06:40:44 - INFO - utils.trainer -   PearsonR: 0.24086
+09/29/2026 06:40:44 - INFO - utils.trainer -   === Best epoch test result ===
+09/29/2026 06:40:44 - INFO - utils.trainer -     Loss: 0.00905
+09/29/2026 06:40:44 - INFO - utils.trainer -     MSE: 96.44527
+09/29/2026 06:40:44 - INFO - utils.trainer -     MAE: 8.05795
+09/29/2026 06:40:44 - INFO - utils.trainer -     RMSE: 9.82066
+09/29/2026 06:40:44 - INFO - utils.trainer -     R2: 0.03960
+09/29/2026 06:40:44 - INFO - utils.trainer -     PearsonR: 0.24086
+09/29/2026 06:40:45 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train/final-epoch-30
+09/29/2026 06:40:45 - INFO - utils.trainer -   Final model saved at epoch 30
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS] command: main.py --local_rank=0 --model TimeLLM --num_epochs 30 --num_repeat 1 --save_steps 25 --schedule cos --early_stop_patience 20 --early_stop_metric MAE --dataset AgeCAUEEG --fc_threshold 0.0 --fc_keep_ratio 1.0 --graph_evidence --d_model 128 --num_heads 8 --d_ff 128 --dropout 0.1 --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B --few_shot 0 --few_shot_seed 42 --pretrain_path  --llm_init pretrained --use_task_prompt --readout evidence_query --num_gcn_layers 1 --num_prototypes 1000 --deepspeed --do_train --do_evaluate --do_test
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   local_rank = 0
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   model = TimeLLM
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   num_epochs = 30
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   num_repeat = 1
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   save_steps = 25
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   schedule = cos
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   early_stop_patience = 20
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   early_stop_metric = MAE
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   dataset = AgeCAUEEG
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   fc_threshold = 0.0
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   fc_keep_ratio = 1.0
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   graph_evidence = True
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   d_model = 128
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   num_heads = 8
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   d_ff = 128
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   dropout = 0.1
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   llm_type = llama
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   llm_path = ./model/deepseek-r1-distill-llama-8B
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   few_shot = 0
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   few_shot_seed = 42
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   pretrain_path = 
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   llm_init = pretrained
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   use_task_prompt = True
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   readout = evidence_query
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   num_gcn_layers = 1
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   num_prototypes = 1000
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   deepspeed = True
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   do_train = True
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   do_evaluate = True
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS]   do_test = True
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS-effective] batch_size = 32 (from deepspeed/train.json)
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS-effective] learning_rate = 0.0001 (from deepspeed/train.json)
+09/29/2026 06:45:19 - INFO - utils.logger -   [ARGS-effective] deepspeed_config = deepspeed/train.json
+09/29/2026 06:45:19 - INFO - __main__ -   ########## Repeat:0 ##########
+09/29/2026 06:45:19 - INFO - utils.trainer -   ***** Running training *****
+09/29/2026 06:45:19 - INFO - utils.trainer -     Num examples = 61
+09/29/2026 06:45:19 - INFO - utils.trainer -     Num Epochs = 30
+09/29/2026 06:45:19 - INFO - utils.trainer -     Total train batch size = 32
+09/29/2026 06:45:19 - INFO - utils.trainer -     warmup steps = 400
+09/29/2026 06:45:19 - INFO - utils.trainer -     Total optimization steps = 1830
+09/29/2026 06:45:19 - INFO - utils.trainer -     Save steps = 25
+09/29/2026 06:46:42 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:46:51 - INFO - utils.trainer -   Loss: 0.01075
+09/29/2026 06:46:51 - INFO - utils.trainer -   MSE: 114.63465
+09/29/2026 06:46:51 - INFO - utils.trainer -   MAE: 8.68609
+09/29/2026 06:46:51 - INFO - utils.trainer -   RMSE: 10.70676
+09/29/2026 06:46:51 - INFO - utils.trainer -   R2: -0.03780
+09/29/2026 06:46:51 - INFO - utils.trainer -   PearsonR: 0.03659
+09/29/2026 06:46:52 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train
+09/29/2026 06:46:52 - INFO - utils.trainer -   Best model saved (val_MAE=8.6861)
+09/29/2026 06:46:52 - INFO - utils.trainer -   Epoch: 1, Loss: 0.05157, Val loss: 0.01075, Val MAE: 8.6861, Best val MAE: 8.6861, No improve: 0/20, Time: 82.4s
+09/29/2026 06:48:14 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:48:23 - INFO - utils.trainer -   Loss: 0.01093
+09/29/2026 06:48:23 - INFO - utils.trainer -   MSE: 116.46170
+09/29/2026 06:48:23 - INFO - utils.trainer -   MAE: 8.81505
+09/29/2026 06:48:23 - INFO - utils.trainer -   RMSE: 10.79174
+09/29/2026 06:48:23 - INFO - utils.trainer -   R2: -0.05434
+09/29/2026 06:48:23 - INFO - utils.trainer -   PearsonR: 0.18245
+09/29/2026 06:48:23 - INFO - utils.trainer -   Epoch: 2, Loss: 0.03393, Val loss: 0.01093, Val MAE: 8.8150, Best val MAE: 8.6861, No improve: 1/20, Time: 82.3s
+09/29/2026 06:49:46 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:49:55 - INFO - utils.trainer -   Loss: 0.01084
+09/29/2026 06:49:55 - INFO - utils.trainer -   MSE: 115.46243
+09/29/2026 06:49:55 - INFO - utils.trainer -   MAE: 8.78040
+09/29/2026 06:49:55 - INFO - utils.trainer -   RMSE: 10.74534
+09/29/2026 06:49:55 - INFO - utils.trainer -   R2: -0.04530
+09/29/2026 06:49:55 - INFO - utils.trainer -   PearsonR: 0.24418
+09/29/2026 06:49:55 - INFO - utils.trainer -   Epoch: 3, Loss: 0.03215, Val loss: 0.01084, Val MAE: 8.7804, Best val MAE: 8.6861, No improve: 2/20, Time: 82.2s
+09/29/2026 06:51:17 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:51:27 - INFO - utils.trainer -   Loss: 0.01008
+09/29/2026 06:51:27 - INFO - utils.trainer -   MSE: 107.72231
+09/29/2026 06:51:27 - INFO - utils.trainer -   MAE: 8.10806
+09/29/2026 06:51:27 - INFO - utils.trainer -   RMSE: 10.37893
+09/29/2026 06:51:27 - INFO - utils.trainer -   R2: 0.02477
+09/29/2026 06:51:27 - INFO - utils.trainer -   PearsonR: 0.26242
+09/29/2026 06:51:30 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train
+09/29/2026 06:51:30 - INFO - utils.trainer -   Best model saved (val_MAE=8.1081)
+09/29/2026 06:51:30 - INFO - utils.trainer -   Epoch: 4, Loss: 0.02906, Val loss: 0.01008, Val MAE: 8.1081, Best val MAE: 8.1081, No improve: 0/20, Time: 82.4s
+09/29/2026 06:52:52 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:53:01 - INFO - utils.trainer -   Loss: 0.03437
+09/29/2026 06:53:01 - INFO - utils.trainer -   MSE: 365.14270
+09/29/2026 06:53:01 - INFO - utils.trainer -   MAE: 16.78172
+09/29/2026 06:53:01 - INFO - utils.trainer -   RMSE: 19.10871
+09/29/2026 06:53:01 - INFO - utils.trainer -   R2: -2.30569
+09/29/2026 06:53:01 - INFO - utils.trainer -   PearsonR: 0.18684
+09/29/2026 06:53:01 - INFO - utils.trainer -   Epoch: 5, Loss: 0.03395, Val loss: 0.03437, Val MAE: 16.7817, Best val MAE: 8.1081, No improve: 1/20, Time: 82.2s
+09/29/2026 06:54:23 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:54:33 - INFO - utils.trainer -   Loss: 0.01014
+09/29/2026 06:54:33 - INFO - utils.trainer -   MSE: 108.15384
+09/29/2026 06:54:33 - INFO - utils.trainer -   MAE: 8.42707
+09/29/2026 06:54:33 - INFO - utils.trainer -   RMSE: 10.39970
+09/29/2026 06:54:33 - INFO - utils.trainer -   R2: 0.02087
+09/29/2026 06:54:33 - INFO - utils.trainer -   PearsonR: 0.26670
+09/29/2026 06:54:33 - INFO - utils.trainer -   Epoch: 6, Loss: 0.03370, Val loss: 0.01014, Val MAE: 8.4271, Best val MAE: 8.1081, No improve: 2/20, Time: 82.1s
+09/29/2026 06:55:55 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:56:04 - INFO - utils.trainer -   Loss: 0.01383
+09/29/2026 06:56:04 - INFO - utils.trainer -   MSE: 147.03020
+09/29/2026 06:56:04 - INFO - utils.trainer -   MAE: 10.05403
+09/29/2026 06:56:04 - INFO - utils.trainer -   RMSE: 12.12560
+09/29/2026 06:56:04 - INFO - utils.trainer -   R2: -0.33109
+09/29/2026 06:56:04 - INFO - utils.trainer -   PearsonR: 0.24455
+09/29/2026 06:56:04 - INFO - utils.trainer -   Epoch: 7, Loss: 0.03382, Val loss: 0.01383, Val MAE: 10.0540, Best val MAE: 8.1081, No improve: 3/20, Time: 82.0s
+09/29/2026 06:57:27 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:57:36 - INFO - utils.trainer -   Loss: 0.01120
+09/29/2026 06:57:36 - INFO - utils.trainer -   MSE: 119.22475
+09/29/2026 06:57:36 - INFO - utils.trainer -   MAE: 8.93512
+09/29/2026 06:57:36 - INFO - utils.trainer -   RMSE: 10.91901
+09/29/2026 06:57:36 - INFO - utils.trainer -   R2: -0.07936
+09/29/2026 06:57:36 - INFO - utils.trainer -   PearsonR: 0.25404
+09/29/2026 06:57:36 - INFO - utils.trainer -   Epoch: 8, Loss: 0.03232, Val loss: 0.01120, Val MAE: 8.9351, Best val MAE: 8.1081, No improve: 4/20, Time: 82.6s
+09/29/2026 06:58:59 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 06:59:09 - INFO - utils.trainer -   Loss: 0.01006
+09/29/2026 06:59:09 - INFO - utils.trainer -   MSE: 107.52783
+09/29/2026 06:59:09 - INFO - utils.trainer -   MAE: 8.10595
+09/29/2026 06:59:09 - INFO - utils.trainer -   RMSE: 10.36956
+09/29/2026 06:59:09 - INFO - utils.trainer -   R2: 0.02653
+09/29/2026 06:59:09 - INFO - utils.trainer -   PearsonR: 0.26959
+09/29/2026 06:59:12 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train
+09/29/2026 06:59:12 - INFO - utils.trainer -   Best model saved (val_MAE=8.1059)
+09/29/2026 06:59:12 - INFO - utils.trainer -   Epoch: 9, Loss: 0.03258, Val loss: 0.01006, Val MAE: 8.1059, Best val MAE: 8.1059, No improve: 0/20, Time: 82.7s
+09/29/2026 07:00:35 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:00:44 - INFO - utils.trainer -   Loss: 0.00995
+09/29/2026 07:00:44 - INFO - utils.trainer -   MSE: 106.16636
+09/29/2026 07:00:44 - INFO - utils.trainer -   MAE: 8.29319
+09/29/2026 07:00:44 - INFO - utils.trainer -   RMSE: 10.30371
+09/29/2026 07:00:44 - INFO - utils.trainer -   R2: 0.03886
+09/29/2026 07:00:44 - INFO - utils.trainer -   PearsonR: 0.26742
+09/29/2026 07:00:44 - INFO - utils.trainer -   Epoch: 10, Loss: 0.03458, Val loss: 0.00995, Val MAE: 8.2932, Best val MAE: 8.1059, No improve: 1/20, Time: 82.6s
+09/29/2026 07:02:07 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:02:17 - INFO - utils.trainer -   Loss: 0.00963
+09/29/2026 07:02:17 - INFO - utils.trainer -   MSE: 102.87765
+09/29/2026 07:02:17 - INFO - utils.trainer -   MAE: 8.01585
+09/29/2026 07:02:17 - INFO - utils.trainer -   RMSE: 10.14286
+09/29/2026 07:02:17 - INFO - utils.trainer -   R2: 0.06863
+09/29/2026 07:02:17 - INFO - utils.trainer -   PearsonR: 0.29342
+09/29/2026 07:02:20 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train
+09/29/2026 07:02:20 - INFO - utils.trainer -   Best model saved (val_MAE=8.0159)
+09/29/2026 07:02:20 - INFO - utils.trainer -   Epoch: 11, Loss: 0.03000, Val loss: 0.00963, Val MAE: 8.0159, Best val MAE: 8.0159, No improve: 0/20, Time: 82.6s
+09/29/2026 07:03:42 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:03:52 - INFO - utils.trainer -   Loss: 0.01713
+09/29/2026 07:03:52 - INFO - utils.trainer -   MSE: 182.05736
+09/29/2026 07:03:52 - INFO - utils.trainer -   MAE: 11.32670
+09/29/2026 07:03:52 - INFO - utils.trainer -   RMSE: 13.49286
+09/29/2026 07:03:52 - INFO - utils.trainer -   R2: -0.64819
+09/29/2026 07:03:52 - INFO - utils.trainer -   PearsonR: 0.27964
+09/29/2026 07:03:52 - INFO - utils.trainer -   Epoch: 12, Loss: 0.03031, Val loss: 0.01713, Val MAE: 11.3267, Best val MAE: 8.0159, No improve: 1/20, Time: 82.6s
+09/29/2026 07:05:15 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:05:24 - INFO - utils.trainer -   Loss: 0.01052
+09/29/2026 07:05:24 - INFO - utils.trainer -   MSE: 111.90411
+09/29/2026 07:05:24 - INFO - utils.trainer -   MAE: 8.60436
+09/29/2026 07:05:24 - INFO - utils.trainer -   RMSE: 10.57847
+09/29/2026 07:05:24 - INFO - utils.trainer -   R2: -0.01308
+09/29/2026 07:05:24 - INFO - utils.trainer -   PearsonR: 0.24650
+09/29/2026 07:05:24 - INFO - utils.trainer -   Epoch: 13, Loss: 0.03045, Val loss: 0.01052, Val MAE: 8.6044, Best val MAE: 8.0159, No improve: 2/20, Time: 82.6s
+09/29/2026 07:06:47 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:06:57 - INFO - utils.trainer -   Loss: 0.01236
+09/29/2026 07:06:57 - INFO - utils.trainer -   MSE: 131.37598
+09/29/2026 07:06:57 - INFO - utils.trainer -   MAE: 9.42637
+09/29/2026 07:06:57 - INFO - utils.trainer -   RMSE: 11.46194
+09/29/2026 07:06:57 - INFO - utils.trainer -   R2: -0.18937
+09/29/2026 07:06:57 - INFO - utils.trainer -   PearsonR: 0.30367
+09/29/2026 07:06:57 - INFO - utils.trainer -   Epoch: 14, Loss: 0.03134, Val loss: 0.01236, Val MAE: 9.4264, Best val MAE: 8.0159, No improve: 3/20, Time: 82.6s
+09/29/2026 07:08:19 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:08:29 - INFO - utils.trainer -   Loss: 0.01884
+09/29/2026 07:08:29 - INFO - utils.trainer -   MSE: 200.28354
+09/29/2026 07:08:29 - INFO - utils.trainer -   MAE: 11.94015
+09/29/2026 07:08:29 - INFO - utils.trainer -   RMSE: 14.15216
+09/29/2026 07:08:29 - INFO - utils.trainer -   R2: -0.81320
+09/29/2026 07:08:29 - INFO - utils.trainer -   PearsonR: 0.32263
+09/29/2026 07:08:29 - INFO - utils.trainer -   Epoch: 15, Loss: 0.02900, Val loss: 0.01884, Val MAE: 11.9402, Best val MAE: 8.0159, No improve: 4/20, Time: 82.6s
+09/29/2026 07:09:51 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:10:01 - INFO - utils.trainer -   Loss: 0.01299
+09/29/2026 07:10:01 - INFO - utils.trainer -   MSE: 138.07207
+09/29/2026 07:10:01 - INFO - utils.trainer -   MAE: 9.68898
+09/29/2026 07:10:01 - INFO - utils.trainer -   RMSE: 11.75041
+09/29/2026 07:10:01 - INFO - utils.trainer -   R2: -0.24999
+09/29/2026 07:10:01 - INFO - utils.trainer -   PearsonR: 0.31094
+09/29/2026 07:10:01 - INFO - utils.trainer -   Epoch: 16, Loss: 0.03253, Val loss: 0.01299, Val MAE: 9.6890, Best val MAE: 8.0159, No improve: 5/20, Time: 82.6s
+09/29/2026 07:11:23 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:11:33 - INFO - utils.trainer -   Loss: 0.01025
+09/29/2026 07:11:33 - INFO - utils.trainer -   MSE: 109.19421
+09/29/2026 07:11:33 - INFO - utils.trainer -   MAE: 8.51338
+09/29/2026 07:11:33 - INFO - utils.trainer -   RMSE: 10.44960
+09/29/2026 07:11:33 - INFO - utils.trainer -   R2: 0.01145
+09/29/2026 07:11:33 - INFO - utils.trainer -   PearsonR: 0.31584
+09/29/2026 07:11:33 - INFO - utils.trainer -   Epoch: 17, Loss: 0.03004, Val loss: 0.01025, Val MAE: 8.5134, Best val MAE: 8.0159, No improve: 6/20, Time: 82.5s
+09/29/2026 07:12:56 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:13:05 - INFO - utils.trainer -   Loss: 0.01041
+09/29/2026 07:13:05 - INFO - utils.trainer -   MSE: 110.66228
+09/29/2026 07:13:05 - INFO - utils.trainer -   MAE: 8.61721
+09/29/2026 07:13:05 - INFO - utils.trainer -   RMSE: 10.51961
+09/29/2026 07:13:05 - INFO - utils.trainer -   R2: -0.00184
+09/29/2026 07:13:05 - INFO - utils.trainer -   PearsonR: 0.26010
+09/29/2026 07:13:05 - INFO - utils.trainer -   Epoch: 18, Loss: 0.02879, Val loss: 0.01041, Val MAE: 8.6172, Best val MAE: 8.0159, No improve: 7/20, Time: 82.6s
+09/29/2026 07:14:28 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:14:37 - INFO - utils.trainer -   Loss: 0.00933
+09/29/2026 07:14:37 - INFO - utils.trainer -   MSE: 99.47536
+09/29/2026 07:14:37 - INFO - utils.trainer -   MAE: 8.05005
+09/29/2026 07:14:37 - INFO - utils.trainer -   RMSE: 9.97373
+09/29/2026 07:14:37 - INFO - utils.trainer -   R2: 0.09944
+09/29/2026 07:14:37 - INFO - utils.trainer -   PearsonR: 0.33189
+09/29/2026 07:14:37 - INFO - utils.trainer -   Epoch: 19, Loss: 0.02998, Val loss: 0.00933, Val MAE: 8.0501, Best val MAE: 8.0159, No improve: 8/20, Time: 82.6s
+09/29/2026 07:16:00 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:16:09 - INFO - utils.trainer -   Loss: 0.00954
+09/29/2026 07:16:09 - INFO - utils.trainer -   MSE: 101.61198
+09/29/2026 07:16:09 - INFO - utils.trainer -   MAE: 8.17787
+09/29/2026 07:16:09 - INFO - utils.trainer -   RMSE: 10.08028
+09/29/2026 07:16:09 - INFO - utils.trainer -   R2: 0.08009
+09/29/2026 07:16:09 - INFO - utils.trainer -   PearsonR: 0.32965
+09/29/2026 07:16:09 - INFO - utils.trainer -   Epoch: 20, Loss: 0.02983, Val loss: 0.00954, Val MAE: 8.1779, Best val MAE: 8.0159, No improve: 9/20, Time: 82.5s
+09/29/2026 07:17:32 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:17:41 - INFO - utils.trainer -   Loss: 0.01153
+09/29/2026 07:17:41 - INFO - utils.trainer -   MSE: 122.57610
+09/29/2026 07:17:41 - INFO - utils.trainer -   MAE: 9.15242
+09/29/2026 07:17:41 - INFO - utils.trainer -   RMSE: 11.07141
+09/29/2026 07:17:41 - INFO - utils.trainer -   R2: -0.10970
+09/29/2026 07:17:41 - INFO - utils.trainer -   PearsonR: 0.34395
+09/29/2026 07:17:41 - INFO - utils.trainer -   Epoch: 21, Loss: 0.02982, Val loss: 0.01153, Val MAE: 9.1524, Best val MAE: 8.0159, No improve: 10/20, Time: 82.5s
+09/29/2026 07:19:04 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:19:14 - INFO - utils.trainer -   Loss: 0.01016
+09/29/2026 07:19:14 - INFO - utils.trainer -   MSE: 108.14108
+09/29/2026 07:19:14 - INFO - utils.trainer -   MAE: 8.50157
+09/29/2026 07:19:14 - INFO - utils.trainer -   RMSE: 10.39909
+09/29/2026 07:19:14 - INFO - utils.trainer -   R2: 0.02098
+09/29/2026 07:19:14 - INFO - utils.trainer -   PearsonR: 0.33802
+09/29/2026 07:19:14 - INFO - utils.trainer -   Epoch: 22, Loss: 0.02824, Val loss: 0.01016, Val MAE: 8.5016, Best val MAE: 8.0159, No improve: 11/20, Time: 82.6s
+09/29/2026 07:20:36 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:20:46 - INFO - utils.trainer -   Loss: 0.00981
+09/29/2026 07:20:46 - INFO - utils.trainer -   MSE: 104.48005
+09/29/2026 07:20:46 - INFO - utils.trainer -   MAE: 8.35435
+09/29/2026 07:20:46 - INFO - utils.trainer -   RMSE: 10.22155
+09/29/2026 07:20:46 - INFO - utils.trainer -   R2: 0.05413
+09/29/2026 07:20:46 - INFO - utils.trainer -   PearsonR: 0.32461
+09/29/2026 07:20:46 - INFO - utils.trainer -   Epoch: 23, Loss: 0.03268, Val loss: 0.00981, Val MAE: 8.3543, Best val MAE: 8.0159, No improve: 12/20, Time: 82.5s
+09/29/2026 07:22:08 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:22:18 - INFO - utils.trainer -   Loss: 0.00923
+09/29/2026 07:22:18 - INFO - utils.trainer -   MSE: 98.36498
+09/29/2026 07:22:18 - INFO - utils.trainer -   MAE: 8.04773
+09/29/2026 07:22:18 - INFO - utils.trainer -   RMSE: 9.91791
+09/29/2026 07:22:18 - INFO - utils.trainer -   R2: 0.10949
+09/29/2026 07:22:18 - INFO - utils.trainer -   PearsonR: 0.35698
+09/29/2026 07:22:18 - INFO - utils.trainer -   Epoch: 24, Loss: 0.03152, Val loss: 0.00923, Val MAE: 8.0477, Best val MAE: 8.0159, No improve: 13/20, Time: 82.5s
+09/29/2026 07:23:40 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:23:50 - INFO - utils.trainer -   Loss: 0.01021
+09/29/2026 07:23:50 - INFO - utils.trainer -   MSE: 108.67879
+09/29/2026 07:23:50 - INFO - utils.trainer -   MAE: 8.55971
+09/29/2026 07:23:50 - INFO - utils.trainer -   RMSE: 10.42491
+09/29/2026 07:23:50 - INFO - utils.trainer -   R2: 0.01612
+09/29/2026 07:23:50 - INFO - utils.trainer -   PearsonR: 0.35162
+09/29/2026 07:23:52 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train/checkpoint-epoch-25
+09/29/2026 07:23:52 - INFO - utils.trainer -   Checkpoint saved at epoch 25
+09/29/2026 07:23:52 - INFO - utils.trainer -   Epoch: 25, Loss: 0.02734, Val loss: 0.01021, Val MAE: 8.5597, Best val MAE: 8.0159, No improve: 14/20, Time: 82.5s
+09/29/2026 07:25:14 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:25:23 - INFO - utils.trainer -   Loss: 0.00987
+09/29/2026 07:25:23 - INFO - utils.trainer -   MSE: 105.09648
+09/29/2026 07:25:23 - INFO - utils.trainer -   MAE: 8.43097
+09/29/2026 07:25:23 - INFO - utils.trainer -   RMSE: 10.25166
+09/29/2026 07:25:23 - INFO - utils.trainer -   R2: 0.04855
+09/29/2026 07:25:23 - INFO - utils.trainer -   PearsonR: 0.32666
+09/29/2026 07:25:23 - INFO - utils.trainer -   Epoch: 26, Loss: 0.02919, Val loss: 0.00987, Val MAE: 8.4310, Best val MAE: 8.0159, No improve: 15/20, Time: 82.4s
+09/29/2026 07:26:46 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:26:55 - INFO - utils.trainer -   Loss: 0.01146
+09/29/2026 07:26:55 - INFO - utils.trainer -   MSE: 121.83029
+09/29/2026 07:26:55 - INFO - utils.trainer -   MAE: 9.14079
+09/29/2026 07:26:55 - INFO - utils.trainer -   RMSE: 11.03768
+09/29/2026 07:26:55 - INFO - utils.trainer -   R2: -0.10295
+09/29/2026 07:26:55 - INFO - utils.trainer -   PearsonR: 0.36422
+09/29/2026 07:26:55 - INFO - utils.trainer -   Epoch: 27, Loss: 0.02919, Val loss: 0.01146, Val MAE: 9.1408, Best val MAE: 8.0159, No improve: 16/20, Time: 82.2s
+09/29/2026 07:28:17 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:28:26 - INFO - utils.trainer -   Loss: 0.01185
+09/29/2026 07:28:26 - INFO - utils.trainer -   MSE: 125.92979
+09/29/2026 07:28:26 - INFO - utils.trainer -   MAE: 9.28230
+09/29/2026 07:28:26 - INFO - utils.trainer -   RMSE: 11.22184
+09/29/2026 07:28:26 - INFO - utils.trainer -   R2: -0.14006
+09/29/2026 07:28:26 - INFO - utils.trainer -   PearsonR: 0.34742
+09/29/2026 07:28:26 - INFO - utils.trainer -   Epoch: 28, Loss: 0.03102, Val loss: 0.01185, Val MAE: 9.2823, Best val MAE: 8.0159, No improve: 17/20, Time: 82.2s
+09/29/2026 07:29:48 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:29:58 - INFO - utils.trainer -   Loss: 0.00988
+09/29/2026 07:29:58 - INFO - utils.trainer -   MSE: 105.08656
+09/29/2026 07:29:58 - INFO - utils.trainer -   MAE: 8.42655
+09/29/2026 07:29:58 - INFO - utils.trainer -   RMSE: 10.25117
+09/29/2026 07:29:58 - INFO - utils.trainer -   R2: 0.04864
+09/29/2026 07:29:58 - INFO - utils.trainer -   PearsonR: 0.36191
+09/29/2026 07:29:58 - INFO - utils.trainer -   Epoch: 29, Loss: 0.03047, Val loss: 0.00988, Val MAE: 8.4265, Best val MAE: 8.0159, No improve: 18/20, Time: 82.1s
+09/29/2026 07:31:20 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+09/29/2026 07:31:29 - INFO - utils.trainer -   Loss: 0.01100
+09/29/2026 07:31:29 - INFO - utils.trainer -   MSE: 116.91508
+09/29/2026 07:31:29 - INFO - utils.trainer -   MAE: 8.94455
+09/29/2026 07:31:29 - INFO - utils.trainer -   RMSE: 10.81273
+09/29/2026 07:31:29 - INFO - utils.trainer -   R2: -0.05845
+09/29/2026 07:31:29 - INFO - utils.trainer -   PearsonR: 0.36060
+09/29/2026 07:31:29 - INFO - utils.trainer -   Epoch: 30, Loss: 0.02927, Val loss: 0.01100, Val MAE: 8.9445, Best val MAE: 8.0159, No improve: 19/20, Time: 82.2s
+09/29/2026 07:31:30 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+09/29/2026 07:31:30 - INFO - utils.trainer -     582 keys not in checkpoint (kept from init)
+09/29/2026 07:31:30 - INFO - utils.trainer -   Model loaded from output_dir/TimeLLM_AgeCAUEEG_train/TimeLLM-0.bin (17/18 keys)
+09/29/2026 07:31:30 - INFO - utils.trainer -   ***** Running regression evaluation on test0 dataset *****
+09/29/2026 07:31:30 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+09/29/2026 07:31:30 - INFO - utils.trainer -     582 keys not in checkpoint (kept from init)
+09/29/2026 07:31:30 - INFO - utils.trainer -   Model loaded from output_dir/TimeLLM_AgeCAUEEG_train/TimeLLM-0.bin (17/18 keys)
+09/29/2026 07:31:39 - INFO - utils.trainer -   Loss: 0.00885
+09/29/2026 07:31:39 - INFO - utils.trainer -   MSE: 94.37101
+09/29/2026 07:31:39 - INFO - utils.trainer -   MAE: 7.82075
+09/29/2026 07:31:39 - INFO - utils.trainer -   RMSE: 9.71447
+09/29/2026 07:31:39 - INFO - utils.trainer -   R2: 0.06025
+09/29/2026 07:31:39 - INFO - utils.trainer -   PearsonR: 0.25708
+09/29/2026 07:31:39 - INFO - utils.trainer -   === Best epoch test result ===
+09/29/2026 07:31:39 - INFO - utils.trainer -     Loss: 0.00885
+09/29/2026 07:31:39 - INFO - utils.trainer -     MSE: 94.37101
+09/29/2026 07:31:39 - INFO - utils.trainer -     MAE: 7.82075
+09/29/2026 07:31:39 - INFO - utils.trainer -     RMSE: 9.71447
+09/29/2026 07:31:39 - INFO - utils.trainer -     R2: 0.06025
+09/29/2026 07:31:39 - INFO - utils.trainer -     PearsonR: 0.25708
+09/29/2026 07:31:40 - INFO - utils.trainer -   Model saved to output_dir/TimeLLM_AgeCAUEEG_train/final-epoch-30
+09/29/2026 07:31:40 - INFO - utils.trainer -   Final model saved at epoch 30
