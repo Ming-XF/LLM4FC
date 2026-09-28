@@ -244,6 +244,28 @@ class Model(nn.Module):
             config.task_type == 'regression'
             and config.readout == 'answer_query'
             and config.age_head == 'ordinal')
+        self.use_age_alignment = (
+            config.task_type == 'regression'
+            and config.readout == 'answer_query'
+            and config.age_head == 'linear'
+            and config.align_lambda > 0)
+        if self.use_age_alignment:
+            # E3v7: 线性头不变；另建原始 4096 维年龄 bin 短语原型，
+            # 对齐损失把 h_answer 拉向标签 bin 的语言锚点。
+            self.age_bin_w = config.age_bin_width / 100.0
+            self.n_age_bins = int(round(1.0 / self.age_bin_w))
+            bin_embeds = []
+            with torch.no_grad():
+                for k in range(self.n_age_bins):
+                    lo = int(k * config.age_bin_width)
+                    hi = int((k + 1) * config.age_bin_width)
+                    phrase = (f"an EEG pattern associated with age "
+                              f"{lo} to {hi}")
+                    ids = torch.tensor(self.tokenizer.encode(phrase))
+                    emb = self._word_embeddings(ids).mean(dim=0)
+                    bin_embeds.append(F.normalize(emb, p=2, dim=-1))
+            self.register_buffer(
+                'raw_bin_prototypes', torch.stack(bin_embeds, dim=0))
         if self.use_ordinal_age_head:
             # E3: 有序年龄区间原型头。年龄区间描述的冻结 LLM embedding
             # 作为输出原型，h_answer 与各原型余弦匹配 → 区间分布 →
@@ -480,12 +502,22 @@ class Model(nn.Module):
             loss = F.huber_loss(
                 prediction, labels.float(), delta=1.0)
             if self.use_ordinal_age_head and self.config.align_lambda > 0:
-                # 语义对齐：把 h 的语义子空间投影拉向真实年龄
-                # bin 的语言锚点方向（源域-only）。
+                # 语义对齐（有序头模式）：把 h 的语义子空间投影拉向
+                # 真实年龄 bin 的语言锚点方向（源域-only）。
                 bin_idx = (labels / self.age_bin_w).long().clamp(
                     0, self.n_age_bins - 1)
                 e_bin = self.age_bin_prototypes[bin_idx].float()   # (B, r)
                 cos = (self._h_age_proj * e_bin).sum(dim=-1)
+                align = (1 - cos).mean()
+                loss = loss + self.config.align_lambda * align
+            elif self.use_age_alignment:
+                # 语义对齐（线性头模式，E3v7）：h_answer 直接对齐
+                # 4096 维 bin 短语原型方向。
+                bin_idx = (labels / self.age_bin_w).long().clamp(
+                    0, self.n_age_bins - 1)
+                e_bin = self.raw_bin_prototypes[bin_idx].float()   # (B, d_llm)
+                h_norm = F.normalize(h_answer.float(), p=2, dim=-1)
+                cos = (h_norm * e_bin).sum(dim=-1)
                 align = (1 - cos).mean()
                 loss = loss + self.config.align_lambda * align
         else:
