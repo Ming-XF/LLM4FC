@@ -41,6 +41,8 @@ def collect(dataset_cls, batch=64):
                 feats.append(stats.numpy())
         X = np.concatenate(feats)
         y = ds.all_data['labels'][idx].astype(np.float64)
+        if y.ndim > 1 and y.shape[1] == 2:
+            y = y[:, 1]                       # one-hot → 正类
         out[split] = (X, y)
     return out
 
