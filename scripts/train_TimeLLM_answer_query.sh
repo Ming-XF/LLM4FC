@@ -15,9 +15,9 @@
 #
 
 # ── 实验参数（在脚本内部配置，不再从命令行传入）──
-DATASET="AgeCAUEEG"              # 数据集: DiseaseBeirut/GenderDS/AgeCAUEEG/AgeTUAB 等
+DATASET="AgeCAUEEG"                # 数据集: DiseaseBeirut/GenderDS/AgeCAUEEG/AgeTUAB 等
 EARLY_STOP_METRIC="MAE"          # 早停指标: AUC(分类) / MAE(回归)
-PRETRAIN_PATH=""                 # 零样本评估: "./output_dir/TimeLLM_AgeCAUEEG_train"
+PRETRAIN_PATH=""   # 零样本评估: v2冻结头(无bin,加载跳过)
 
 deepspeed --num_gpus=2 main.py \
     --model "TimeLLM" \

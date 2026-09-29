@@ -173,6 +173,26 @@
   spec9 未裁剪 ±5 的脚本 bug，已定位）
 - 反向（TUAB 拟合）头拟合中，用于 TUAB→CAUEEG 反向验证
 
+### 反向验证（TUAB 源 → CAUEEG 目标）
+- 疾病：**AUC 0.704**（诊断 0.700-0.731 区间内）；年龄：**r=+0.207**
+  （MAE 9.61）——双向双任务全部有效
+- 反向头：output_dir/stats_ridge_tuab.pt / stats_logistic_tuab.pt
+  （疾病 val AUC 0.817、年龄 val r 0.320）
+
+## 第二阶段总结
+
+CAER-v2 在**年龄回归与疾病分类、两个迁移方向**上全部验证有效：
+
+| 任务/方向 | 基线 | CAER-v2 |
+|---|---|---|
+| 年龄 CAUEEG→TUAB | 0.039 | **+0.344** |
+| 年龄 TUAB→CAUEEG | — | **+0.207** |
+| 疾病 CAUEEG→TUAB | 0.350 | **+0.814** |
+| 疾病 TUAB→CAUEEG | — | **+0.704** |
+
+方法文档：CAER.md（v2 定稿）。疾病任务按 codex 建议以
+"跨任务生理表型迁移"表述（AD vs 异常语义错位的诚实处理）。
+
 ## 最终方法（经验证有效）
 
 **Calibration-Anchored Evidence Reprogramming（CAER）**

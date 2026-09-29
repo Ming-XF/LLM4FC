@@ -54,7 +54,7 @@ def save_head(path, mu, sigma, w, b):
 
 
 def main():
-    src = sys.argv[1] if len(sys.argv) > 1 else 'CAUEEG'
+    src = sys.argv.pop(1) if len(sys.argv) > 1 else 'CAUEEG'
     suf = '' if src == 'CAUEEG' else f'_{src.lower()}'
     age_ds = {'CAUEEG': AgeCAUEEGDataset,
               'TUAB': __import__('data', fromlist=['AgeTUABDataset'])

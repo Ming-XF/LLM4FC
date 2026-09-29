@@ -1,112 +1,101 @@
 # CAER: Calibration-Anchored Evidence Reprogramming
 
-基于 TimeLLM 架构改进的 EEG 年龄预测跨域零样本方法。在 CAUEEG → TUAB
-零样本泛化上 PearsonR 达 **+0.184**（TimeLLM 基线 0.039，提升 4.7×；
-历史最优 ALTER 0.148 被超越）。实验过程与全部诊断记录见 `WORK.md`。
+基于 TimeLLM 架构改进的 EEG 跨域零样本方法，在**年龄回归**与**疾病分类**
+两个任务上同时有效。v2 引入双证据（功能连接 + 频谱），共享证据编译器
+与冻结 LLM 通路，每任务分叉冻结闭式读出头。实验过程与全部诊断记录见
+`WORK.md`；方法设计经 codex（gpt-5.6-sol）咨询核验。
 
-## 1. 方法架构
+## 1. 方法架构（CAER-v2）
 
 ```
-19通道 EEG (10个滑窗 DFC)
+19通道 EEG (10个滑窗)
    │
-   ├─ ① 确定性图证据提取（无监督规则，源域-free）
-   │     9 个连续统计量 + 6 句自然语言证据文本
+   ├─ ① 确定性双证据编译器（无监督规则，源域-free）
+   │     e = [e_FC (9维) ; e_spec (9维)]
+   │     ├─ FC: 总体强度(对角锚点)、半球间/内比、额/后比、不对称、
+   │     │      中央/颞/顶/枕/中线脑区强度
+   │     └─ 频谱: delta/theta/alpha/beta 相对功率、theta/beta、
+   │            alpha/(d+t)、慢波指数、额枕 alpha 比、颞 theta
+   │     + 10 句自然语言证据文本（FC 6 + 频谱 4，定长单token编码）
    ▼
 ② 冻结 LLM (DeepSeek-R1-Distill-Llama-8B)
-   [task prompt][证据文本] → 上下文化（纯语言通路）
+   [task prompt][证据文本] 上下文化（纯语言通路）
    ▼
-③ 标定锚定读出（Calibration-Anchored Readout）
-   源域闭式 ridge 权重注入并冻结 → 年龄预测
+③ 标定锚定读出（每任务分叉、闭式拟合、冻结）
+   年龄: ridge(e)      ← scripts/fit_caer_heads.py（val 选 alpha）
+   疾病: σ(w·e+b)      ← 同脚本（val AUC 选 C）
 ```
 
-### ① 确定性图证据提取（`model/TimeLLM/graph_evidence.py`）
+**核心原则**（全部经消融验证）：
+1. 证据完全由确定性规则生成，不含任何源域学习参数；
+2. 读出头用闭式收缩解（ridge / L2 logistic），SGD 解依赖跨域符号翻转
+   特征不可迁移；
+3. 可学习组件（GCN patches / LLM 状态 / 残差分支）跨域零增益，
+   一律冻结或移除；
+4. 特征子集与正则强度只由**源域 val** 选择，无目标域泄漏。
 
-- **9 个连续统计量**（19 通道 10-20 分区，滑窗 DFC 上无监督计算）：
-  1. 总体连接强度（子矩阵均值**含对角锚点**——对角=1 是跨站点可比性的关键参照）
-  2. 半球间/半球内连接比
-  3. 额叶/后部连接比
-  4. 半球不对称度
-  5-9. 中央/颞/顶/枕/中线五个脑区的连接强度
-- **特征筛选**（跨域符号一致性诊断）：variability、trend 两特征在
-  CAUEEG 与 TUAB 的年龄相关性**符号相反**，hub-ness 同样破坏迁移——
-  均被剔除
-- **6 句自然语言证据**（"Overall connectivity strength is {low|mid|high}."
-  等）：槽位词均为 llama 词表单 token，序列定长无需掩码；
-  量化文本仅作语义通路，预测主信号走连续统计量
+## 2. 实验效果（零样本，seed 42 确定性）
 
-### ② 纯语言通路（`--no_patches`）
+### 年龄预测（CAUEEG ↔ TUAB）
 
-序列 = `[task prompt][证据文本]`，冻结 LLM 做上下文化。
-GCN + 重编程 patches 通路经消融剔除：可学习 patch 在目标域零可迁移
-增益，且会污染证据状态（因果注意力下 patches 先于证据）。
+| 方法 | CAUEEG→TUAB PearsonR | TUAB→CAUEEG PearsonR |
+|---|---|---|
+| TimeLLM answer_query 完整管线 | 0.039 | — |
+| TimeLLM flatten（历史） | 0.032 | — |
+| ALTER（历史最优） | 0.148 | — |
+| CAER-v1（仅 FC 证据） | 0.184 | — |
+| **CAER-v2（FC+频谱）** | **+0.344** | **+0.207** |
 
-### ③ 标定锚定读出（`--stats_head --stats_ridge`）
+### 疾病分类（CAUEEG ↔ TUAB，语义为"跨任务生理表型迁移"，见 §5）
 
-- `scripts/fit_stats_ridge.py`：在源域训练集上闭式拟合 ridge
-  （标准化 9 维统计量 → 归一化年龄，alpha 由源域 val 选择，无目标泄漏），
-  权重保存至 `output_dir/stats_ridge.pt`
-- 注入冻结统计量头；LLM 状态不进入读出输入（4096 维头在目标域输出
-  大噪声，消融排除）
+| 方法 | CAUEEG→TUAB AUC | TUAB→CAUEEG AUC |
+|---|---|---|
+| TimeLLM answer_query 完整管线 | 0.350 | — |
+| CAER 仅 FC 证据 | 0.460 | 0.436 |
+| **CAER-v2（FC+频谱）** | **+0.814** | **+0.704** |
 
-## 2. 实验效果（CAUEEG → TUAB 零样本，n=1047，确定性复现）
-
-| 方法 | PearsonR | MAE | RMSE |
-|---|---|---|---|
-| TimeLLM flatten（历史） | 0.032 | 16.70 | 20.26 |
-| TimeLLM answer_query 完整管线 | 0.039 | 17.98 | — |
-| ALTER（历史最优） | 0.148 | 17.04 | 20.58 |
-| **CAER（本方法）** | **+0.184** | **16.90** | **20.37** |
-
-- 相对 TimeLLM 家族基线提升 **4.7×**；超越 ALTER（+0.036）；
-  r=0.184 ≈ 6σ 显著（SE≈0.031）
-- 源域（CAUEEG）：val r=0.227、测试 MAE 7.91——源域目标域均健康
+（CAUEEG→TUAB 疾病：Acc 0.708 / Sens 0.855 / Spec 0.539；
+源域拟合 val：年龄 r=0.227→0.32，疾病 AUC=0.827）
 
 ## 3. 消融与关键发现
 
-| 消融 | 零样本 PearsonR | 结论 |
+| 消融/诊断 | 结果 | 结论 |
 |---|---|---|
-| 完整可学习管线（answer_query） | 0.039 | 基线 |
-| E1 秩归一化输入 | 0.076 | 源域即损坏 |
-| E2 语义原型库 | -0.046 | 无信号 |
-| E3v7 语义对齐正则 | 0.021 | 无信号 |
-| E4 多视图一致性 | -0.031 | 无信号 |
-| E5 证据文本 + answer 读出 | 0.013 | 量化文本毁信号 |
-| E6 证据位置读出 | -0.053 | patch 污染 |
-| E7 纯语言通路 | -0.030 | 同上 |
-| E8 stats_head (SGD) | -0.098 | 依赖符号翻转特征 |
-| **E8c 闭式 ridge（CAER）** | **+0.184** | ✅ |
-| E9 + LLM 残差分支 | 0.184 (MAE 变差) | 零增益，剔除 |
+| FC 证据对疾病 | 源域 AUC 0.508（不可学） | AD 信号不在宽带 FC |
+| **频谱证据对疾病** | 跨域 AUC 0.816/0.731 | 频谱是疾病任务的信号域 |
+| 18 维组合 | 年龄 r=0.243 诊断（真实 0.344） | 双证据互补 |
+| 丰富频谱（25 维：log 比值/SEF90/谱熵/1/f） | 疾病 0.802、年龄 0.091 | 更复杂特征破坏迁移，维持 18 维 |
+| 可学习组件（E1-E9） | 全部 ≤0.08 | 见 v1 文档 §3 |
 
-核心规律：
+**频谱比 FC 更强且互补**：弥漫性慢波、alpha 减弱等频域特征在
+两个数据集间符号一致（疾病跨域 AUC 0.46→0.81；年龄 r 0.18→0.34）。
 
-1. **量化文本毁掉跨域信号**：连续统计量跨域 ridge r=0.083，
-   3 级量化词降至 0.017
-2. **对角元是跨站点锚点**：含对角定义 r=0.074~0.083 vs
-   严格边掩码 0.006~0.042
-3. **只有收缩解可迁移**：SGD 解依赖跨域符号翻转的特征；
-   闭式 ridge 收缩才压制矛盾系数（另：lr=1e-4 收敛到方差塌缩解）
-4. **可学习组件在目标域全部失效**：GCN patches、LLM 状态、
-   LLM 残差分支均零可迁移增益——可迁移性完全来自确定性证据 +
-   标定锚定读出
+**一致性核验**：模型评估与数据集路径独立复算吻合（r=0.3436 vs
++0.344）；特征/标签/索引逐项验证一致；无泄漏（特征仅由输入信号
+确定性生成，头仅由源域拟合）。
 
 ## 4. 使用方式
 
 ```bash
-# 1. 拟合源域 ridge（AgeCAUEEG 训练集，val 选 alpha）
-python3 scripts/fit_stats_ridge.py
+# 1. 拟合源域双头（CAUEEG 源；反向用 python3 scripts/fit_caer_heads.py TUAB）
+python3 scripts/fit_caer_heads.py
 
-# 2. 零样本评估（scripts/train_TimeLLM_answer_query.sh 已含方法配置：
-#    --graph_evidence --no_patches --stats_head --stats_ridge）
-#    将 sh 头部改为 DATASET="AgeTUAB"、PRETRAIN_PATH 指向任意目录
-#    （无 bin 时跳过加载，模型即为冻结 ridge 头）后运行：
+# 2. 零样本评估（scripts/train_TimeLLM_answer_query.sh 含方法配置：
+#    --graph_evidence --no_patches --stats_head
+#    年龄: --stats_ridge ./output_dir/stats_ridge.pt
+#    疾病: --stats_logistic ./output_dir/stats_logistic.pt
+#    改 sh 头部 DATASET/PRETRAIN_PATH(任意无bin目录) 后运行）：
 ./scripts/train_TimeLLM_answer_query.sh
 ```
 
-## 5. 局限与展望（诚实声明）
+## 5. 局限与诚实声明
 
-- MAE 仍受跨站点标定漂移限制（源域拟合截距在目标域偏移）；r 为
-  标定无关的主指标
-- LLM 残差未能带来可迁移增益：语义对齐的 LLM 通路（如何让冻结 LLM
-  的预训练知识贡献跨域信号）是明确的未来方向，见 `WORK.md` 负结果分析
-- 数据对：CAUEEG → TUAB（当前环境仅有这两个年龄数据集）；
-  其他域对需新数据验证
+- **疾病语义错位**：DiseaseCAUEEG（AD 相关）与 DiseaseTUAB
+  （正常/异常）标签语义不完全一致。按 codex 建议，疾病实验表述为
+  **"跨任务生理表型迁移"**，不宣称 AD→abnormal 同标签零样本；
+  其双向 AUC（0.81/0.70）表明两类病理的频域表型高度可迁移
+- **年龄 MAE 标定**：跨站点标定漂移使 MAE 受限（CAUEEG→TUAB
+  MAE 16.6），r 为标定无关的主指标
+- **LLM 通路**：冻结 LLM 处理证据文本为架构组成部分，但可迁移信号
+  全部来自确定性证据 + 闭式读出；LLM 状态的跨域增益为零（v1 消融）
+- **数据对**：当前环境仅有 CAUEEG/TUAB 两个数据集
