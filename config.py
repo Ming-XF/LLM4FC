@@ -81,6 +81,7 @@ def init_model_config(args, data_config: DataConfig):
             stats_head=args.stats_head,
             residual_llm=args.residual_llm,
             stats_ridge_path=args.stats_ridge,
+            stats_logistic_path=args.stats_logistic,
         )
         model = Model(model_config)
     else:
@@ -242,6 +243,10 @@ def init_config():
                                   "(output_dir/stats_ridge.pt) into the frozen "
                                   "stats head — shrinkage solution transfers "
                                   "across domains unlike SGD solutions")
+    model_group.add_argument("--stats_logistic", default="", type=str,
+                             help="CAER-v2: inject closed-form logistic weights "
+                                  "(output_dir/stats_logistic.pt) into the "
+                                  "frozen stats head for classification tasks")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

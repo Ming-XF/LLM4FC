@@ -6,7 +6,8 @@ import torch.nn.functional as F
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 
 from ..base import BaseConfig, ModelOutputs
-from .graph_evidence import _EVIDENCE_TEMPLATES, compute_graph_evidence
+from .graph_evidence import (_EVIDENCE_TEMPLATES, _SPECTRAL_TEMPLATES,
+                         compute_graph_evidence)
 from .prompts import NEURAL_SEMANTIC_PROTOTYPES, get_prompt_config
 
 
@@ -68,7 +69,8 @@ class TimeLLMConfig(BaseConfig):
                  stat_vector=False,
                  stats_head=False,
                  residual_llm=False,
-                 stats_ridge_path=''):
+                 stats_ridge_path='',
+                 stats_logistic_path=''):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -98,6 +100,7 @@ class TimeLLMConfig(BaseConfig):
         self.stats_head = stats_head
         self.residual_llm = residual_llm
         self.stats_ridge_path = stats_ridge_path
+        self.stats_logistic_path = stats_logistic_path
 
 
 class ReprogrammingLayer(nn.Module):
@@ -233,7 +236,8 @@ class Model(nn.Module):
         self.evidence_templates = None
         if config.graph_evidence:
             self.evidence_templates = []
-            for prefix, words, suffix in _EVIDENCE_TEMPLATES:
+            for prefix, words, suffix in (
+                    _EVIDENCE_TEMPLATES + _SPECTRAL_TEMPLATES):
                 p_ids = self.tokenizer.encode(prefix, add_special_tokens=False)
                 s_ids = self.tokenizer.encode(suffix, add_special_tokens=False)
                 w_ids = {}
@@ -352,7 +356,7 @@ class Model(nn.Module):
             # --stats_head: 头只读 6 维连续统计量（LLM 状态不参与）。
             # --residual_llm (E9): 统计量分支 + 零初始化 LLM 分支残差。
             if config.residual_llm:
-                self.stats_branch = nn.Linear(9, config.output_dim)
+                self.stats_branch = nn.Linear(18, config.output_dim)
                 self.llm_bottleneck = nn.Linear(self.d_llm, 32)
                 self.llm_branch = nn.Linear(32, config.output_dim)
                 nn.init.zeros_(self.llm_branch.weight)
@@ -373,7 +377,7 @@ class Model(nn.Module):
                     for p in self.stats_branch.parameters():
                         p.requires_grad = False
             elif config.stats_head:
-                in_dim = 9
+                in_dim = 18
                 self.output_projection = nn.Sequential(
                     nn.Linear(in_dim, config.output_dim),
                     nn.Dropout(config.dropout),
@@ -393,8 +397,25 @@ class Model(nn.Module):
                             spec['b'].reshape(-1))
                     for p in self.output_projection.parameters():
                         p.requires_grad = False
+                if config.stats_logistic_path:
+                    # CAER-v2: 分类任务的冻结闭式 logistic 头
+                    # （logits = [log(1-p), log(p)] 与二元评估协议一致）
+                    spec = torch.load(
+                        config.stats_logistic_path, map_location='cpu',
+                        weights_only=False)
+                    self.register_buffer('stats_mu', spec['mu'])
+                    self.register_buffer('stats_sigma', spec['sigma'])
+                    self.stats_logistic = nn.Linear(18, 1)
+                    with torch.no_grad():
+                        self.stats_logistic.weight.copy_(
+                            spec['w'].unsqueeze(0))
+                        self.stats_logistic.bias.copy_(
+                            spec['b'].reshape(-1))
+                    for p in self.stats_logistic.parameters():
+                        p.requires_grad = False
+                    self.output_projection = None
             else:
-                in_dim = self.d_llm + (9 if config.stat_vector else 0)
+                in_dim = self.d_llm + (18 if config.stat_vector else 0)
                 self.output_projection = nn.Sequential(
                     nn.Linear(in_dim, config.output_dim),
                     nn.Dropout(config.dropout),
@@ -414,7 +435,7 @@ class Model(nn.Module):
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def forward(self, DFC, SFC, labels, gender=None, age=None,
-                education=None):
+                education=None, spectral=None):
         B, T, C, _ = DFC.shape
         device = DFC.device
 
@@ -491,7 +512,8 @@ class Model(nn.Module):
         evidence_embeds = None
         evidence_stats = None
         if self.config.graph_evidence:
-            levels_all, evidence_stats = compute_graph_evidence(DFC)
+            levels_all, evidence_stats = compute_graph_evidence(
+                DFC, spectral)
             evidence_ids = []
             for levels in levels_all:
                 ids = []
@@ -622,13 +644,21 @@ class Model(nn.Module):
                 prediction = (y_stats + y_llm).squeeze(-1)
                 logits = prediction.unsqueeze(-1)
             elif self.config.stats_head:
-                # E8b: 头只读连续统计量（6 维），LLM 状态不参与
+                # E8b/CAER-v2: 头只读连续统计量，LLM 状态不参与
                 h_ev = evidence_stats.to(
-                    dtype=self.output_projection[0].weight.dtype)
-                if self.config.stats_ridge_path:
+                    dtype=self.stats_logistic.weight.dtype
+                    if self.config.stats_logistic_path
+                    else self.output_projection[0].weight.dtype)
+                if (self.config.stats_ridge_path
+                        or self.config.stats_logistic_path):
                     h_ev = (h_ev - self.stats_mu.to(h_ev.device)) / \
                         self.stats_sigma.to(h_ev.device)
-                logits = self.output_projection(h_ev).squeeze(1)
+                if self.config.stats_logistic_path:
+                    p = torch.sigmoid(self.stats_logistic(h_ev))
+                    logits = torch.cat(
+                        [torch.log1p(-p), torch.log(p)], dim=-1)  # (B, 2)
+                else:
+                    logits = self.output_projection(h_ev).squeeze(1)
             else:
                 ev_start = prompt_length + (
                     T * C if reprogrammed is not None else 0)

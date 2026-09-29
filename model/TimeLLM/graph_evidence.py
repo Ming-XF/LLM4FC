@@ -47,14 +47,17 @@ def _quantize(x, thresholds, label_list):
     return [label_list[i] for i in idx.tolist()]
 
 
-def compute_graph_evidence(dfc):
+def compute_graph_evidence(dfc, spectral=None):
     """对 (B, W, C, C) DFC 计算确定性图统计量并量化为证据描述。
 
+    Args:
+        dfc: (B, W, C, C) 动态功能连接。
+        spectral: (B, 9) 频谱统计量（数据集层确定性计算），None 时
+            仅用 FC 证据（向后兼容）。
+
     Returns:
-        levels: (B,) list，每个元素为 6 个证据词（strength, inter,
-            frontal, variability, trend, asymmetry）。
-        stats:  (B, 6) 连续统计量（按名义尺度重缩放，供 --stat_vector
-            直接拼入读出层输入，保留可迁移的连续信号）。
+        levels: (B,) list，每个元素为证据词列表（FC 6 句 + 频谱 4 句）。
+        stats:  (B, 9) 或 (B, 18) 连续统计量（FC + 频谱拼接，裁剪 ±5）。
     """
     B, W, C, _ = dfc.shape
     device = dfc.device
@@ -132,10 +135,10 @@ def compute_graph_evidence(dfc):
         ])
 
     # 连续统计量按名义尺度重缩放（~单位量级，供线性头学习）；
-    # 裁剪重尾。9 维：4 个跨域一致的核心特征 + 5 个脑区均值
+    # 裁剪重尾。FC 9 维：4 个跨域一致的核心特征 + 5 个脑区均值
     # （variability/trend 两特征在 CAUEEG 与 TUAB 的年龄相关性符号
     # 相反，已剔除——见 WORK.md 诊断；hub-ness 同样破坏迁移，已剔除）
-    stats = torch.stack([
+    fc_stats = torch.stack([
         strength / 0.3,
         inter_ratio,
         front_ratio,
@@ -146,7 +149,37 @@ def compute_graph_evidence(dfc):
         occ_mw / 0.3,
         mid_mw / 0.3,
     ], dim=-1)                                                 # (B, 9)
-    stats = stats.clamp(-5.0, 5.0)
+    fc_stats = fc_stats.clamp(-5.0, 5.0)
+
+    if spectral is None:
+        return levels, fc_stats
+
+    # ── 频谱证据（CAER-v2）：量化 4 个频谱句 + 9 维连续频谱统计量 ──
+    spec = spectral.float().to(device)
+    rel_d, rel_t, rel_a, rel_b = spec[:, 0], spec[:, 1], spec[:, 2], spec[:, 3]
+    tb_ratio, a_dt, slowing, fa_pa, tt_total = (spec[:, 4], spec[:, 5],
+                                                spec[:, 6], spec[:, 7],
+                                                spec[:, 8])
+    with torch.no_grad():
+        slowing_labels = _quantize(
+            slowing, [0.6, 1.2], ['low', 'mid', 'high'])
+        alpha_labels = _quantize(
+            rel_a, [0.25, 0.5], ['low', 'mid', 'high'])
+        tb_labels = _quantize(
+            tb_ratio, [0.8, 1.6], ['low', 'mid', 'high'])
+        fb_idx = torch.where(
+            fa_pa < 0.8, torch.zeros_like(fa_pa, dtype=torch.long),
+            torch.where(fa_pa > 1.3, torch.full_like(fa_pa, 2, dtype=torch.long),
+                        torch.ones_like(fa_pa, dtype=torch.long)))
+        fb_words = ['front', 'even', 'back']
+    for b in range(B):
+        levels[b].extend([
+            slowing_labels[b], alpha_labels[b], tb_labels[b],
+            fb_words[int(fb_idx[b])],
+        ])
+
+    spec_stats = spec.clamp(-5.0, 5.0)
+    stats = torch.cat([fc_stats, spec_stats], dim=-1)           # (B, 18)
     return levels, stats
 
 
@@ -159,4 +192,12 @@ _EVIDENCE_TEMPLATES = [
     (" Temporal variability is ", ["low", "mid", "high"], "."),
     (" Connectivity ", ["down", "flat", "up"], " across windows."),
     (" Hemispheric asymmetry is ", ["small", "mid", "large"], "."),
+]
+
+# 频谱证据句（CAER-v2；频谱统计量由数据集层确定性计算传入）
+_SPECTRAL_TEMPLATES = [
+    (" Diffuse slowing is ", ["low", "mid", "high"], "."),
+    (" Alpha activity is ", ["low", "mid", "high"], "."),
+    (" Theta-beta ratio is ", ["low", "mid", "high"], "."),
+    (" Frontal-posterior alpha balance is ", ["front", "even", "back"], "."),
 ]

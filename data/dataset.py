@@ -314,6 +314,59 @@ class BaseDataset(Dataset):
         return fc_sparse
 
     @staticmethod
+    def spectral_stats(time_series, hz):
+        """CAER-v2: 确定性频谱证据（9 维，无监督规则）。
+
+        对 10 个滑窗（12s）做 Welch PSD（2s 分段、hanning 窗），
+        取全通道均值得到 delta/theta/alpha/beta 相对功率，以及
+        theta/beta、alpha/(d+t)、慢波指数 (d+t)/(a+b)、
+        额/枕 alpha 比、颞区 theta 占比。
+
+        频谱特征是 AD 与异常 EEG 的经典信号域（弥漫性慢波、alpha 减弱），
+        跨数据集稳定且与 FC 证据互补。
+
+        Returns:
+            torch.Tensor shape (9,)
+        """
+        W = 12 * hz
+        step = (60 * hz - W) // 9
+        nperseg = 2 * hz
+        freqs = np.fft.rfftfreq(nperseg, 1 / hz)
+        bands = {'d': (0.5, 4.0), 't': (4.0, 8.0),
+                 'a': (8.0, 13.0), 'b': (13.0, 30.0)}
+        frontal = [0, 1, 5, 6, 10, 13]
+        posterior = [3, 4, 8, 9, 12, 15]
+        temporal = [11, 12, 14, 15]
+        win = np.hanning(nperseg)
+        rows = []
+        ts = time_series.detach().numpy().astype(np.float64)
+        nseg = W // nperseg
+        for k in range(10):
+            s = k * step
+            w = ts[:, s:s + W]
+            w = (w - w.mean(1, keepdims=True)) / (w.std(1, keepdims=True) + 1e-8)
+            pw = {bn: [] for bn in bands}
+            for ch in range(w.shape[0]):
+                seg = w[ch, :nseg * nperseg].reshape(nseg, nperseg)
+                ps = (np.abs(np.fft.rfft(seg * win, axis=1)) ** 2).mean(0)
+                for bn, (lo, hi) in bands.items():
+                    pw[bn].append(ps[(freqs >= lo) & (freqs < hi)].sum())
+            total = sum(np.mean(v) for v in pw.values())
+            rel = {bn: np.mean(v) / total for bn, v in pw.items()}
+            fa = sum(pw['a'][ch] for ch in frontal)
+            pa = sum(pw['a'][ch] for ch in posterior)
+            tt = sum(pw['t'][ch] for ch in temporal)
+            rows.append([
+                rel['d'], rel['t'], rel['a'], rel['b'],
+                rel['t'] / max(rel['b'], 1e-9),
+                rel['a'] / max(rel['d'] + rel['t'], 1e-9),
+                (rel['d'] + rel['t']) / max(rel['a'] + rel['b'], 1e-9),
+                fa / max(pa, 1e-9),
+                tt / total,
+            ])
+        return torch.tensor(np.array(rows).mean(0), dtype=torch.float32)
+
+    @staticmethod
     def dynamic_connectivity(time_series, window_size, step_size):
         """Compute dynamic FC via sliding windows.
 

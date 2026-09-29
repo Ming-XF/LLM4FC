@@ -119,9 +119,13 @@ class TimeLLMTrainer(Trainer):
                 and not getattr(self.args, 'mv_consistency', False)):
             # E1: 秩归一化输入（E4 多视图模式下由模型内部构造秩视图）
             dfc = rank_normalize_dfc(dfc)
+        spectral = inputs.get('spectral')
+        if spectral is not None:
+            spectral = spectral.float().to(self.device)
         kwargs = {
             "DFC": dfc,
             "SFC": inputs['correlation'].float().to(self.device),
             "labels": labels.to(self.device),
+            "spectral": spectral,
         }
         return kwargs

@@ -127,6 +127,37 @@
 - 源域 r=0.193/MAE 7.91（残差有效）；零样本 r=+0.18395（与 E8c 完全一致）、
   MAE 17.49/RMSE 21.06 反而略差 → **LLM 残差零可迁移增益，剔除**
 
+## 第二阶段：疾病任务扩展（CAER-v2）
+
+### 目标
+保持年龄任务泛化有效（r=0.184），提升疾病任务跨域零样本泛化。
+
+### 数据与语义
+- DiseaseCAUEEG（5068 例，AD 相关二分类）、DiseaseTUAB（5602 例，
+  正常/异常）——当前环境唯一疾病域对；标签语义不完全一致（AD vs 异常，
+  codex 曾警告），诊断显示频谱证据下两者仍高度可迁移（见下）
+
+### 关键诊断（D1-D3）
+- **FC 证据对疾病任务无效**：CAUEEG 域内 AUC 仅 0.508（AD 在 FC 空间
+  不可学）；跨域两个方向均 <0.5
+- **频谱证据是突破**（9 维：相对频带功率 d/t/a/b、t/b、a/(d+t)、
+  慢波指数、额枕 alpha 比、颞 theta）：
+  疾病跨域 CAUEEG→TUAB **AUC 0.816**、反向 0.731；
+  域内 0.719/0.821（FC: 0.508/0.626）；
+  年龄跨域 r=0.196（超 FC 的 0.184）、域内 0.324
+- **18 维组合（FC+频谱）**：疾病跨域 AUC 0.811、年龄跨域 **r=+0.243**
+  ——年龄大幅提升，疾病由频谱主导
+
+### CAER-v2 设计（实现完成，验证中）
+- 证据 = 9 维 FC 统计量 + 9 维频谱统计量（数据集层确定性计算，
+  `BaseDataset.spectral_stats`，4 个 age/disease 数据集已接入）
+  + 10 句证据文本（FC 6 + 频谱 4）
+- 双任务冻结闭式头（`scripts/fit_caer_heads.py`，共享证据、分叉读出）：
+  年龄 ridge（val 选 alpha）/ 疾病 logistic（val AUC 选 C）
+- 分类读出：p=sigmoid(w·x+b) → logits=[log(1-p), log(p)]（B,2 二元协议）
+- 基线：标准 answer_query 管线 DiseaseCAUEEG 30-epoch 训练中
+  （epoch1 val AUC 0.504 ≈ 随机，与诊断一致）
+
 ## 最终方法（经验证有效）
 
 **Calibration-Anchored Evidence Reprogramming（CAER）**
