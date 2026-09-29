@@ -54,14 +54,11 @@ def compute_graph_evidence(dfc):
     """
     B, W, C, _ = dfc.shape
     device = dfc.device
-    inter_m, intra_m, front_m, post_m = _build_edge_masks(C, device)
-    inter_m = inter_m.unsqueeze(0)                 # (1, C, C)
-    intra_m = intra_m.unsqueeze(0)
-    front_m = front_m.unsqueeze(0)
-    post_m = post_m.unsqueeze(0)
 
     with torch.no_grad():
         abs_dfc = dfc.abs()
+        # 全矩阵强度（含对角：对角=1 作为每窗口的锚点参照，
+        # 使统计量跨站点更可比——见 WORK.md 诊断）
         win_strength = abs_dfc.mean(dim=(-1, -2))                       # (B, W)
         strength = win_strength.mean(-1)                                # (B,)
         variability = win_strength.std(-1)                              # (B,)
@@ -72,30 +69,28 @@ def compute_graph_evidence(dfc):
                  ).sum(-1) / (t ** 2).sum()
         trend_norm = slope / (win_strength.mean(-1) + 1e-6)
 
-        def edge_mean(mask):
-            n = mask.sum()
-            return (abs_dfc * mask).sum(dim=(-1, -2)) / n               # (B, W)
+        # 子矩阵均值（含对角，与跨域诊断的 old-def 一致）
+        abs_all = abs_dfc.sum(dim=(-1, -2))                             # (B, W)
 
-        inter_mw = edge_mean(inter_m).mean(-1)                          # (B,)
-        intra_mw = edge_mean(intra_m).mean(-1)
-        front_mw = edge_mean(front_m).mean(-1)
-        post_mw = edge_mean(post_m).mean(-1)
-        inter_ratio = inter_mw / (intra_mw + 1e-6)
-        front_ratio = front_mw / (post_mw + 1e-6)
-        # 半球不对称：左右半球内部边强度的差异
-        L_m = torch.zeros(C, device=device, dtype=torch.bool)
-        R_m = torch.zeros(C, device=device, dtype=torch.bool)
-        L_m[_CH_LEFT] = True
-        R_m[_CH_RIGHT] = True
-        left_mask = (torch.triu(torch.ones(C, C, device=device,
-                                          dtype=torch.bool), diagonal=1)
-                     & L_m[:, None] & L_m[None, :]).unsqueeze(0)
-        right_mask = (torch.triu(torch.ones(C, C, device=device,
-                                           dtype=torch.bool), diagonal=1)
-                      & R_m[:, None] & R_m[None, :]).unsqueeze(0)
-        left_mw = (abs_dfc * left_mask).sum((-1, -2)) / left_mask.sum()
-        right_mw = (abs_dfc * right_mask).sum((-1, -2)) / right_mask.sum()
-        asym = (left_mw - right_mw).abs().mean(-1)                      # (B,)
+        def sub_sum(idx):
+            return abs_dfc[:, :, idx][:, :, :, idx].sum(dim=(-1, -2))
+
+        left_s = sub_sum(_CH_LEFT)
+        right_s = sub_sum(_CH_RIGHT)
+        front_s = sub_sum(_CH_FRONTAL)
+        post_s = sub_sum(_CH_POSTERIOR)
+        inter_w = (abs_all - left_s - right_s) / (
+            2 * len(_CH_LEFT) * len(_CH_RIGHT))
+        intra_w = (left_s + right_s) / (
+            len(_CH_LEFT) ** 2 + len(_CH_RIGHT) ** 2)
+        front_w = front_s / len(_CH_FRONTAL) ** 2
+        post_w = post_s / len(_CH_POSTERIOR) ** 2
+        asym_w = (left_s / len(_CH_LEFT) ** 2
+                  - right_s / len(_CH_RIGHT) ** 2).abs()
+
+        inter_ratio = inter_w.mean(-1) / (intra_w.mean(-1) + 1e-6)
+        front_ratio = front_w.mean(-1) / (post_w.mean(-1) + 1e-6)
+        asym = asym_w.mean(-1)
 
         # ── 量化（相关值是尺度无关的，固定阈值跨站点可解释）──
         strength_labels = _quantize(

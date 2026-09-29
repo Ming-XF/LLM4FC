@@ -78,6 +78,7 @@ def init_model_config(args, data_config: DataConfig):
             graph_evidence=args.graph_evidence,
             no_patches=args.no_patches,
             stat_vector=args.stat_vector,
+            stats_head=args.stats_head,
         )
         model = Model(model_config)
     else:
@@ -226,6 +227,10 @@ def init_config():
                                   "statistics to the evidence-pooled states "
                                   "before the readout head (preserves the "
                                   "transferable continuous signal)")
+    model_group.add_argument("--stats_head", action="store_true",
+                             help="E8b: readout head reads ONLY the 6-dim "
+                                  "continuous graph statistics (LLM states "
+                                  "excluded from the head input)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

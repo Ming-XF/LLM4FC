@@ -65,7 +65,8 @@ class TimeLLMConfig(BaseConfig):
                  mv_lambda=0.0,
                  graph_evidence=False,
                  no_patches=False,
-                 stat_vector=False):
+                 stat_vector=False,
+                 stats_head=False):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -92,6 +93,7 @@ class TimeLLMConfig(BaseConfig):
         self.graph_evidence = graph_evidence
         self.no_patches = no_patches
         self.stat_vector = stat_vector
+        self.stats_head = stats_head
 
 
 class ReprogrammingLayer(nn.Module):
@@ -343,7 +345,11 @@ class Model(nn.Module):
             # (evidence_query, E6) instead of flattening all patches.
             # --stat_vector: 连续图统计量直接拼入读出输入，保留可迁移
             # 的连续信号（量化文本会丢失跨域信号，见 WORK.md 诊断）。
-            in_dim = self.d_llm + (6 if config.stat_vector else 0)
+            # --stats_head: 头只读 6 维连续统计量（LLM 状态不参与）。
+            if config.stats_head:
+                in_dim = 6
+            else:
+                in_dim = self.d_llm + (6 if config.stat_vector else 0)
             self.output_projection = nn.Sequential(
                 nn.Linear(in_dim, config.output_dim),
                 nn.Dropout(config.dropout),
@@ -554,16 +560,21 @@ class Model(nn.Module):
             # E6: 从证据文本 token 位置读出。证据状态是冻结 LLM 对
             # 确定性图证据文本的上下文化表示（含前面 DFC patches 的
             # 因果注意力影响），均值池化后送入线性头。
-            ev_start = prompt_length + (
-                T * C if reprogrammed is not None else 0)
-            h_ev = hidden[:, ev_start:ev_start + evidence_embeds.shape[1]]
-            h_ev = h_ev.mean(dim=1).to(
-                dtype=self.output_projection[0].weight.dtype)
-            if self.config.stat_vector:
-                h_ev = torch.cat(
-                    [h_ev, evidence_stats.to(
-                        dtype=self.output_projection[0].weight.dtype)],
-                    dim=-1)
+            if self.config.stats_head:
+                # E8b: 头只读连续统计量（6 维），LLM 状态不参与
+                h_ev = evidence_stats.to(
+                    dtype=self.output_projection[0].weight.dtype)
+            else:
+                ev_start = prompt_length + (
+                    T * C if reprogrammed is not None else 0)
+                h_ev = hidden[:, ev_start:ev_start + evidence_embeds.shape[1]]
+                h_ev = h_ev.mean(dim=1).to(
+                    dtype=self.output_projection[0].weight.dtype)
+                if self.config.stat_vector:
+                    h_ev = torch.cat(
+                        [h_ev, evidence_stats.to(
+                            dtype=self.output_projection[0].weight.dtype)],
+                        dim=-1)
             logits = self.output_projection(h_ev).squeeze(1)
         else:
             hidden_patches = hidden[:, prompt_length:, :self.config.d_ff].to(
