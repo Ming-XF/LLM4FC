@@ -32,7 +32,7 @@ deepspeed --num_gpus=2 main.py \
     --fc_keep_ratio 1.0 \
     --graph_evidence \
     --no_patches \
-    --residual_llm \
+    --stats_head \
     --stats_ridge "./output_dir/stats_ridge.pt" \
     --d_model 128 \
     --num_heads 8 \

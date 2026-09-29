@@ -122,6 +122,38 @@
   **历史 ALTER 0.148（被超越）**；源域 val r=0.227
 - 修复：npz 标签已是归一化值（fit 脚本多余 /100 曾致 MAE 46.8）
 
-### #9 — E9：LLM 残差分支验证（运行中）
+### #9 — E9：LLM 残差分支验证（结果：剔除）
 - 冻结 9 维 ridge 统计量分支 + 零初始化 LLM 状态残差分支（瓶颈 32 维）
-- 检验 LLM 上下文化能否在确定性下限之上再提供可迁移增益
+- 源域 r=0.193/MAE 7.91（残差有效）；零样本 r=+0.18395（与 E8c 完全一致）、
+  MAE 17.49/RMSE 21.06 反而略差 → **LLM 残差零可迁移增益，剔除**
+
+## 最终方法（经验证有效）
+
+**Calibration-Anchored Evidence Reprogramming（CAER）**
+基于 TimeLLM 的改进（全部改动在 TimeLLM 管线内）：
+
+1. **确定性图证据**（`--graph_evidence`，model/TimeLLM/graph_evidence.py）：
+   19 通道 10 分区滑窗 DFC → 9 个连续统计量（总体强度含对角锚点、
+   半球间/半球内比、额/后比、半球不对称、中央/颞/顶/枕/中线脑区强度；
+   剔除跨域符号翻转的 variability/trend/hub）+ 6 句自然语言证据文本
+   （单 token 槽位词定长编码，无监督规则生成）
+2. **纯语言通路**（`--no_patches`）：序列 = [task prompt][证据文本]，
+   冻结 llama-8B 上下文化（GCN/重编程 patch 通路消融剔除）
+3. **标定锚定读出**（`--stats_head --stats_ridge`）：源域闭式 ridge
+   （scripts/fit_stats_ridge.py，源 val 选 alpha）注入冻结统计量头；
+   SGD 解依赖跨域符号翻转特征、4096 维 LLM 状态头过拟合——均已消融排除
+
+**验证结果（CAUEEG → TUAB 零样本，n=1047，seed 42 确定性）**：
+
+| 方法 | PearsonR | MAE | RMSE |
+|---|---|---|---|
+| TimeLLM flatten（历史） | 0.032 | 16.70 | 20.26 |
+| TimeLLM answer_query 完整管线 | 0.039 | 17.98 | — |
+| ALTER（历史最优） | 0.148 | 17.04 | 20.58 |
+| **CAER（本方法）** | **+0.184** | **16.90** | **20.37** |
+
+- 相对 TimeLLM 家族基线提升 **4.7×**（0.039→0.184），超越 ALTER（+0.036）
+- 源域（CAUEEG）：val r=0.227，测试 MAE 7.91
+- E9 消融：可学习 LLM 残差零可迁移增益（r 不变、MAE 变差）
+- 负结果启示：可学习组件（GCN patches/LLM 残差/4096 维头）在目标域
+  全部失效；可迁移性来自确定性证据 + 收缩解（ridge）

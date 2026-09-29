@@ -1,0 +1,109 @@
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS] command: main.py --local_rank=1 --model TimeLLM --num_epochs 100 --num_repeat 1 --save_steps 25 --schedule cos --early_stop_patience 20 --early_stop_metric MAE --dataset AgeTUAB --fc_threshold 0.0 --fc_keep_ratio 1.0 --graph_evidence --no_patches --residual_llm --stats_ridge ./output_dir/stats_ridge.pt --d_model 128 --num_heads 8 --d_ff 128 --dropout 0.1 --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B --few_shot 0 --few_shot_seed 42 --pretrain_path ./output_dir/TimeLLM_AgeCAUEEG_train_E9_resid --llm_init pretrained --use_task_prompt --readout evidence_query --num_gcn_layers 1 --num_prototypes 1000 --deepspeed --deepspeed_config deepspeed/train_stats_head.json --do_train --do_evaluate --do_test
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   local_rank = 1
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   model = TimeLLM
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   num_epochs = 100
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   num_repeat = 1
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   save_steps = 25
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   schedule = cos
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   early_stop_patience = 20
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   early_stop_metric = MAE
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   dataset = AgeTUAB
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   fc_threshold = 0.0
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   fc_keep_ratio = 1.0
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   graph_evidence = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   no_patches = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   residual_llm = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   stats_ridge = ./output_dir/stats_ridge.pt
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   d_model = 128
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   num_heads = 8
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   d_ff = 128
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   dropout = 0.1
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   llm_type = llama
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   llm_path = ./model/deepseek-r1-distill-llama-8B
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   few_shot = 0
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   few_shot_seed = 42
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   pretrain_path = ./output_dir/TimeLLM_AgeCAUEEG_train_E9_resid
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   llm_init = pretrained
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   use_task_prompt = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   readout = evidence_query
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   num_gcn_layers = 1
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   num_prototypes = 1000
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   deepspeed = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   deepspeed_config = deepspeed/train_stats_head.json
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   do_train = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   do_evaluate = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   do_test = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS-effective] batch_size = 32 (from deepspeed/train_stats_head.json)
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS-effective] learning_rate = 0.001 (from deepspeed/train_stats_head.json)
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS-effective] deepspeed_config = deepspeed/train_stats_head.json
+09/29/2026 10:12:04 - INFO - __main__ -   ########## zero-shot ##########
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS] command: main.py --local_rank=0 --model TimeLLM --num_epochs 100 --num_repeat 1 --save_steps 25 --schedule cos --early_stop_patience 20 --early_stop_metric MAE --dataset AgeTUAB --fc_threshold 0.0 --fc_keep_ratio 1.0 --graph_evidence --no_patches --residual_llm --stats_ridge ./output_dir/stats_ridge.pt --d_model 128 --num_heads 8 --d_ff 128 --dropout 0.1 --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B --few_shot 0 --few_shot_seed 42 --pretrain_path ./output_dir/TimeLLM_AgeCAUEEG_train_E9_resid --llm_init pretrained --use_task_prompt --readout evidence_query --num_gcn_layers 1 --num_prototypes 1000 --deepspeed --deepspeed_config deepspeed/train_stats_head.json --do_train --do_evaluate --do_test
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   local_rank = 0
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   model = TimeLLM
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   num_epochs = 100
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   num_repeat = 1
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   save_steps = 25
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   schedule = cos
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   early_stop_patience = 20
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   early_stop_metric = MAE
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   dataset = AgeTUAB
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   fc_threshold = 0.0
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   fc_keep_ratio = 1.0
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   graph_evidence = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   no_patches = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   residual_llm = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   stats_ridge = ./output_dir/stats_ridge.pt
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   d_model = 128
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   num_heads = 8
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   d_ff = 128
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   dropout = 0.1
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   llm_type = llama
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   llm_path = ./model/deepseek-r1-distill-llama-8B
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   few_shot = 0
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   few_shot_seed = 42
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   pretrain_path = ./output_dir/TimeLLM_AgeCAUEEG_train_E9_resid
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   llm_init = pretrained
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   use_task_prompt = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   readout = evidence_query
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   num_gcn_layers = 1
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   num_prototypes = 1000
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   deepspeed = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   deepspeed_config = deepspeed/train_stats_head.json
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   do_train = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   do_evaluate = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS]   do_test = True
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS-effective] batch_size = 32 (from deepspeed/train_stats_head.json)
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS-effective] learning_rate = 0.001 (from deepspeed/train_stats_head.json)
+09/29/2026 10:12:04 - INFO - utils.logger -   [ARGS-effective] deepspeed_config = deepspeed/train_stats_head.json
+09/29/2026 10:12:04 - INFO - __main__ -   ########## zero-shot ##########
+09/29/2026 10:12:18 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpxlfskj50/test.c -o /tmp/tmpxlfskj50/test.o
+09/29/2026 10:12:18 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpxlfskj50/test.o -laio -o /tmp/tmpxlfskj50/a.out
+09/29/2026 10:12:18 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpe6bdo9cs/test.c -o /tmp/tmpe6bdo9cs/test.o
+09/29/2026 10:12:18 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpe6bdo9cs/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmpe6bdo9cs/a.out
+09/29/2026 10:12:19 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmphu1if48g/test.c -o /tmp/tmphu1if48g/test.o
+09/29/2026 10:12:19 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmphu1if48g/test.o -laio -o /tmp/tmphu1if48g/a.out
+09/29/2026 10:12:19 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpso92yk42/test.c -o /tmp/tmpso92yk42/test.o
+09/29/2026 10:12:19 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpso92yk42/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmpso92yk42/a.out
+09/29/2026 10:12:23 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+09/29/2026 10:12:23 - INFO - utils.trainer -     584 keys not in checkpoint (kept from init)
+09/29/2026 10:12:23 - INFO - utils.trainer -   Model loaded from ./output_dir/TimeLLM_AgeCAUEEG_train_E9_resid/TimeLLM-0.bin (21/22 keys)
+09/29/2026 10:12:23 - INFO - utils.trainer -   ***** Running regression evaluation on test0 dataset *****
+09/29/2026 10:12:23 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+09/29/2026 10:12:23 - INFO - utils.trainer -     584 keys not in checkpoint (kept from init)
+09/29/2026 10:12:23 - INFO - utils.trainer -   Model loaded from ./output_dir/TimeLLM_AgeCAUEEG_train_E9_resid/TimeLLM-0.bin (21/22 keys)
+09/29/2026 10:12:28 - INFO - utils.trainer -   Loss: 0.00856
+09/29/2026 10:12:28 - INFO - utils.trainer -   MSE: 443.71747
+09/29/2026 10:12:28 - INFO - utils.trainer -   MAE: 17.49327
+09/29/2026 10:12:28 - INFO - utils.trainer -   RMSE: 21.06460
+09/29/2026 10:12:28 - INFO - utils.trainer -   R2: -0.37602
+09/29/2026 10:12:28 - INFO - utils.trainer -   PearsonR: 0.18395
+09/29/2026 10:12:28 - INFO - __main__ -   
+============================================================
+  Zero-shot (TimeLLM_AgeCAUEEG_train_E9_resid → AgeTUAB)  seed=42
+============================================================
+09/29/2026 10:12:28 - INFO - __main__ -     Loss           : 0.0086
+09/29/2026 10:12:28 - INFO - __main__ -     MSE            : 443.7175
+09/29/2026 10:12:28 - INFO - __main__ -     MAE            : 17.4933
+09/29/2026 10:12:28 - INFO - __main__ -     RMSE           : 21.0646
+09/29/2026 10:12:28 - INFO - __main__ -     R2             : -0.3760
+09/29/2026 10:12:28 - INFO - __main__ -     PearsonR       : 0.1839
