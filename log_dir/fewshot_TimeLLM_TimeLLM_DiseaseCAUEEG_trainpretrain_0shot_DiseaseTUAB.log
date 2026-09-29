@@ -1,0 +1,99 @@
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS] command: main.py --local_rank=1 --model TimeLLM --num_epochs 30 --num_repeat 1 --save_steps 25 --schedule cos --early_stop_patience 20 --early_stop_metric AUC --dataset DiseaseTUAB --fc_threshold 0.0 --fc_keep_ratio 1.0 --d_model 128 --num_heads 8 --d_ff 128 --dropout 0.1 --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B --few_shot 0 --few_shot_seed 42 --pretrain_path ./output_dir/TimeLLM_DiseaseCAUEEG_train --llm_init pretrained --use_task_prompt --readout answer_query --num_gcn_layers 1 --num_prototypes 1000 --deepspeed --do_train --do_evaluate --do_test
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   local_rank = 1
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   model = TimeLLM
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   num_epochs = 30
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   num_repeat = 1
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   save_steps = 25
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   schedule = cos
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   early_stop_patience = 20
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   early_stop_metric = AUC
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   dataset = DiseaseTUAB
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   fc_threshold = 0.0
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   fc_keep_ratio = 1.0
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   d_model = 128
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   num_heads = 8
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   d_ff = 128
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   dropout = 0.1
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   llm_type = llama
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   llm_path = ./model/deepseek-r1-distill-llama-8B
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   few_shot = 0
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   few_shot_seed = 42
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   pretrain_path = ./output_dir/TimeLLM_DiseaseCAUEEG_train
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   llm_init = pretrained
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   use_task_prompt = True
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   readout = answer_query
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   num_gcn_layers = 1
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   num_prototypes = 1000
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   deepspeed = True
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   do_train = True
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   do_evaluate = True
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   do_test = True
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS-effective] batch_size = 32 (from deepspeed/train.json)
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS-effective] learning_rate = 0.0001 (from deepspeed/train.json)
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS-effective] deepspeed_config = deepspeed/train.json
+09/29/2026 11:19:51 - INFO - __main__ -   ########## zero-shot ##########
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS] command: main.py --local_rank=0 --model TimeLLM --num_epochs 30 --num_repeat 1 --save_steps 25 --schedule cos --early_stop_patience 20 --early_stop_metric AUC --dataset DiseaseTUAB --fc_threshold 0.0 --fc_keep_ratio 1.0 --d_model 128 --num_heads 8 --d_ff 128 --dropout 0.1 --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B --few_shot 0 --few_shot_seed 42 --pretrain_path ./output_dir/TimeLLM_DiseaseCAUEEG_train --llm_init pretrained --use_task_prompt --readout answer_query --num_gcn_layers 1 --num_prototypes 1000 --deepspeed --do_train --do_evaluate --do_test
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   local_rank = 0
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   model = TimeLLM
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   num_epochs = 30
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   num_repeat = 1
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   save_steps = 25
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   schedule = cos
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   early_stop_patience = 20
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   early_stop_metric = AUC
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   dataset = DiseaseTUAB
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   fc_threshold = 0.0
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   fc_keep_ratio = 1.0
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   d_model = 128
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   num_heads = 8
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   d_ff = 128
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   dropout = 0.1
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   llm_type = llama
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   llm_path = ./model/deepseek-r1-distill-llama-8B
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   few_shot = 0
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   few_shot_seed = 42
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   pretrain_path = ./output_dir/TimeLLM_DiseaseCAUEEG_train
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   llm_init = pretrained
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   use_task_prompt = True
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   readout = answer_query
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   num_gcn_layers = 1
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   num_prototypes = 1000
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   deepspeed = True
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   do_train = True
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   do_evaluate = True
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS]   do_test = True
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS-effective] batch_size = 32 (from deepspeed/train.json)
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS-effective] learning_rate = 0.0001 (from deepspeed/train.json)
+09/29/2026 11:19:51 - INFO - utils.logger -   [ARGS-effective] deepspeed_config = deepspeed/train.json
+09/29/2026 11:19:51 - INFO - __main__ -   ########## zero-shot ##########
+09/29/2026 11:20:03 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpglct9k7i/test.c -o /tmp/tmpglct9k7i/test.o
+09/29/2026 11:20:03 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpglct9k7i/test.o -laio -o /tmp/tmpglct9k7i/a.out
+09/29/2026 11:20:03 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpew4oc1vq/test.c -o /tmp/tmpew4oc1vq/test.o
+09/29/2026 11:20:03 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpew4oc1vq/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmpew4oc1vq/a.out
+09/29/2026 11:20:03 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmp05cnjfbd/test.c -o /tmp/tmp05cnjfbd/test.o
+09/29/2026 11:20:03 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmp05cnjfbd/test.o -laio -o /tmp/tmp05cnjfbd/a.out
+09/29/2026 11:20:03 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat -fno-strict-overflow -DNDEBUG -O2 -Wall -fPIC -O2 -isystem /root/miniconda3/include -fPIC -O2 -isystem /root/miniconda3/include -fPIC -c /tmp/tmpmjw_3fos/test.c -o /tmp/tmpmjw_3fos/test.o
+09/29/2026 11:20:03 - INFO - root -   gcc -pthread -B /root/miniconda3/compiler_compat /tmp/tmpmjw_3fos/test.o -L/usr/local/cuda -L/usr/local/cuda/lib64 -lcufile -o /tmp/tmpmjw_3fos/a.out
+09/29/2026 11:20:07 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+09/29/2026 11:20:07 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+09/29/2026 11:20:07 - INFO - utils.trainer -     582 keys not in checkpoint (kept from init)
+09/29/2026 11:20:07 - INFO - utils.trainer -     582 keys not in checkpoint (kept from init)
+09/29/2026 11:20:07 - INFO - utils.trainer -   Model loaded from ./output_dir/TimeLLM_DiseaseCAUEEG_train/TimeLLM-0.bin (18/19 keys)
+09/29/2026 11:20:07 - INFO - utils.trainer -   Model loaded from ./output_dir/TimeLLM_DiseaseCAUEEG_train/TimeLLM-0.bin (18/19 keys)
+09/29/2026 11:20:07 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
+09/29/2026 11:20:16 - INFO - utils.trainer -   Loss: 1.07218
+09/29/2026 11:20:16 - INFO - utils.trainer -   AUC: 0.34956
+09/29/2026 11:20:16 - INFO - utils.trainer -   Accuracy: 0.41765
+09/29/2026 11:20:16 - INFO - utils.trainer -   Precision: 0.46644
+09/29/2026 11:20:16 - INFO - utils.trainer -   Specificity: 0.19494
+09/29/2026 11:20:16 - INFO - utils.trainer -   Sensitivity: 0.61099
+09/29/2026 11:20:16 - INFO - __main__ -   
+============================================================
+  Zero-shot (TimeLLM_DiseaseCAUEEG_train → DiseaseTUAB)  seed=42
+============================================================
+09/29/2026 11:20:16 - INFO - __main__ -     Loss           : 1.0722
+09/29/2026 11:20:16 - INFO - __main__ -     AUC            : 0.3496
+09/29/2026 11:20:16 - INFO - __main__ -     Accuracy       : 0.4176
+09/29/2026 11:20:16 - INFO - __main__ -     Precision      : 0.4664
+09/29/2026 11:20:16 - INFO - __main__ -     Specificity    : 0.1949
+09/29/2026 11:20:16 - INFO - __main__ -     Sensitivity    : 0.6110
