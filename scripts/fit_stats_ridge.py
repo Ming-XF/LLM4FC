@@ -37,11 +37,12 @@ def main():
     ds = AgeCAUEEGDataset(dc)
     ds.train = True
     X = collect_stats(ds, ds.train_index)
-    y = (ds.all_data['labels'][ds.train_index] / 100).astype(np.float64)
+    # npz 标签已是归一化值 [0,1]（与训练损失一致），无需再除以 100
+    y = ds.all_data['labels'][ds.train_index].astype(np.float64)
     ds.train = False
     ds._mode = 'val'
     Xv = collect_stats(ds, ds.val_index)
-    yv = (ds.all_data['labels'][ds.val_index] / 100).astype(np.float64)
+    yv = ds.all_data['labels'][ds.val_index].astype(np.float64)
 
     mu, sigma = X.mean(0), X.std(0) + 1e-8
     Xs, Xvs = (X - mu) / sigma, (Xv - mu) / sigma
