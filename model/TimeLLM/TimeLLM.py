@@ -67,7 +67,8 @@ class TimeLLMConfig(BaseConfig):
                  no_patches=False,
                  stat_vector=False,
                  stats_head=False,
-                 residual_llm=False):
+                 residual_llm=False,
+                 stats_ridge_path=''):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -96,6 +97,7 @@ class TimeLLMConfig(BaseConfig):
         self.stat_vector = stat_vector
         self.stats_head = stats_head
         self.residual_llm = residual_llm
+        self.stats_ridge_path = stats_ridge_path
 
 
 class ReprogrammingLayer(nn.Module):
@@ -362,6 +364,21 @@ class Model(nn.Module):
                     nn.Linear(in_dim, config.output_dim),
                     nn.Dropout(config.dropout),
                 )
+                if config.stats_ridge_path:
+                    # E8c: 注入源域闭式 ridge 权重并冻结（收缩解跨域可迁移，
+                    # SGD 解会依赖跨域符号翻转的特征）
+                    spec = torch.load(
+                        config.stats_ridge_path, map_location='cpu',
+                        weights_only=False)
+                    self.register_buffer('stats_mu', spec['mu'])
+                    self.register_buffer('stats_sigma', spec['sigma'])
+                    with torch.no_grad():
+                        self.output_projection[0].weight.copy_(
+                            spec['w'].unsqueeze(0))
+                        self.output_projection[0].bias.copy_(
+                            spec['b'].reshape(-1))
+                    for p in self.output_projection.parameters():
+                        p.requires_grad = False
             else:
                 in_dim = self.d_llm + (6 if config.stat_vector else 0)
                 self.output_projection = nn.Sequential(
@@ -591,6 +608,9 @@ class Model(nn.Module):
                 # E8b: 头只读连续统计量（6 维），LLM 状态不参与
                 h_ev = evidence_stats.to(
                     dtype=self.output_projection[0].weight.dtype)
+                if self.config.stats_ridge_path:
+                    h_ev = (h_ev - self.stats_mu.to(h_ev.device)) / \
+                        self.stats_sigma.to(h_ev.device)
                 logits = self.output_projection(h_ev).squeeze(1)
             else:
                 ev_start = prompt_length + (

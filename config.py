@@ -80,6 +80,7 @@ def init_model_config(args, data_config: DataConfig):
             stat_vector=args.stat_vector,
             stats_head=args.stats_head,
             residual_llm=args.residual_llm,
+            stats_ridge_path=args.stats_ridge,
         )
         model = Model(model_config)
     else:
@@ -236,6 +237,11 @@ def init_config():
                              help="E9: residual fusion head — stats branch "
                                   "(transferable floor) + zero-init LLM-state "
                                   "branch (source capacity)")
+    model_group.add_argument("--stats_ridge", default="", type=str,
+                             help="E8c: inject closed-form ridge weights "
+                                  "(output_dir/stats_ridge.pt) into the frozen "
+                                  "stats head — shrinkage solution transfers "
+                                  "across domains unlike SGD solutions")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
