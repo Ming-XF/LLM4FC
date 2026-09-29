@@ -117,7 +117,8 @@ def compute_graph_evidence(dfc):
             var_labels[b], trend_words[int(trend_idx[b])], asym_labels[b],
         ])
 
-    # 连续统计量按名义尺度重缩放（~单位量级，供线性头学习）
+    # 连续统计量按名义尺度重缩放（~单位量级，供线性头学习）；
+    # 裁剪重尾（趋势/不对称项有离群值，会主导平方损失）
     stats = torch.stack([
         strength / 0.3,
         inter_ratio,
@@ -126,6 +127,7 @@ def compute_graph_evidence(dfc):
         trend_norm / 0.05,
         asym / 0.05,
     ], dim=-1)                                                 # (B, 6)
+    stats = stats.clamp(-5.0, 5.0)
     return levels, stats
 
 

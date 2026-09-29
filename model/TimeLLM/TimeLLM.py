@@ -613,8 +613,12 @@ class Model(nn.Module):
             prediction = logits.squeeze(-1)
             if labels.dim() > 1 and labels.shape[-1] == 1:
                 labels = labels.squeeze(-1)
+            # stats_head/residual_llm: 统计量分支需要鲁棒损失
+            # （重尾特征下 delta=1.0 的平方损失收敛到方差塌缩解）
+            delta = 0.05 if (
+                self.config.stats_head or self.config.residual_llm) else 1.0
             loss = F.huber_loss(
-                prediction, labels.float(), delta=1.0)
+                prediction, labels.float(), delta=delta)
             if self.use_ordinal_age_head and self.config.align_lambda > 0:
                 # 语义对齐（有序头模式）：把 h 的语义子空间投影拉向
                 # 真实年龄 bin 的语言锚点方向（源域-only）。
