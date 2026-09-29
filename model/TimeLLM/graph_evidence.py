@@ -118,15 +118,15 @@ def compute_graph_evidence(dfc):
         ])
 
     # 连续统计量按名义尺度重缩放（~单位量级，供线性头学习）；
-    # 裁剪重尾（趋势/不对称项有离群值，会主导平方损失）
+    # 裁剪重尾。仅保留跨域符号一致的特征
+    # （variability/trend 两特征在 CAUEEG 与 TUAB 的年龄相关性符号
+    # 相反，会破坏跨域迁移——见 WORK.md 诊断）
     stats = torch.stack([
         strength / 0.3,
         inter_ratio,
         front_ratio,
-        variability / 0.05,
-        trend_norm / 0.05,
         asym / 0.05,
-    ], dim=-1)                                                 # (B, 6)
+    ], dim=-1)                                                 # (B, 4)
     stats = stats.clamp(-5.0, 5.0)
     return levels, stats
 
