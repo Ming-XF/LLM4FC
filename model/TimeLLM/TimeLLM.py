@@ -358,6 +358,20 @@ class Model(nn.Module):
                 nn.init.zeros_(self.llm_branch.weight)
                 nn.init.zeros_(self.llm_branch.bias)
                 self.output_projection = None
+                if config.stats_ridge_path:
+                    # 冻结 ridge 统计量分支（可迁移下限），LLM 分支学残差
+                    spec = torch.load(
+                        config.stats_ridge_path, map_location='cpu',
+                        weights_only=False)
+                    self.register_buffer('stats_mu', spec['mu'])
+                    self.register_buffer('stats_sigma', spec['sigma'])
+                    with torch.no_grad():
+                        self.stats_branch.weight.copy_(
+                            spec['w'].unsqueeze(0))
+                        self.stats_branch.bias.copy_(
+                            spec['b'].reshape(-1))
+                    for p in self.stats_branch.parameters():
+                        p.requires_grad = False
             elif config.stats_head:
                 in_dim = 9
                 self.output_projection = nn.Sequential(
@@ -595,6 +609,9 @@ class Model(nn.Module):
                 # E9: 统计量分支（可迁移下限）+ 零初始化 LLM 分支残差
                 st = evidence_stats.to(
                     dtype=self.stats_branch.weight.dtype)
+                if self.config.stats_ridge_path:
+                    st = (st - self.stats_mu.to(st.device)) / \
+                        self.stats_sigma.to(st.device)
                 y_stats = self.stats_branch(st)
                 ev_start = prompt_length + (
                     T * C if reprogrammed is not None else 0)
