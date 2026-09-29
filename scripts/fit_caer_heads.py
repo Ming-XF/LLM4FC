@@ -54,8 +54,17 @@ def save_head(path, mu, sigma, w, b):
 
 
 def main():
+    src = sys.argv[1] if len(sys.argv) > 1 else 'CAUEEG'
+    suf = '' if src == 'CAUEEG' else f'_{src.lower()}'
+    age_ds = {'CAUEEG': AgeCAUEEGDataset,
+              'TUAB': __import__('data', fromlist=['AgeTUABDataset'])
+              .AgeTUABDataset}[src]
+    dis_ds = {'CAUEEG': DiseaseCAUEEGDataset,
+              'TUAB': __import__('data', fromlist=['DiseaseTUABDataset'])
+              .DiseaseTUABDataset}[src]
+
     # ── 年龄: ridge 头 ──
-    d = collect(AgeCAUEEGDataset)
+    d = collect(age_ds)
     Xtr, ytr = d['train']
     Xva, yva = d['val']
     mu, sigma = Xtr.mean(0), Xtr.std(0) + 1e-8
@@ -68,11 +77,13 @@ def main():
         if r > best_r:
             best_r, best_a = r, a
     m = Ridge(alpha=best_a).fit(Xs, ytr)
-    save_head('output_dir/stats_ridge.pt', mu, sigma, m.coef_, m.intercept_)
-    print(f'age: best alpha={best_a}, val r={best_r:+.4f} -> stats_ridge.pt')
+    save_head(f'output_dir/stats_ridge{suf}.pt', mu, sigma,
+              m.coef_, m.intercept_)
+    print(f'age: best alpha={best_a}, val r={best_r:+.4f} '
+          f'-> stats_ridge{suf}.pt')
 
     # ── 疾病: logistic 头 ──
-    d = collect(DiseaseCAUEEGDataset)
+    d = collect(dis_ds)
     Xtr, ytr = d['train']
     Xva, yva = d['val']
     mu, sigma = Xtr.mean(0), Xtr.std(0) + 1e-8
@@ -85,10 +96,10 @@ def main():
         if auc > best_auc:
             best_auc, best_c = auc, C
     m = LogisticRegression(C=best_c, max_iter=3000).fit(Xs, ytr)
-    save_head('output_dir/stats_logistic.pt', mu, sigma,
+    save_head(f'output_dir/stats_logistic{suf}.pt', mu, sigma,
               m.coef_[0], m.intercept_[0])
     print(f'disease: best C={best_c}, val AUC={best_auc:.4f} '
-          f'-> stats_logistic.pt')
+          f'-> stats_logistic{suf}.pt')
 
 
 if __name__ == '__main__':
