@@ -66,7 +66,8 @@ class TimeLLMConfig(BaseConfig):
                  graph_evidence=False,
                  no_patches=False,
                  stat_vector=False,
-                 stats_head=False):
+                 stats_head=False,
+                 residual_llm=False):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -94,6 +95,7 @@ class TimeLLMConfig(BaseConfig):
         self.no_patches = no_patches
         self.stat_vector = stat_vector
         self.stats_head = stats_head
+        self.residual_llm = residual_llm
 
 
 class ReprogrammingLayer(nn.Module):
@@ -346,14 +348,26 @@ class Model(nn.Module):
             # --stat_vector: 连续图统计量直接拼入读出输入，保留可迁移
             # 的连续信号（量化文本会丢失跨域信号，见 WORK.md 诊断）。
             # --stats_head: 头只读 6 维连续统计量（LLM 状态不参与）。
-            if config.stats_head:
+            # --residual_llm (E9): 统计量分支 + 零初始化 LLM 分支残差。
+            if config.residual_llm:
+                self.stats_branch = nn.Linear(6, config.output_dim)
+                self.llm_bottleneck = nn.Linear(self.d_llm, 32)
+                self.llm_branch = nn.Linear(32, config.output_dim)
+                nn.init.zeros_(self.llm_branch.weight)
+                nn.init.zeros_(self.llm_branch.bias)
+                self.output_projection = None
+            elif config.stats_head:
                 in_dim = 6
+                self.output_projection = nn.Sequential(
+                    nn.Linear(in_dim, config.output_dim),
+                    nn.Dropout(config.dropout),
+                )
             else:
                 in_dim = self.d_llm + (6 if config.stat_vector else 0)
-            self.output_projection = nn.Sequential(
-                nn.Linear(in_dim, config.output_dim),
-                nn.Dropout(config.dropout),
-            )
+                self.output_projection = nn.Sequential(
+                    nn.Linear(in_dim, config.output_dim),
+                    nn.Dropout(config.dropout),
+                )
         else:
             self.head_nf = config.d_ff * config.node_size * config.num_windows
             self.output_projection = nn.Sequential(
@@ -560,10 +574,24 @@ class Model(nn.Module):
             # E6: 从证据文本 token 位置读出。证据状态是冻结 LLM 对
             # 确定性图证据文本的上下文化表示（含前面 DFC patches 的
             # 因果注意力影响），均值池化后送入线性头。
-            if self.config.stats_head:
+            if self.config.residual_llm:
+                # E9: 统计量分支（可迁移下限）+ 零初始化 LLM 分支残差
+                st = evidence_stats.to(
+                    dtype=self.stats_branch.weight.dtype)
+                y_stats = self.stats_branch(st)
+                ev_start = prompt_length + (
+                    T * C if reprogrammed is not None else 0)
+                h_ev = hidden[:, ev_start:ev_start + evidence_embeds.shape[1]]
+                h_ev = h_ev.mean(dim=1).to(
+                    dtype=self.stats_branch.weight.dtype)
+                y_llm = self.llm_branch(F.relu(self.llm_bottleneck(h_ev)))
+                prediction = (y_stats + y_llm).squeeze(-1)
+                logits = prediction.unsqueeze(-1)
+            elif self.config.stats_head:
                 # E8b: 头只读连续统计量（6 维），LLM 状态不参与
                 h_ev = evidence_stats.to(
                     dtype=self.output_projection[0].weight.dtype)
+                logits = self.output_projection(h_ev).squeeze(1)
             else:
                 ev_start = prompt_length + (
                     T * C if reprogrammed is not None else 0)
@@ -575,7 +603,7 @@ class Model(nn.Module):
                         [h_ev, evidence_stats.to(
                             dtype=self.output_projection[0].weight.dtype)],
                         dim=-1)
-            logits = self.output_projection(h_ev).squeeze(1)
+                logits = self.output_projection(h_ev).squeeze(1)
         else:
             hidden_patches = hidden[:, prompt_length:, :self.config.d_ff].to(
                 dtype=self.output_projection[1].weight.dtype)

@@ -79,6 +79,7 @@ def init_model_config(args, data_config: DataConfig):
             no_patches=args.no_patches,
             stat_vector=args.stat_vector,
             stats_head=args.stats_head,
+            residual_llm=args.residual_llm,
         )
         model = Model(model_config)
     else:
@@ -231,6 +232,10 @@ def init_config():
                              help="E8b: readout head reads ONLY the 6-dim "
                                   "continuous graph statistics (LLM states "
                                   "excluded from the head input)")
+    model_group.add_argument("--residual_llm", action="store_true",
+                             help="E9: residual fusion head — stats branch "
+                                  "(transferable floor) + zero-init LLM-state "
+                                  "branch (source capacity)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
