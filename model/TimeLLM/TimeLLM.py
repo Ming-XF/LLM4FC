@@ -352,14 +352,14 @@ class Model(nn.Module):
             # --stats_head: 头只读 6 维连续统计量（LLM 状态不参与）。
             # --residual_llm (E9): 统计量分支 + 零初始化 LLM 分支残差。
             if config.residual_llm:
-                self.stats_branch = nn.Linear(4, config.output_dim)
+                self.stats_branch = nn.Linear(9, config.output_dim)
                 self.llm_bottleneck = nn.Linear(self.d_llm, 32)
                 self.llm_branch = nn.Linear(32, config.output_dim)
                 nn.init.zeros_(self.llm_branch.weight)
                 nn.init.zeros_(self.llm_branch.bias)
                 self.output_projection = None
             elif config.stats_head:
-                in_dim = 4
+                in_dim = 9
                 self.output_projection = nn.Sequential(
                     nn.Linear(in_dim, config.output_dim),
                     nn.Dropout(config.dropout),
@@ -380,7 +380,7 @@ class Model(nn.Module):
                     for p in self.output_projection.parameters():
                         p.requires_grad = False
             else:
-                in_dim = self.d_llm + (4 if config.stat_vector else 0)
+                in_dim = self.d_llm + (9 if config.stat_vector else 0)
                 self.output_projection = nn.Sequential(
                     nn.Linear(in_dim, config.output_dim),
                     nn.Dropout(config.dropout),

@@ -10,9 +10,13 @@ import torch
 # ── 19 通道 10-20 分区（与各 age 数据集通道顺序一致）──
 _CH_LEFT = [0, 1, 2, 3, 4, 10, 11, 12]      # Fp1 F3 C3 P3 O1 F7 T3 T5
 _CH_RIGHT = [5, 6, 7, 8, 9, 13, 14, 15]     # Fp2 F4 C4 P4 O2 F8 T4 T6
-_CH_MID = [16, 17, 18]                       # Fz Cz Pz
+_CH_MIDLINE = [16, 17, 18]                   # Fz Cz Pz
 _CH_FRONTAL = [0, 1, 5, 6, 10, 13]           # Fp1 F3 Fp2 F4 F7 F8
 _CH_POSTERIOR = [3, 4, 8, 9, 12, 15]         # P3 O1 P4 O2 T5 T6
+_CH_CENTRAL = [2, 7, 17]                     # C3 C4 Cz
+_CH_TEMPORAL = [11, 12, 14, 15]              # T3 T5 T4 T6
+_CH_PARIETAL = [3, 8, 18]                    # P3 P4 Pz
+_CH_OCCIPITAL = [4, 9]                       # O1 O2
 
 
 def _build_edge_masks(C, device):
@@ -79,6 +83,11 @@ def compute_graph_evidence(dfc):
         right_s = sub_sum(_CH_RIGHT)
         front_s = sub_sum(_CH_FRONTAL)
         post_s = sub_sum(_CH_POSTERIOR)
+        cent_s = sub_sum(_CH_CENTRAL)
+        temp_s = sub_sum(_CH_TEMPORAL)
+        pari_s = sub_sum(_CH_PARIETAL)
+        occ_s = sub_sum(_CH_OCCIPITAL)
+        mid_s = sub_sum(_CH_MIDLINE)
         inter_w = (abs_all - left_s - right_s) / (
             2 * len(_CH_LEFT) * len(_CH_RIGHT))
         intra_w = (left_s + right_s) / (
@@ -91,6 +100,11 @@ def compute_graph_evidence(dfc):
         inter_ratio = inter_w.mean(-1) / (intra_w.mean(-1) + 1e-6)
         front_ratio = front_w.mean(-1) / (post_w.mean(-1) + 1e-6)
         asym = asym_w.mean(-1)
+        cent_mw = (cent_s / len(_CH_CENTRAL) ** 2).mean(-1)
+        temp_mw = (temp_s / len(_CH_TEMPORAL) ** 2).mean(-1)
+        pari_mw = (pari_s / len(_CH_PARIETAL) ** 2).mean(-1)
+        occ_mw = (occ_s / len(_CH_OCCIPITAL) ** 2).mean(-1)
+        mid_mw = (mid_s / len(_CH_MIDLINE) ** 2).mean(-1)
 
         # ── 量化（相关值是尺度无关的，固定阈值跨站点可解释）──
         strength_labels = _quantize(
@@ -118,15 +132,20 @@ def compute_graph_evidence(dfc):
         ])
 
     # 连续统计量按名义尺度重缩放（~单位量级，供线性头学习）；
-    # 裁剪重尾。仅保留跨域符号一致的特征
+    # 裁剪重尾。9 维：4 个跨域一致的核心特征 + 5 个脑区均值
     # （variability/trend 两特征在 CAUEEG 与 TUAB 的年龄相关性符号
-    # 相反，会破坏跨域迁移——见 WORK.md 诊断）
+    # 相反，已剔除——见 WORK.md 诊断；hub-ness 同样破坏迁移，已剔除）
     stats = torch.stack([
         strength / 0.3,
         inter_ratio,
         front_ratio,
         asym / 0.05,
-    ], dim=-1)                                                 # (B, 4)
+        cent_mw / 0.3,
+        temp_mw / 0.3,
+        pari_mw / 0.3,
+        occ_mw / 0.3,
+        mid_mw / 0.3,
+    ], dim=-1)                                                 # (B, 9)
     stats = stats.clamp(-5.0, 5.0)
     return levels, stats
 
