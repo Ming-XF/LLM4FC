@@ -21,7 +21,7 @@ PRETRAIN_PATH=""                 # 零样本评估: "./output_dir/TimeLLM_AgeCAU
 
 deepspeed --num_gpus=2 main.py \
     --model "TimeLLM" \
-    --num_epochs 30 \
+    --num_epochs 100 \
     --num_repeat 1 \
     --save_steps 25 \
     --schedule 'cos' \
