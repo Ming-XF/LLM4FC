@@ -48,6 +48,7 @@ deepspeed --num_gpus=2 main.py \
     --num_gcn_layers 1 \
     --num_prototypes 1000 \
     --deepspeed \
+    --deepspeed_config "deepspeed/train_stats_head.json" \
     --do_train \
     --do_evaluate \
     --do_test
