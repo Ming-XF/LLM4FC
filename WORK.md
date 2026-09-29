@@ -105,6 +105,23 @@
 6. **6 维头优化不足**：Adam lr=1e-4 下需 ~65 epoch 才收敛
    （30 epoch loss 0.052 vs ridge 最优 0.008）
 
-### #5b — E8b：stats_head（运行中，100 epoch）
-- 统计量改回 old-def（含对角锚点）；头只读 6 维连续统计量
-- 预期：源域 r≈0.17、零样本 r≈+0.07~0.08（确定性迁移下限）
+### #5b — E8b：stats_head（结论：SGD 不可行 → 闭式 ridge 成功）
+- 统计量改回 old-def（含对角锚点）；头只读连续统计量
+- 关键教训链：lr=1e-4 收敛到塌缩解（r≈0）；lr=1e-3 批噪声下落入
+  反相关解（r=-0.098 零样本，variability/trend 两特征跨域符号翻转）；
+  **唯一可靠解 = 闭式 ridge（收缩压制矛盾系数）**
+
+### #8c — E8c：Calibration-Anchored Evidence Readout（方法成型）
+- `scripts/fit_stats_ridge.py` 源域闭式拟合 ridge（val 选 alpha），
+  注入冻结统计量头（--stats_ridge），`--no_patches` 纯证据通路
+- 特征：4 维（strength/inter/front/asym）→ **9 维**（+5 脑区均值
+  cent/temp/pari/occ/mid；variability/trend/hub 跨域符号翻转，剔除）
+- **最终零样本结果（CAUEEG → TUAB，n=1047）**：
+  PearsonR **+0.184** / MAE 16.90 / RMSE 20.37
+  对比：TimeLLM answer_query 基线 0.039（**4.7×**）、历史 flatten 0.032、
+  **历史 ALTER 0.148（被超越）**；源域 val r=0.227
+- 修复：npz 标签已是归一化值（fit 脚本多余 /100 曾致 MAE 46.8）
+
+### #9 — E9：LLM 残差分支验证（运行中）
+- 冻结 9 维 ridge 统计量分支 + 零初始化 LLM 状态残差分支（瓶颈 32 维）
+- 检验 LLM 上下文化能否在确定性下限之上再提供可迁移增益
