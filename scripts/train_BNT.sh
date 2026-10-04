@@ -1,19 +1,13 @@
 #!/bin/bash
 #
-# BNT training script
-# Usage: ./scripts/train_BNT.sh <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>
-#
-# Examples:
-#   ./scripts/train_BNT.sh DiseaseBeirut   AUC   0.001
-#   ./scripts/train_BNT.sh GenderDS        AUC   0.001
-#   ./scripts/train_BNT.sh AgeTUAB         MAE   0.1
+# BNT training script — no external arguments; edit the variables below.
+# Run: sh scripts/train_BNT.sh
 #
 
-DATASET=${1:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
-EARLY_STOP_METRIC=${2:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
-EARLY_STOP_MIN_DELTA=${3:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
+DATASET="AgeTUAB"
+EARLY_STOP_METRIC="R2"
 
-deepspeed --num_gpus=6 main.py \
+deepspeed --num_gpus=2 main.py \
     --model "BNT" \
     --num_repeat 1 \
     --dataset "$DATASET" \
@@ -24,8 +18,7 @@ deepspeed --num_gpus=6 main.py \
     --fc_keep_ratio 1.0 \
     --num_epochs 200 \
     --schedule 'cos' \
-    --early_stop_patience 10 \
-    --early_stop_min_delta "$EARLY_STOP_MIN_DELTA" \
+    --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --deepspeed \
     --do_train \

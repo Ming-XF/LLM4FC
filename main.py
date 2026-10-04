@@ -75,6 +75,27 @@ def _apply_deepspeed_config(args, ds_config_path):
           f"(from {ds_config_path})")
 
 
+def log_explicit_args(args):
+    """Write the explicitly specified CLI args into the log file.
+
+    Values are read at call time (after any DeepSpeed JSON overrides), and
+    args whose current value differs from the CLI snapshot are marked as
+    overridden (e.g. batch_size / learning_rate from the DeepSpeed config).
+    """
+    explicit = getattr(args, 'explicit_args', {})
+    lines = ["=" * 20 + " Explicit args " + "=" * 20]
+    for k in sorted(explicit):
+        cli_val = explicit[k]
+        cur_val = getattr(args, k, cli_val)
+        if cur_val != cli_val:
+            lines.append(f"  {k}: {cur_val}  # overridden (CLI: {cli_val})")
+        else:
+            lines.append(f"  {k}: {cur_val}")
+    lines.append(f"  [effective] batch_size: {args.batch_size}, "
+                 f"learning_rate: {args.learning_rate}")
+    logger.info("\n".join(lines))
+
+
 def main(args):
     # ── 判断运行模式 ──
     transfer_mode = bool(args.pretrain_path)
@@ -138,6 +159,8 @@ def main(args):
 
             if is_zero_shot:
                 # Zero-shot: 不加 few-shot 采样，直接加载预训练模型评估
+                if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                    log_explicit_args(args)
                 trainer = eval(args.model + 'Trainer')(
                     args, local_rank=local_rank, task_id=0)
                 trainer.load_model(path=args.pretrain_path)
@@ -157,6 +180,8 @@ def main(args):
                             f"{finetune_ds_path}, using original: {ds_path}")
                 else:
                     args.learning_rate = 1e-5
+                if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                    log_explicit_args(args)
                 trainer = eval(args.model + 'Trainer')(
                     args, local_rank=local_rank, task_id=0,
                     episode_seed=episode_seed)
@@ -213,6 +238,7 @@ def main(args):
                     init_logger(f'{args.log_dir}/train_{args.model}{args.append}_{args.dataset}.log')
                 if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
                     logger.info(f"{'#'*10} Repeat:{i} {'#'*10}")
+                    log_explicit_args(args)
                 trainer.train()
                 all_episode_results.append(trainer.best_result)
 
@@ -238,6 +264,7 @@ def main(args):
             trainer = eval(args.model + 'Trainer')(args)
             init_logger(f'{args.log_dir}/test_{args.model}{args.append}'
                         f'_zero-shot_{args.dataset}.log')
+            log_explicit_args(args)
             trainer.load_model(path=args.pretrain_path)
             trainer.model.eval()
             trainer.evaluate()
@@ -245,6 +272,7 @@ def main(args):
             trainer = eval(args.model + 'Trainer')(args)
             init_logger(f'{args.log_dir}/test_{args.model}{args.append}'
                         f'_{args.dataset}.log')
+            log_explicit_args(args)
             trainer.load_model()
             trainer.evaluate()
 

@@ -117,3 +117,42 @@ class TimeLLMTrainer(Trainer):
             "labels": labels.to(self.device),
         }
         return kwargs
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TimeLLMPatchTrainer — raw-EEG Time-LLM patching with a frozen LLM
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TimeLLMPatchTrainer(Trainer):
+    """TimeLLM raw-EEG patch trainer (Time-LLM-style reprogramming).
+
+    Architecture: raw EEG (B, 19, T) → per-channel z-score → patch embedding
+    → (B, N*P, 128) → Reprogramming (cross-attention to text prototypes)
+    → frozen LLM → channel mean-pool → flatten → regressor/classifier.
+    """
+
+    def __init__(self, args, local_rank=0, task_id=0, episode_seed=None):
+        super().__init__(args, local_rank=local_rank, task_id=task_id,
+                         episode_seed=episode_seed)
+
+    def prepare_inputs_kwargs(self, inputs):
+        """Extract fields for TimeLLMPatch forward pass.
+
+        Uses the raw EEG time series as the sole input (no DFC/SFC).
+
+        按任务类型自适应：
+        - 分类：标签 → integer index
+        - 回归：标签 → float32
+        """
+        labels = inputs['labels']
+        if self.data_config.is_classification:
+            if labels.dim() > 1 and labels.shape[-1] > 1:
+                labels = labels.argmax(dim=-1)
+            labels = labels.long()
+        elif self.data_config.is_regression:
+            labels = labels.float()
+        kwargs = {
+            "x": inputs['time_series'].float().to(self.device),
+            "labels": labels.to(self.device),
+        }
+        return kwargs

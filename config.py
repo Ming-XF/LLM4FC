@@ -2,6 +2,7 @@ from model import *
 import torch.nn as nn
 from data import DataConfig
 import argparse
+import sys
 
 import pdb
 
@@ -69,6 +70,26 @@ def init_model_config(args, data_config: DataConfig):
             use_task_prompt=args.use_task_prompt,
         )
         model = Model(model_config)
+    elif args.model == 'TimeLLMPatch':
+        model_config = TimeLLMPatchConfig(
+            node_size=data_config.node_size,
+            time_series_size=data_config.time_series_size,
+            d_model=args.d_model,
+            n_heads=args.num_heads,
+            d_ff=args.d_ff,
+            num_prototypes=args.num_prototypes,
+            dropout=args.dropout,
+            patch_len=args.patch_len,
+            patch_stride=args.patch_stride,
+            task_type=data_config.task_type,
+            output_dim=data_config.output_dim,
+            dataset_name=args.dataset,
+            llm_type=args.llm_type,
+            llm_path=args.llm_path,
+            llm_init=args.llm_init,
+            use_task_prompt=args.use_task_prompt,
+        )
+        model = TimeLLMPatchModel(model_config)
     else:
         model = None
         model_config = None
@@ -87,8 +108,25 @@ def init_parameters(model, model_config):
                     nn.init.orthogonal_(p)
 
 
+class TrackingArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser that records which options were explicitly passed on
+    the command line (both ``--opt value`` and ``--opt=value`` forms)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.explicit_options = set()
+
+    def parse_known_args(self, args=None, namespace=None):
+        if args is None:
+            args = sys.argv[1:]
+        for token in args:
+            if token.startswith('--'):
+                self.explicit_options.add(token[2:].split('=', 1)[0])
+        return super().parse_known_args(args, namespace)
+
+
 def init_config():
-    parser = argparse.ArgumentParser()
+    parser = TrackingArgumentParser()
 
     global_group = parser.add_argument_group(title="global", description="")
     global_group.add_argument("--project", default="", type=str, help="")
@@ -154,13 +192,14 @@ def init_config():
                              help="LLM weight init for ablation: 'pretrained' (default) "
                                   "or 'random' (same arch, randomly-initialized weights, "
                                   "to test whether pretrained knowledge contributes)")
-    model_group.add_argument("--patch_stride", default=5, type=int, help="DFC temporal subsampling stride (TimeLLM v1 only)")
+    model_group.add_argument("--patch_stride", default=5, type=int, help="Patch stride (TimeLLMPatch raw-EEG patching; legacy DFC subsampling for TimeLLM v1)")
     model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
     model_group.add_argument("--num_gcn_layers", default=1, type=int, help="Number of GCN layers (TimeLLM)")
     model_group.add_argument("--use_task_prompt", action="store_true",
                              help="TimeLLM: include task description prompt")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
+    model_group.add_argument("--patch_len", default=512, type=int, help="Patch length in raw samples (TimeLLMPatch)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
@@ -179,8 +218,6 @@ def init_config():
     train_group.add_argument("--beta", default=1., type=float, help="")
     train_group.add_argument("--early_stop_patience", default=20, type=int,
                              help="Early stopping patience (epochs, 0 = disabled)")
-    train_group.add_argument("--early_stop_min_delta", default=0.001, type=float,
-                             help="Minimum improvement to reset patience")
     train_group.add_argument("--early_stop_metric", default="Loss", type=str,
                              help="Metric to monitor for early stopping (Accuracy / AUC / Loss)")
 
@@ -209,6 +246,13 @@ def init_config():
     evaluate_group.add_argument("--do_test", action="store_true", help="")
 
 
+    option_dest = {opt.lstrip('-'): act.dest
+                   for act in parser._actions for opt in act.option_strings}
     args = parser.parse_args()
+    # CLI 值快照：只含命令行上显式出现的参数。日志时用当前值对比，
+    # 以反映 DeepSpeed JSON 对 batch_size/learning_rate 的覆盖。
+    args.explicit_args = {option_dest[opt]: getattr(args, option_dest[opt])
+                          for opt in parser.explicit_options
+                          if opt in option_dest}
 
     return args

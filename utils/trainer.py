@@ -10,7 +10,6 @@ from torch.nn import functional as F
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score, accuracy_score, r2_score
 from sklearn.metrics import precision_recall_fscore_support, classification_report
-from scipy.stats import pearsonr
 
 from config import init_model_config
 from .optimizer import init_optimizer
@@ -61,7 +60,8 @@ class Trainer(object):
             self.model = model.to(args.device)
             self.scaler = torch.cuda.amp.GradScaler()
 
-        self.scheduler = None if args.deepspeed else self.scheduler
+        if not args.deepspeed:
+            self.scheduler = None
         self.best_result = None
         self.test_result = None
 
@@ -171,7 +171,7 @@ class Trainer(object):
         from utils.early_stopping import EarlyStopping
         metric_name = self.args.early_stop_metric
         # ── 指标方向：越小越好 vs 越大越好 ──
-        LOWER_IS_BETTER = {'Loss', 'MSE', 'MAE', 'RMSE'}
+        LOWER_IS_BETTER = {'Loss', 'MAE'}
         HIGHER_IS_BETTER = {'Accuracy', 'AUC', 'Precision', 'Sensitivity',
                            'Specificity', 'Recall', 'F_score', 'R2', 'PearsonR',
                            'PearsonR_mean'}
@@ -184,7 +184,6 @@ class Trainer(object):
             mode = 'min'
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
-            min_delta=self.args.early_stop_min_delta,
             mode=mode,
         )
 
@@ -220,7 +219,6 @@ class Trainer(object):
                     if mode != 'min':
                         early_stopper = EarlyStopping(
                             patience=self.args.early_stop_patience,
-                            min_delta=self.args.early_stop_min_delta,
                             mode='min',
                         )
 
@@ -316,7 +314,7 @@ class Trainer(object):
         # ── 早停指标：动态推断（与 train() 保持一致）──
         from utils.early_stopping import EarlyStopping
         metric_name = self.args.early_stop_metric
-        LOWER_IS_BETTER = {'Loss', 'MSE', 'MAE', 'RMSE'}
+        LOWER_IS_BETTER = {'Loss', 'MAE'}
         HIGHER_IS_BETTER = {'Accuracy', 'AUC', 'Precision', 'Sensitivity',
                            'Specificity', 'Recall', 'F_score', 'R2', 'PearsonR',
                            'PearsonR_mean'}
@@ -329,7 +327,6 @@ class Trainer(object):
 
         early_stopper = EarlyStopping(
             patience=self.args.early_stop_patience,
-            min_delta=self.args.early_stop_min_delta,
             mode=mode,
         )
         best_model_dir = os.path.join(self.args.model_dir,
@@ -700,7 +697,7 @@ class Trainer(object):
 
     # ── 回归评估（年龄预测等）────────────────────────────────
     def regression_evaluate(self, dataloader_key='test'):
-        """单值回归评估：MSE, MAE, RMSE, R², Pearson r。
+        """单值回归评估：MAE, R²。
 
         适用于年龄预测等连续标量标签任务。
         """
@@ -816,33 +813,22 @@ class Trainer(object):
                 span = float(lmax - lmin)
 
             if len(preds_v) > 1:
-                mse = np.mean((preds_v - labels_v) ** 2)
                 mae = np.mean(np.abs(preds_v - labels_v))
-                rmse = np.sqrt(mse)
                 r2 = r2_score(labels_v, preds_v)
-                pearson_r, pearson_p = pearsonr(preds_v, labels_v)
-                result['MSE'] = float(mse * span ** 2)
                 result['MAE'] = float(mae * span)
-                result['RMSE'] = float(rmse * span)
                 result['R2'] = float(r2)
-                result['PearsonR'] = float(pearson_r)
             else:
-                result['MSE'] = 0.0
                 result['MAE'] = 0.0
-                result['RMSE'] = 0.0
                 result['R2'] = 0.0
-                result['PearsonR'] = 0.0
 
             print()
             print(f'{dataloader_key}{self.task_id} : Loss:{result["Loss"]:.5f}, '
-                  f'MSE:{result["MSE"]:.5f}, MAE:{result["MAE"]:.5f}, '
-                  f'RMSE:{result["RMSE"]:.5f}, R²:{result["R2"]:.5f}, '
-                  f'PearsonR:{result["PearsonR"]:.5f}')
+                  f'MAE:{result["MAE"]:.5f}, R²:{result["R2"]:.5f}')
             for k, v in result.items():
                 if v is not None and isinstance(v, (int, float, np.floating, np.integer)):
                     logger.info(f"{k}: {v:.5f}")
         else:
-            result = {'MSE': 0.0}
+            result = {'MAE': 0.0, 'R2': 0.0}
 
         return result
 

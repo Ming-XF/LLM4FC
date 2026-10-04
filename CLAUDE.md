@@ -31,7 +31,7 @@ Key runtime flags (defined in `config.py:init_config`):
 - `--deepspeed` uses `deepspeed/train.json` (training) or `deepspeed/finetune.json` (few-shot); the DeepSpeed JSON is the **single source of truth for batch size and LR** — `main.py:_apply_deepspeed_config` overwrites `args.batch_size`/`args.learning_rate` from it.
 - `--do_parallel` uses `torch.nn.parallel.DistributedDataParallel` instead (init via `torchrun`/env vars).
 - `--few_shot 0` = use all data; `>0` = N subjects per class; `-1` = full-data finetune. Combined with `--pretrain_path` this triggers transfer-learning mode (zero-shot / few-shot) in `main.py:main`.
-- `--early_stop_metric`/`--early_stop_patience`/`--early_stop_min_delta` control val-based early stopping.
+- `--early_stop_metric`/`--early_stop_patience` (default 20) control val-based early stopping. Any strictly better val score counts as an improvement (no min-delta threshold).
 - `--save_steps` controls checkpoint cadence; `--schedule cos` is the standard LR schedule (see `scripts/`).
 - Debug/utility flags: `--max_steps` limits steps per epoch (`-1` = full), `--drop_last` drops the last incomplete batch, `--standard_split` forces the 60/20/20 split even when `--num_repeat > 1`.
 

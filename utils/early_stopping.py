@@ -4,7 +4,7 @@ Usage::
 
     from utils.early_stopping import EarlyStopping
 
-    early_stopper = EarlyStopping(patience=20, min_delta=0.001, mode='max')
+    early_stopper = EarlyStopping(patience=20, mode='max')
     for epoch in range(num_epochs):
         ...
         val_result = evaluate(dataloader_key='val')
@@ -21,16 +21,14 @@ class EarlyStopping:
 
     Args:
         patience:  number of epochs without improvement before stopping.
-        min_delta: minimum absolute change to count as an improvement.
         mode:      ``'max'`` (larger is better, e.g. Accuracy / AUC) or
                    ``'min'`` (smaller is better, e.g. Loss).
     """
 
-    def __init__(self, patience=20, min_delta=0.001, mode='max'):
+    def __init__(self, patience=20, mode='max'):
         if patience <= 0:
             patience = float('inf')               # effectively disabled
         self.patience = patience
-        self.min_delta = min_delta
         self.mode = mode
         self.best_score = None
         self.counter = 0
@@ -52,8 +50,8 @@ class EarlyStopping:
             self.is_best = True
             return True
 
-        improved = ((self.mode == 'max' and score > self.best_score + self.min_delta) or
-                    (self.mode == 'min' and score < self.best_score - self.min_delta))
+        improved = ((self.mode == 'max' and score > self.best_score) or
+                    (self.mode == 'min' and score < self.best_score))
 
         if improved:
             self.best_score = score

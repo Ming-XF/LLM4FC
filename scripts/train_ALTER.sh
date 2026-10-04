@@ -1,19 +1,13 @@
 #!/bin/bash
 #
-# ALTER training script
-# Usage: ./scripts/train_ALTER.sh <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>
-#
-# Examples:
-#   ./scripts/train_ALTER.sh DiseaseBeirut   AUC   0.001
-#   ./scripts/train_ALTER.sh GenderDS        AUC   0.001
-#   ./scripts/train_ALTER.sh AgeCAUEEG       MAE   0.1
+# ALTER training script — no external arguments; edit the variables below.
+# Run: sh scripts/train_ALTER.sh
 #
 
-DATASET=${1:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
-EARLY_STOP_METRIC=${2:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
-EARLY_STOP_MIN_DELTA=${3:?"Usage: $0 <DATASET> <EARLY_STOP_METRIC> <EARLY_STOP_MIN_DELTA>"}
+DATASET="AgeCAUEEG"
+EARLY_STOP_METRIC="R2"
 
-deepspeed --num_gpus=6 main.py \
+deepspeed --num_gpus=2 main.py \
     --model "ALTER" \
     --num_epochs 200 \
     --num_repeat 1 \
@@ -25,8 +19,7 @@ deepspeed --num_gpus=6 main.py \
     --fc_keep_ratio 1.0 \
     --num_heads 1 \
     --schedule 'cos' \
-    --early_stop_patience 10 \
-    --early_stop_min_delta "$EARLY_STOP_MIN_DELTA" \
+    --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --deepspeed \
     --do_train \

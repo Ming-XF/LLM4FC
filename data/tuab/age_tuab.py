@@ -145,6 +145,7 @@ class AgeTUABDataset(BaseDataset):
         return {
                 'DFC': DFC,
                 'correlation': SFC,
+                'time_series': time_series,
                 'labels': labels,
         }
 
