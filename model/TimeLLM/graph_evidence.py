@@ -50,6 +50,9 @@ def _quantize(x, thresholds, label_list):
 def compute_graph_evidence(dfc, spectral=None, morph=None):
     """对 (B, W, C, C) DFC 计算确定性图统计量并量化为证据描述。
 
+    W=1（整分钟静态 FC，TimeLLMKnowledge）受支持：variability/trend
+    置 0，其余统计量照常。
+
     Args:
         dfc: (B, W, C, C) 动态功能连接。
         spectral: (B, 9) 频谱统计量（数据集层确定性计算），None 时
@@ -71,13 +74,19 @@ def compute_graph_evidence(dfc, spectral=None, morph=None):
         # 使统计量跨站点更可比——见 WORK.md 诊断）
         win_strength = abs_dfc.mean(dim=(-1, -2))                       # (B, W)
         strength = win_strength.mean(-1)                                # (B,)
-        variability = win_strength.std(-1)                              # (B,)
-        # 时间趋势：每窗口强度对窗口序号的归一化斜率
-        t = torch.arange(W, device=device).float()
-        t = (t - t.mean())
-        slope = (t * (win_strength - win_strength.mean(-1, keepdim=True))
-                 ).sum(-1) / (t ** 2).sum()
-        trend_norm = slope / (win_strength.mean(-1) + 1e-6)
+        if W > 1:
+            variability = win_strength.std(-1)                          # (B,)
+            # 时间趋势：每窗口强度对窗口序号的归一化斜率
+            t = torch.arange(W, device=device).float()
+            t = (t - t.mean())
+            slope = (t * (win_strength - win_strength.mean(-1, keepdim=True))
+                     ).sum(-1) / (t ** 2).sum()
+            trend_norm = slope / (win_strength.mean(-1) + 1e-6)
+        else:
+            # W=1（整分钟静态 FC）：单窗口 std 为 NaN、斜率分母为 0，
+            # 二者均置 0（variability/trend 不进 fc_stats，只喂量化词）
+            variability = torch.zeros_like(strength)
+            trend_norm = torch.zeros_like(strength)
 
         # 子矩阵均值（含对角，与跨域诊断的 old-def 一致）
         abs_all = abs_dfc.sum(dim=(-1, -2))                             # (B, W)

@@ -160,3 +160,45 @@ class TimeLLMPatchTrainer(Trainer):
             "labels": labels.to(self.device),
         }
         return kwargs
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TimeLLMKnowledgeTrainer — 领域知识 Token 编译器（纯知识版，无 patch 路径）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TimeLLMKnowledgeTrainer(Trainer):
+    """Domain-knowledge compiler trainer (no patch path).
+
+    Architecture: raw EEG (B, 19, T) → whole-minute static FC + dataset-level
+    spectral/morph stats → 32 display stats → per-stat phrase+value embedding
+    (128-dim sum) → knowledge soft prompt → frozen LLM → last-K-layer READOUT
+    aggregation → linear head.
+    """
+
+    def __init__(self, args, local_rank=0, task_id=0, episode_seed=None):
+        super().__init__(args, local_rank=local_rank, task_id=task_id,
+                         episode_seed=episode_seed)
+
+    def prepare_inputs_kwargs(self, inputs):
+        """Extract fields for TimeLLMKnowledge forward pass.
+
+        Uses the raw EEG time series plus dataset-level spectral/morph stats.
+
+        按任务类型自适应：
+        - 分类：标签 → integer index
+        - 回归：标签 → float32
+        """
+        labels = inputs['labels']
+        if self.data_config.is_classification:
+            if labels.dim() > 1 and labels.shape[-1] > 1:
+                labels = labels.argmax(dim=-1)
+            labels = labels.long()
+        elif self.data_config.is_regression:
+            labels = labels.float()
+        kwargs = {
+            "x": inputs['time_series'].float().to(self.device),
+            "labels": labels.to(self.device),
+            "spectral": inputs['spectral'].float().to(self.device),
+            "morph": inputs['morph'].float().to(self.device),
+        }
+        return kwargs

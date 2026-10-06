@@ -91,6 +91,24 @@ def init_model_config(args, data_config: DataConfig):
             use_task_prompt=args.use_task_prompt,
         )
         model = TimeLLMPatchModel(model_config)
+    elif args.model == 'TimeLLMKnowledge':
+        model_config = TimeLLMKnowledgeConfig(
+            node_size=data_config.node_size,
+            time_series_size=data_config.time_series_size,
+            d_model=args.d_model,
+            n_heads=args.num_heads,
+            num_prototypes=args.num_prototypes,
+            dropout=args.dropout,
+            task_type=data_config.task_type,
+            output_dim=data_config.output_dim,
+            dataset_name=args.dataset,
+            llm_type=args.llm_type,
+            llm_path=args.llm_path,
+            llm_init=args.llm_init,
+            use_task_prompt=args.use_task_prompt,
+            readout_layers=args.readout_layers,
+        )
+        model = TimeLLMKnowledgeModel(model_config)
     else:
         model = None
         model_config = None
@@ -204,6 +222,9 @@ def init_config():
                                   "text prompt before the DFC patches")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
     model_group.add_argument("--patch_len", default=512, type=int, help="Patch length in raw samples (TimeLLMPatch)")
+    model_group.add_argument("--readout_layers", default=4, type=int,
+                             help="TimeLLMKnowledge: number of final LLM layers "
+                                  "aggregated for READOUT position readout (K)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

@@ -317,17 +317,17 @@ class BaseDataset(Dataset):
     def spectral_stats(time_series, hz):
         """CAER-v2: 确定性频谱证据（9 维，无监督规则）。
 
-        对 10 个滑窗（12s）做 Welch PSD（2s 分段、hanning 窗），
-        取全通道均值得到 delta/theta/alpha/beta 相对功率，以及
-        theta/beta、alpha/(d+t)、慢波指数 (d+t)/(a+b)、
-        额/枕 alpha 比、颞区 theta 占比。
+        整分钟版（TimeLLMKnowledge）：15 个非重叠 4s 段做 Welch PSD
+        （hanning 窗），每段先算比值、再对 15 段求均值，得到
+        delta/theta/alpha/beta 相对功率，以及 theta/beta、
+        alpha/(d+t)、慢波指数 (d+t)/(a+b)、额/枕 alpha 比、颞区 theta
+        占比。不再使用 10 个 12s 滑窗。
 
         Returns:
             torch.Tensor shape (9,)
         """
-        W = 12 * hz
-        step = (60 * hz - W) // 9
-        nperseg = 2 * hz
+        nperseg = 4 * hz
+        nseg = (60 * hz) // nperseg                          # 15
         freqs = np.fft.rfftfreq(nperseg, 1 / hz)
         bands = {'d': (0.5, 4.0), 't': (4.0, 8.0),
                  'a': (8.0, 13.0), 'b': (13.0, 30.0)}
@@ -335,17 +335,15 @@ class BaseDataset(Dataset):
         posterior = [3, 4, 8, 9, 12, 15]
         temporal = [11, 12, 14, 15]
         win = np.hanning(nperseg)
-        rows = []
         ts = time_series.detach().numpy().astype(np.float64)
-        nseg = W // nperseg
-        for k in range(10):
-            s = k * step
-            w = ts[:, s:s + W]
+        ts = ts[:, :nseg * nperseg]
+        rows = []
+        for k in range(nseg):
+            w = ts[:, k * nperseg:(k + 1) * nperseg]
             w = (w - w.mean(1, keepdims=True)) / (w.std(1, keepdims=True) + 1e-8)
             pw = {bn: [] for bn in bands}
             for ch in range(w.shape[0]):
-                seg = w[ch, :nseg * nperseg].reshape(nseg, nperseg)
-                ps = (np.abs(np.fft.rfft(seg * win, axis=1)) ** 2).mean(0)
+                ps = np.abs(np.fft.rfft(w[ch] * win)) ** 2
                 for bn, (lo, hi) in bands.items():
                     pw[bn].append(ps[(freqs >= lo) & (freqs < hi)].sum())
             total = sum(np.mean(v) for v in pw.values())
@@ -375,8 +373,11 @@ class BaseDataset(Dataset):
           gamma_pow           30-45Hz 相对功率
           spike_mean/max      |ΔΔx|>6×MAD 的棘波速率（均值/最大通道）
         周期-非周期（年龄相关）:
-          apf / apf_std       alpha 峰值频率（7-13Hz，均值/跨通道 std）
+          apf / apf_std       alpha 峰值频率（7-13Hz，均值/15 段 std）
           slope               2-40Hz log-log PSD 非周期斜率
+
+        整分钟版（TimeLLMKnowledge）：时域特征在整分钟上计算（不变），
+        PSD 特征改用 15 个非重叠 4s 段（替换 10 个 12s 滑窗）。
 
         Returns:
             torch.Tensor shape (14,)
@@ -384,8 +385,6 @@ class BaseDataset(Dataset):
         ts = time_series.detach().numpy().astype(np.float64)
         ts = (ts - ts.mean(1, keepdims=True)) / (ts.std(1, keepdims=True) + 1e-8)
         C, N = ts.shape
-        W = 12 * hz
-        step = (60 * hz - W) // 9
 
         d1 = np.abs(np.diff(ts, axis=1))
         d2 = np.abs(np.diff(ts, n=2, axis=1))
@@ -398,26 +397,26 @@ class BaseDataset(Dataset):
         mad = np.median(d2, axis=1) / 0.6745
         spike = ((d2 > 6 * mad[:, None]).sum(1)) / (N - 2)
 
-        # PSD: 12s 窗 × 4s 分段 → 0.25Hz 分辨率
+        # PSD: 整分钟 15 个非重叠 4s 分段 → 0.25Hz 分辨率
         nperseg = 4 * hz
-        nseg = W // nperseg
+        nseg = (60 * hz) // nperseg
         freqs = np.fft.rfftfreq(nperseg, 1 / hz)
         win = np.hanning(nperseg)
         gmask = (freqs >= 30) & (freqs < 45)
         amask = (freqs >= 7) & (freqs < 13)
         smask = (freqs >= 2) & (freqs < 40)
         lf = np.log(freqs[smask])
+        ts_seg = ts[:, :nseg * nperseg].reshape(C, nseg, nperseg)
         gamma_vals, apf_vals, slope_vals = [], [], []
-        for k in range(10):
-            s = k * step
-            w = ts[:, s:s + W]
+        for k in range(nseg):
+            w = ts_seg[:, k]
             w = (w - w.mean(1, keepdims=True)) / (w.std(1, keepdims=True) + 1e-8)
-            seg = w[:, :nseg * nperseg].reshape(C, nseg, nperseg)
-            ps = (np.abs(np.fft.rfft(seg * win, axis=2)) ** 2).mean(1)
+            ps = np.abs(np.fft.rfft(w * win, axis=1)) ** 2
             tot = ps.sum(1) + 1e-12
             gamma_vals.append((ps[:, gmask].sum(1) / tot).mean())
             apf_vals.append(freqs[amask][ps[:, amask].argmax(1)].mean())
-            slope_vals.append(np.polyfit(lf, np.log(ps[:, smask].mean(0) + 1e-12), 1)[0])
+            slope_vals.append(np.polyfit(
+                lf, np.log(ps[:, smask].mean(0) + 1e-12), 1)[0])
 
         return torch.tensor([
             ll.mean(), ll.max(),
