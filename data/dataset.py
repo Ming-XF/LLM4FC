@@ -314,6 +314,123 @@ class BaseDataset(Dataset):
         return fc_sparse
 
     @staticmethod
+    def spectral_stats(time_series, hz):
+        """CAER-v2: 确定性频谱证据（9 维，无监督规则）。
+
+        对 10 个滑窗（12s）做 Welch PSD（2s 分段、hanning 窗），
+        取全通道均值得到 delta/theta/alpha/beta 相对功率，以及
+        theta/beta、alpha/(d+t)、慢波指数 (d+t)/(a+b)、
+        额/枕 alpha 比、颞区 theta 占比。
+
+        Returns:
+            torch.Tensor shape (9,)
+        """
+        W = 12 * hz
+        step = (60 * hz - W) // 9
+        nperseg = 2 * hz
+        freqs = np.fft.rfftfreq(nperseg, 1 / hz)
+        bands = {'d': (0.5, 4.0), 't': (4.0, 8.0),
+                 'a': (8.0, 13.0), 'b': (13.0, 30.0)}
+        frontal = [0, 1, 5, 6, 10, 13]
+        posterior = [3, 4, 8, 9, 12, 15]
+        temporal = [11, 12, 14, 15]
+        win = np.hanning(nperseg)
+        rows = []
+        ts = time_series.detach().numpy().astype(np.float64)
+        nseg = W // nperseg
+        for k in range(10):
+            s = k * step
+            w = ts[:, s:s + W]
+            w = (w - w.mean(1, keepdims=True)) / (w.std(1, keepdims=True) + 1e-8)
+            pw = {bn: [] for bn in bands}
+            for ch in range(w.shape[0]):
+                seg = w[ch, :nseg * nperseg].reshape(nseg, nperseg)
+                ps = (np.abs(np.fft.rfft(seg * win, axis=1)) ** 2).mean(0)
+                for bn, (lo, hi) in bands.items():
+                    pw[bn].append(ps[(freqs >= lo) & (freqs < hi)].sum())
+            total = sum(np.mean(v) for v in pw.values())
+            rel = {bn: np.mean(v) / total for bn, v in pw.items()}
+            fa = sum(pw['a'][ch] for ch in frontal)
+            pa = sum(pw['a'][ch] for ch in posterior)
+            tt = sum(pw['t'][ch] for ch in temporal)
+            rows.append([
+                rel['d'], rel['t'], rel['a'], rel['b'],
+                rel['t'] / max(rel['b'], 1e-9),
+                rel['a'] / max(rel['d'] + rel['t'], 1e-9),
+                (rel['d'] + rel['t']) / max(rel['a'] + rel['b'], 1e-9),
+                fa / max(pa, 1e-9),
+                tt / total,
+            ])
+        return torch.tensor(np.array(rows).mean(0), dtype=torch.float32)
+
+    @staticmethod
+    def morph_stats(time_series, hz):
+        """CAER-v3: 确定性形态学/周期-非周期证据（14 维，无监督规则）。
+
+        时域形态（发作间期放电相关）:
+          ll_mean/ll_max      线长（|Δx| 均值，逐通道均值/最大）
+          sharp_mean/max/focal 锐度 |ΔΔx|（均值/最大/跨通道灶性 std）
+          kurt_mean/max       幅度峰度（瞬态尖波的厚尾特征）
+          zcr_mean            零交叉率
+          gamma_pow           30-45Hz 相对功率
+          spike_mean/max      |ΔΔx|>6×MAD 的棘波速率（均值/最大通道）
+        周期-非周期（年龄相关）:
+          apf / apf_std       alpha 峰值频率（7-13Hz，均值/跨通道 std）
+          slope               2-40Hz log-log PSD 非周期斜率
+
+        Returns:
+            torch.Tensor shape (14,)
+        """
+        ts = time_series.detach().numpy().astype(np.float64)
+        ts = (ts - ts.mean(1, keepdims=True)) / (ts.std(1, keepdims=True) + 1e-8)
+        C, N = ts.shape
+        W = 12 * hz
+        step = (60 * hz - W) // 9
+
+        d1 = np.abs(np.diff(ts, axis=1))
+        d2 = np.abs(np.diff(ts, n=2, axis=1))
+        ll = d1.sum(1) / (N - 1)
+        sharp = d2.mean(1)
+        sharp_max_ch = d2.max(1)
+        kurt = ((ts - ts.mean(1, keepdims=True)) ** 4).mean(1) / (
+            (ts ** 2).mean(1) ** 2 + 1e-12) - 3.0
+        zcr = (np.diff(ts > 0, axis=1) != 0).sum(1) / (N - 1)
+        mad = np.median(d2, axis=1) / 0.6745
+        spike = ((d2 > 6 * mad[:, None]).sum(1)) / (N - 2)
+
+        # PSD: 12s 窗 × 4s 分段 → 0.25Hz 分辨率
+        nperseg = 4 * hz
+        nseg = W // nperseg
+        freqs = np.fft.rfftfreq(nperseg, 1 / hz)
+        win = np.hanning(nperseg)
+        gmask = (freqs >= 30) & (freqs < 45)
+        amask = (freqs >= 7) & (freqs < 13)
+        smask = (freqs >= 2) & (freqs < 40)
+        lf = np.log(freqs[smask])
+        gamma_vals, apf_vals, slope_vals = [], [], []
+        for k in range(10):
+            s = k * step
+            w = ts[:, s:s + W]
+            w = (w - w.mean(1, keepdims=True)) / (w.std(1, keepdims=True) + 1e-8)
+            seg = w[:, :nseg * nperseg].reshape(C, nseg, nperseg)
+            ps = (np.abs(np.fft.rfft(seg * win, axis=2)) ** 2).mean(1)
+            tot = ps.sum(1) + 1e-12
+            gamma_vals.append((ps[:, gmask].sum(1) / tot).mean())
+            apf_vals.append(freqs[amask][ps[:, amask].argmax(1)].mean())
+            slope_vals.append(np.polyfit(lf, np.log(ps[:, smask].mean(0) + 1e-12), 1)[0])
+
+        return torch.tensor([
+            ll.mean(), ll.max(),
+            sharp.mean(), sharp_max_ch.max(), sharp_max_ch.std(),
+            kurt.mean(), kurt.max(),
+            zcr.mean(),
+            np.mean(gamma_vals),
+            spike.mean(), spike.max(),
+            np.mean(apf_vals), np.std(apf_vals),
+            np.mean(slope_vals),
+        ], dtype=torch.float32)
+
+    @staticmethod
     def dynamic_connectivity(time_series, window_size, step_size):
         """Compute dynamic FC via sliding windows.
 

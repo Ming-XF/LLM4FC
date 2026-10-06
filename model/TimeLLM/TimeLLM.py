@@ -6,7 +6,9 @@ import torch.nn.functional as F
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 
 from ..base import BaseConfig, ModelOutputs
+from .graph_evidence import compute_graph_evidence
 from .prompts import get_prompt_config
+from .stats_prompt import build_stats_text
 
 
 class GCNLayer(nn.Module):
@@ -36,6 +38,7 @@ class TimeLLMConfig(BaseConfig):
                  llm_type='chatglm',
                  llm_path='./model/chatglm-6b',
                  use_task_prompt=False,
+                 use_stats_prompt=False,
                  llm_init='pretrained'):
         super().__init__(node_size=node_size, output_dim=output_dim)
         self.d_model = d_model
@@ -52,6 +55,7 @@ class TimeLLMConfig(BaseConfig):
         self.llm_path = llm_path
         self.llm_init = llm_init
         self.use_task_prompt = use_task_prompt
+        self.use_stats_prompt = use_stats_prompt
 
 
 class ReprogrammingLayer(nn.Module):
@@ -188,7 +192,7 @@ class Model(nn.Module):
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def forward(self, DFC, SFC, labels, gender=None, age=None,
-                education=None):
+                education=None, spectral=None, morph=None):
         B, T, C, _ = DFC.shape
         device = DFC.device
 
@@ -227,11 +231,35 @@ class Model(nn.Module):
         task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(
             B, -1, -1)
 
+        # CAER-v3 stats prompt: 每样本一段文本（回归 32 维；分类仅
+        # FC+spec 18 维，形态族不喂），插在任务 prompt 之后、DFC
+        # patches 之前。
+        stats_embeds = None
+        p_stats = 0
+        if self.config.use_stats_prompt:
+            morph_in = morph if self.task_type == 'regression' else None
+            _, stats = compute_graph_evidence(DFC, spectral, morph_in)
+            texts = build_stats_text(stats.detach().cpu())
+            ids_list = [self.tokenizer.encode(
+                t, add_special_tokens=False) for t in texts]
+            p_stats = max(len(ids) for ids in ids_list)
+            if min(len(ids) for ids in ids_list) != p_stats:
+                pad_id = self.tokenizer.pad_token_id
+                ids_list = [ids + [pad_id] * (p_stats - len(ids))
+                            for ids in ids_list]
+            ids_t = torch.tensor(
+                ids_list, device=device, dtype=torch.long)
+            with torch.no_grad():
+                stats_embeds = self._word_embeddings(ids_t)
+
         prompt_parts = [start_tag]
         prompt_length = self.P_start
         if self.config.use_task_prompt:
             prompt_parts.append(task_prompt)
             prompt_length += self.P_task
+        if stats_embeds is not None:
+            prompt_parts.append(stats_embeds.to(dtype=task_prompt.dtype))
+            prompt_length += p_stats
         prompt_parts.append(end_tag)
         prompt_length += self.P_end
         prompt_parts.append(reprogrammed.to(dtype=task_prompt.dtype))

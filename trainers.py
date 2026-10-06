@@ -116,6 +116,10 @@ class TimeLLMTrainer(Trainer):
             "SFC": inputs['correlation'].float().to(self.device),
             "labels": labels.to(self.device),
         }
+        if 'spectral' in inputs:
+            kwargs["spectral"] = inputs['spectral'].float().to(self.device)
+        if 'morph' in inputs:
+            kwargs["morph"] = inputs['morph'].float().to(self.device)
         return kwargs
 
 

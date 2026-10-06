@@ -1,0 +1,1931 @@
+Reading additional input from stdin...
+OpenAI Codex v0.157.1
+--------
+workdir: /root/autodl-tmp/LLM4FC
+model: gpt-5.6-sol
+provider: llmtoken-io
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 01a111d9-1eab-73a3-b600-ccb8a113ad0c
+--------
+user
+你是深度学习与 LLM 应用的实现设计专家。只做设计建议，不要修改任何代码。项目在 /root/autodl-tmp/LLM4FC（EEG 分析，Time-LLM 式重编程：patch 编码 → 冻结 DeepSeek-R1-Distill-Llama-8B → 线性头）。可用 git show 查看历史（e1d17d0:model/TimeLLMPatch/TimeLLMPatch.py、HEAD:model/TimeLLM/graph_evidence.py、HEAD:model/TimeLLM/stats_prompt.py、HEAD:data/dataset.py）。
+
+【需求已定，勿讨论可行性】
+把现有 TimeLLMPatch 模型改进为「领域知识 Token 编译器」：
+LLM 输入 = 第一部分「领域知识 soft prompt」+ 第二部分「任务 prompt」（与现有任务 prompt 保持一致）。
+领域知识部分：在整个 1 分钟 EEG 上（不再划分窗口）计算三方面统计数值（FC 9 维 + 频谱 9 维 + 形态 14 维）。针对每个统计数值（如平均连接强度 0.52）：
+1. 将该统计量的英文短语（如 "overall connectivity strength"）tokenize，取各 token 的 word embedding 求和，得到短语向量；
+2. 将数值 0.52 通过一个 linear 层嵌入到与短语向量相同的 d 维空间，得到数值向量；
+3. 两个向量相加，得到该统计量的组合 embedding；
+4. 所有统计量的组合 embedding 再经过一个 reprogram 模块，获得最终的领域知识 soft prompt。
+
+【现状（TimeLLMPatch，e1d17d0，model/TimeLLMPatch/TimeLLMPatch.py）】
+1. 输入：原始 EEG (B, 19, 12000@200Hz)。patch embedding（patch_len=512, stride=512, Conv1d）→ (B, N*P, d_model=128)。
+2. ReprogrammingLayer（Time-LLM 原版）：query=patch (B,L,128)，source/value=可学习 text prototypes（mapping_layer(词表 embedding) → 1000×128），cross-attention → (B,L,d_llm=4096)。
+3. 序列布局：[start_tag][task prompt][end_tag][patches]，patches=456 个 soft token（19 通道×24 patch）。llama：全局 RoPE 位置编码；chatglm：2D rotary（prompt 段 block 位置 + patches 段 block 位置）。读出只取 patches 位置隐状态（截取前 d_ff=128 维）→ 通道均值池化 → 线性头。LLM 冻结，其余端到端训练，loss 在 forward 里算。
+4. 统计量基础设施（graph_evidence.py compute_graph_evidence，无学习参数）：
+   - 输入 (B,W,C,C) DFC + spectral(B,9) + morph(B,14)，输出连续 display 统计量 stats (B,32)（回归）/ (B,18)（分类，无形态族），已按名义尺度缩放、clip [-5,5]。
+   - FC 9 维：strength/0.3、inter_ratio、front_ratio、asym/0.05、cent/temp/pari/occ/mid 五个脑区均值/0.3。全是静态 FC 可算的（无需窗口）。
+   - 频谱 9 维：δθαβ 相对功率、θ/β、α/(δ+θ)、慢波指数、额枕 α 比、颞 θ 占比。
+   - 形态 14 维：线长/锐度/灶性/峰度/零交叉/γ 功率/棘波速率/APF/APF-std/非周期斜率。
+   - 现有 data/dataset.py 的 spectral_stats/morph_stats 用 10 个 12s 滑窗内部 Welch 计算，需求要求改为整分钟（不再划分窗口）。
+5. 数据集 __getitem__ 已返回 spectral/morph 字段（trainers.py TimeLLMTrainer 已透传；TimeLLMPatchTrainer 目前只传 x 和 labels）。
+
+【请设计，回答以下问题】
+1. 短语编码：token 求和（sum）还是 mean？是否需归一化/缩放？短语如何选择（长度、是否加前后缀）？短语向量 4096 维与数值 linear 的 d 维如何对齐——建议在 4096 维相加后共享投影到 d_model=128 再进 reprogram，还是先在低维相加？
+2. 数值编码：每统计量独立 Linear(1,d) 还是全部共享一个？输入用原始值（如 0.52）还是缩放后的 display 值（strength/0.3≈1.73，clip ±5）？要不要 bias？d=128 还是 4096？
+3. Reprogram 模块：复用现有 ReprogrammingLayer（query=组合 embedding 投影到 128，source/value=text prototypes）即可，还是需要别的（MLP / self-attention 让 32 个统计量交互）？与 patches 的 reprogramming 层共享还是各用一份？知识 soft prompt 每统计量 1 个 token 是否合理？
+4. 序列布局与位置编码：[start][knowledge][task][end][patches] 还是 [start][task][knowledge][end][patches]？读出仍只取 patches 位置可以吗？llama 全局 RoPE 直接顺延即可？chatglm 2D 的 block 位置（目前 prompt 段=start+task+end）要把 knowledge 并入 prompt 段吗？patch 侧 causal 注意力能看到 knowledge（知识在前）是否重要？
+5. 统计量计算：FC 9 维在 forward 里由整分钟静态 FC（z-score 后 (B,19,12000) 直接 corr，W=1 复用 compute_graph_evidence）现算；spectral/morph 在数据集层改为整分钟 Welch（不再 10 滑窗，整段 60s 按 4s 分段）——这个分工合理吗？
+6. 训练细节：word embedding 查表需 no_grad；bf16 下组合 embedding 的 dtype 处理；32 个独立 Linear(1,d) 的初始化策略。
+7. 最小消融对照（不讨论可行性，但请给出验证设计的必要最小集）：无知识 prompt 基线（=现有 TimeLLMPatch）、数值打乱/置零、随机 LLM vs 预训练、去掉 reprogram——哪些最必要？
+8. 命名与开关：在 TimeLLMPatch 里加 --use_knowledge_prompt 开关，还是新建模型类？
+
+请给出可直接落地的完整设计（短语清单规则、数值格式化/缩放规则、各模块维度、插入位置、读出方案、实现步骤），按实现顺序排列。
+codex
+我先核对当前实现里的输入形状、prompt/位置编码和统计量接口，再按“模块维度 → 序列布局 → 统计量计算 → 训练与消融 → 实现顺序”给出可直接落地的设计。只做方案，不改代码。
+exec
+/bin/bash -lc "git show --stat --oneline e1d17d0 -- model/TimeLLMPatch/TimeLLMPatch.py && sed -n '1,280p' model/TimeLLMPatch/TimeLLMPatch.py && printf '\\n--- graph_evidence ---\\n' && sed -n '1,320p' model/TimeLLM/graph_evidence.py && printf '\\n--- stats_prompt ---\\n' && sed -n '1,260p' model/TimeLLM/stats_prompt.py && printf '\\n--- dataset refs ---\\n' && rg -n \"spectral_stats|morph_stats|__getitem__|spectral|morph\" data/dataset.py trainers.py config.py main.py | head -240" in /root/autodl-tmp/LLM4FC
+ succeeded in 0ms:
+e1d17d0 实现了TimeLLMPatch并跑出了年龄实验
+ model/TimeLLMPatch/TimeLLMPatch.py | 343 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 343 insertions(+)
+from math import sqrt
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from transformers import AutoConfig, AutoModel, AutoTokenizer
+
+from ..base import BaseConfig, ModelOutputs
+from .prompts import get_prompt_config
+
+
+class PatchEmbedding(nn.Module):
+    """Time-LLM patching: replicate-pad, unfold, project each patch to d_model.
+
+    Mirrors the upstream Time-LLM PatchEmbedding (layers/Embed.py).
+    """
+
+    def __init__(self, d_model, patch_len, stride, dropout):
+        super().__init__()
+        self.patch_len = patch_len
+        self.stride = stride
+        self.padding_patch_layer = nn.ReplicationPad1d((0, stride))
+        self.value_embedding = nn.Conv1d(
+            patch_len, d_model, kernel_size=3,
+            padding=1, padding_mode='circular', bias=False)
+        nn.init.kaiming_normal_(
+            self.value_embedding.weight, mode='fan_in',
+            nonlinearity='leaky_relu')
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        # x: (B, N, T) raw EEG
+        n_vars = x.shape[1]
+        x = self.padding_patch_layer(x)
+        x = x.unfold(dimension=-1, size=self.patch_len, step=self.stride)
+        x = torch.reshape(x, (x.shape[0] * x.shape[1], x.shape[2], x.shape[3]))
+        x = self.value_embedding(x.permute(0, 2, 1)).transpose(1, 2)
+        return self.dropout(x), n_vars
+
+
+class TimeLLMPatchConfig(BaseConfig):
+    def __init__(self, node_size,
+                 time_series_size=12000,
+                 d_model=128,
+                 n_heads=8,
+                 d_ff=128,
+                 num_prototypes=1000,
+                 dropout=0.1,
+                 patch_len=512,
+                 patch_stride=512,
+                 task_type='classification',
+                 output_dim=2,
+                 dataset_name='CAUEEG',
+                 llm_type='chatglm',
+                 llm_path='./model/chatglm-6b',
+                 use_task_prompt=False,
+                 llm_init='pretrained'):
+        super().__init__(node_size=node_size, output_dim=output_dim)
+        self.time_series_size = time_series_size
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.d_ff = d_ff
+        self.num_prototypes = num_prototypes
+        self.dropout = dropout
+        self.patch_len = patch_len
+        self.patch_stride = patch_stride
+        self.task_type = task_type
+        self.output_dim = output_dim
+        self.dataset_name = dataset_name
+        self.llm_type = llm_type
+        self.llm_path = llm_path
+        self.llm_init = llm_init
+        self.use_task_prompt = use_task_prompt
+
+        # Patches per channel (replicate pad of `stride` adds one patch, and
+        # the final tail is kept): (T - patch_len) // stride + 2.
+        self.patch_nums = (time_series_size - patch_len) // patch_stride + 2
+        # Head sees channel mean-pooled patches: (B, patch_nums, d_ff).
+        self.head_nf = d_ff * self.patch_nums
+
+
+class ReprogrammingLayer(nn.Module):
+    def __init__(self, d_model, n_heads, d_keys=None, d_llm=None,
+                 attention_dropout=0.1):
+        super().__init__()
+        d_keys = d_keys or (d_model // n_heads)
+
+        self.query_projection = nn.Linear(d_model, d_keys * n_heads)
+        self.key_projection = nn.Linear(d_llm, d_keys * n_heads)
+        self.value_projection = nn.Linear(d_llm, d_keys * n_heads)
+        self.out_projection = nn.Linear(d_keys * n_heads, d_llm)
+        self.n_heads = n_heads
+        self.dropout = nn.Dropout(attention_dropout)
+
+    def forward(self, target_embedding, source_embedding, value_embedding):
+        B, L, _ = target_embedding.shape
+        S, _ = source_embedding.shape
+        H = self.n_heads
+
+        target_embedding = self.query_projection(target_embedding).view(
+            B, L, H, -1)
+        source_embedding = self.key_projection(source_embedding).view(S, H, -1)
+        value_embedding = self.value_projection(value_embedding).view(S, H, -1)
+
+        out = self._reprogramming(
+            target_embedding, source_embedding, value_embedding)
+        return self.out_projection(out.reshape(B, L, -1))
+
+    def _reprogramming(self, target_embedding, source_embedding,
+                       value_embedding):
+        _, _, _, E = target_embedding.shape
+        scale = 1. / sqrt(E)
+        scores = torch.einsum(
+            "blhe,she->bhls", target_embedding, source_embedding)
+        attention = self.dropout(torch.softmax(scale * scores, dim=-1))
+        return torch.einsum(
+            "bhls,she->blhe", attention, value_embedding)
+
+
+class Model(nn.Module):
+    def __init__(self, config: TimeLLMPatchConfig):
+        super().__init__()
+        self.config = config
+        self.d_model = config.d_model
+        self.num_prototypes = config.num_prototypes
+        self.n_heads = config.n_heads
+        self.d_llm = 4096
+        self.llm_type = config.llm_type
+        self.llm_path = config.llm_path
+
+        self.patch_embedding = PatchEmbedding(
+            d_model=config.d_model,
+            patch_len=config.patch_len,
+            stride=config.patch_stride,
+            dropout=config.dropout,
+        )
+
+        if self.llm_type == 'chatglm':
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.llm_path, trust_remote_code=True)
+            if config.llm_init == 'random':
+                llm_config = AutoConfig.from_pretrained(
+                    self.llm_path, trust_remote_code=True)
+                self.llm = AutoModel.from_config(
+                    llm_config, trust_remote_code=True).bfloat16()
+            else:
+                self.llm = AutoModel.from_pretrained(
+                    self.llm_path, trust_remote_code=True).bfloat16()
+            self.llm.transformer.gradient_checkpointing = False
+            self.position_encoding_2d = \
+                self.llm.transformer.position_encoding_2d
+            self._word_embeddings = self.llm.transformer.word_embeddings
+            self._transformer = self.llm.transformer
+        elif self.llm_type == 'llama':
+            self.tokenizer = AutoTokenizer.from_pretrained(self.llm_path)
+            if config.llm_init == 'random':
+                llm_config = AutoConfig.from_pretrained(self.llm_path)
+                self.llm = AutoModel.from_config(
+                    llm_config, torch_dtype=torch.bfloat16)
+            else:
+                self.llm = AutoModel.from_pretrained(
+                    self.llm_path, torch_dtype=torch.bfloat16)
+            self.llm.config.use_cache = False
+            self.position_encoding_2d = False
+            self._word_embeddings = self.llm.embed_tokens
+            self._transformer = self.llm
+        else:
+            raise ValueError(f"Unsupported llm_type: {self.llm_type}")
+
+        prompt_config = get_prompt_config(config.dataset_name)
+        task_ids = self.tokenizer.encode(prompt_config.prompt_task)
+        with torch.no_grad():
+            task_embeds = self._word_embeddings(torch.tensor(task_ids))
+        self.register_buffer("task_prompt_embeddings", task_embeds)
+        self.P_task = task_embeds.shape[0]
+
+        start_tag_ids = self.tokenizer.encode("<start_prompt>\n")
+        with torch.no_grad():
+            start_tag_embeds = self._word_embeddings(
+                torch.tensor(start_tag_ids))
+        self.register_buffer("start_tag_embeddings", start_tag_embeds)
+        self.P_start = start_tag_embeds.shape[0]
+
+        end_tag_ids = self.tokenizer.encode("\n<end_prompt>")
+        with torch.no_grad():
+            end_tag_embeds = self._word_embeddings(torch.tensor(end_tag_ids))
+        self.register_buffer("end_tag_embeddings", end_tag_embeds)
+        self.P_end = end_tag_embeds.shape[0]
+
+        self.word_embeddings = self._word_embeddings.weight
+        self.vocab_size = self.word_embeddings.shape[0]
+        self.mapping_layer = nn.Linear(
+            self.vocab_size, self.num_prototypes)
+        self.reprogramming_layer = ReprogrammingLayer(
+            d_model=config.d_model,
+            n_heads=config.n_heads,
+            d_llm=self.d_llm,
+            attention_dropout=config.dropout,
+        )
+
+        self.task_type = config.task_type
+        self.output_projection = nn.Sequential(
+            nn.Flatten(start_dim=1),
+            nn.Linear(config.head_nf, config.output_dim),
+            nn.Dropout(config.dropout),
+        )
+
+        for param in self.llm.parameters():
+            param.requires_grad = False
+
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+    def forward(self, x, labels):
+        B, N, T = x.shape
+        device = x.device
+
+        # Per-sample per-channel z-score: amplitude invariance is the key
+        # property for cross-domain zero-shot transfer.
+        mean = x.mean(dim=-1, keepdim=True)
+        std = x.std(dim=-1, keepdim=True)
+        x = (x - mean) / (std + 1e-5)
+
+        # Patch embedding, then channel-major flatten:
+        # [c0p0, ..., c0p(P-1), c1p0, ..., c(N-1)p(P-1)].
+        x = x.to(dtype=self.patch_embedding.value_embedding.weight.dtype)
+        enc_out, _ = self.patch_embedding(x)
+        P = enc_out.shape[1]
+        enc_out = enc_out.reshape(B, N * P, -1)
+
+        word_embeddings = self.word_embeddings.permute(1, 0).to(
+            dtype=self.mapping_layer.weight.dtype)
+        source_embeddings = self.mapping_layer(
+            word_embeddings).permute(1, 0)
+        source_embeddings = source_embeddings.to(
+            dtype=self.word_embeddings.dtype)
+
+        reprogram_dtype = \
+            self.reprogramming_layer.query_projection.weight.dtype
+        reprogrammed = self.reprogramming_layer(
+            enc_out.to(dtype=reprogram_dtype),
+            source_embeddings.to(dtype=reprogram_dtype),
+            source_embeddings.to(dtype=reprogram_dtype),
+        ).to(dtype=torch.bfloat16)
+
+        start_tag = self.start_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
+        end_tag = self.end_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
+        task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(
+            B, -1, -1)
+
+        prompt_parts = [start_tag]
+        prompt_length = self.P_start
+        if self.config.use_task_prompt:
+            prompt_parts.append(task_prompt)
+            prompt_length += self.P_task
+        prompt_parts.append(end_tag)
+        prompt_length += self.P_end
+        prompt_parts.append(reprogrammed.to(dtype=task_prompt.dtype))
+
+        inputs_embeds = torch.cat(prompt_parts, dim=1)
+        sequence_length = inputs_embeds.shape[1]
+
+        if self.llm_type == 'chatglm':
+            causal_mask = torch.triu(
+                torch.ones(
+                    sequence_length, sequence_length,
+                    dtype=torch.bool, device=device),
+                diagonal=1,
+            )
+            attention_mask = causal_mask.unsqueeze(0).unsqueeze(0).expand(
+                B, 1, -1, -1)
+            global_pos = torch.arange(
+                sequence_length, dtype=torch.long, device=device
+            ).unsqueeze(0).repeat(B, 1)
+            if self.position_encoding_2d:
+                block_pos = torch.cat([
+                    torch.arange(
+                        prompt_length, dtype=torch.long, device=device),
+                    torch.arange(N * P, dtype=torch.long, device=device),
+                ]).unsqueeze(0).repeat(B, 1)
+
+--- graph_evidence ---
+"""E5: Graph-to-Text —— 把每个样本的图统计量用确定性规则转成自然语言证据。
+
+证据完全由无监督规则生成（不含任何源域学习参数），语言锚定使其
+跨数据集稳定；LLM 以文本 token 形式读取证据，真正利用其预训练
+语言理解能力。
+"""
+
+import torch
+
+# ── 19 通道 10-20 分区（与各 age 数据集通道顺序一致）──
+_CH_LEFT = [0, 1, 2, 3, 4, 10, 11, 12]      # Fp1 F3 C3 P3 O1 F7 T3 T5
+_CH_RIGHT = [5, 6, 7, 8, 9, 13, 14, 15]     # Fp2 F4 C4 P4 O2 F8 T4 T6
+_CH_MIDLINE = [16, 17, 18]                   # Fz Cz Pz
+_CH_FRONTAL = [0, 1, 5, 6, 10, 13]           # Fp1 F3 Fp2 F4 F7 F8
+_CH_POSTERIOR = [3, 4, 8, 9, 12, 15]         # P3 O1 P4 O2 T5 T6
+_CH_CENTRAL = [2, 7, 17]                     # C3 C4 Cz
+_CH_TEMPORAL = [11, 12, 14, 15]              # T3 T5 T4 T6
+_CH_PARIETAL = [3, 8, 18]                    # P3 P4 Pz
+_CH_OCCIPITAL = [4, 9]                       # O1 O2
+
+
+def _build_edge_masks(C, device):
+    """构建 (C, C) 布尔上三角边类型掩码集合。"""
+    triu = torch.triu(torch.ones(C, C, device=device, dtype=torch.bool),
+                      diagonal=1)
+    L = torch.zeros(C, device=device, dtype=torch.bool)
+    R = torch.zeros(C, device=device, dtype=torch.bool)
+    Fm = torch.zeros(C, device=device, dtype=torch.bool)
+    P = torch.zeros(C, device=device, dtype=torch.bool)
+    L[_CH_LEFT] = True
+    R[_CH_RIGHT] = True
+    Fm[_CH_FRONTAL] = True
+    P[_CH_POSTERIOR] = True
+    sides = L | R                                  # 排除中线
+    inter = triu & ((L[:, None] & R[None, :]) | (R[:, None] & L[None, :]))
+    intra = triu & sides[:, None] & sides[None, :] & ~inter
+    frontal = triu & Fm[:, None] & Fm[None, :]
+    posterior = triu & P[:, None] & P[None, :]
+    return inter, intra, frontal, posterior
+
+
+def _quantize(x, thresholds, label_list):
+    """按阈值把 (B,) 张量离散为标签词列表。thresholds: [t1, t2]（升序）。"""
+    idx = torch.zeros_like(x, dtype=torch.long)
+    for t in thresholds:
+        idx += (x >= t).long()
+    return [label_list[i] for i in idx.tolist()]
+
+
+def compute_graph_evidence(dfc, spectral=None, morph=None):
+    """对 (B, W, C, C) DFC 计算确定性图统计量并量化为证据描述。
+
+    Args:
+        dfc: (B, W, C, C) 动态功能连接。
+        spectral: (B, 9) 频谱统计量（数据集层确定性计算），None 时
+            仅用 FC 证据（向后兼容）。
+        morph: (B, 14) 形态学/周期-非周期统计量（CAER-v3），None 时
+            输出保持 18 维（v2 兼容）。
+
+    Returns:
+        levels: (B,) list，每个元素为证据词列表
+            （FC 6 句 + 频谱 4 句 [+ 形态 2 句]）。
+        stats:  (B, 9) / (B, 18) / (B, 32) 连续统计量（裁剪 ±5）。
+    """
+    B, W, C, _ = dfc.shape
+    device = dfc.device
+
+    with torch.no_grad():
+        abs_dfc = dfc.abs()
+        # 全矩阵强度（含对角：对角=1 作为每窗口的锚点参照，
+        # 使统计量跨站点更可比——见 WORK.md 诊断）
+        win_strength = abs_dfc.mean(dim=(-1, -2))                       # (B, W)
+        strength = win_strength.mean(-1)                                # (B,)
+        variability = win_strength.std(-1)                              # (B,)
+        # 时间趋势：每窗口强度对窗口序号的归一化斜率
+        t = torch.arange(W, device=device).float()
+        t = (t - t.mean())
+        slope = (t * (win_strength - win_strength.mean(-1, keepdim=True))
+                 ).sum(-1) / (t ** 2).sum()
+        trend_norm = slope / (win_strength.mean(-1) + 1e-6)
+
+        # 子矩阵均值（含对角，与跨域诊断的 old-def 一致）
+        abs_all = abs_dfc.sum(dim=(-1, -2))                             # (B, W)
+
+        def sub_sum(idx):
+            return abs_dfc[:, :, idx][:, :, :, idx].sum(dim=(-1, -2))
+
+        left_s = sub_sum(_CH_LEFT)
+        right_s = sub_sum(_CH_RIGHT)
+        front_s = sub_sum(_CH_FRONTAL)
+        post_s = sub_sum(_CH_POSTERIOR)
+        cent_s = sub_sum(_CH_CENTRAL)
+        temp_s = sub_sum(_CH_TEMPORAL)
+        pari_s = sub_sum(_CH_PARIETAL)
+        occ_s = sub_sum(_CH_OCCIPITAL)
+        mid_s = sub_sum(_CH_MIDLINE)
+        inter_w = (abs_all - left_s - right_s) / (
+            2 * len(_CH_LEFT) * len(_CH_RIGHT))
+        intra_w = (left_s + right_s) / (
+            len(_CH_LEFT) ** 2 + len(_CH_RIGHT) ** 2)
+        front_w = front_s / len(_CH_FRONTAL) ** 2
+        post_w = post_s / len(_CH_POSTERIOR) ** 2
+        asym_w = (left_s / len(_CH_LEFT) ** 2
+                  - right_s / len(_CH_RIGHT) ** 2).abs()
+
+        inter_ratio = inter_w.mean(-1) / (intra_w.mean(-1) + 1e-6)
+        front_ratio = front_w.mean(-1) / (post_w.mean(-1) + 1e-6)
+        asym = asym_w.mean(-1)
+        cent_mw = (cent_s / len(_CH_CENTRAL) ** 2).mean(-1)
+        temp_mw = (temp_s / len(_CH_TEMPORAL) ** 2).mean(-1)
+        pari_mw = (pari_s / len(_CH_PARIETAL) ** 2).mean(-1)
+        occ_mw = (occ_s / len(_CH_OCCIPITAL) ** 2).mean(-1)
+        mid_mw = (mid_s / len(_CH_MIDLINE) ** 2).mean(-1)
+
+        # ── 量化（相关值是尺度无关的，固定阈值跨站点可解释）──
+        strength_labels = _quantize(
+            strength, [0.15, 0.30], ['low', 'mid', 'high'])
+        inter_labels = _quantize(
+            inter_ratio, [0.7, 1.0], ['weak', 'mid', 'strong'])
+        front_labels = _quantize(
+            front_ratio, [0.7, 1.0], ['low', 'mid', 'high'])
+        var_labels = _quantize(
+            variability, [0.02, 0.05], ['low', 'mid', 'high'])
+        asym_labels = _quantize(
+            asym, [0.02, 0.05], ['small', 'mid', 'large'])
+        trend_idx = torch.where(
+            trend_norm > 0.02, torch.full_like(trend_norm, 2, dtype=torch.long),
+            torch.where(trend_norm < -0.02,
+                        torch.full_like(trend_norm, 0, dtype=torch.long),
+                        torch.ones_like(trend_norm, dtype=torch.long)))
+        trend_words = ['down', 'flat', 'up']
+
+    levels = []
+    for b in range(B):
+        levels.append([
+            strength_labels[b], inter_labels[b], front_labels[b],
+            var_labels[b], trend_words[int(trend_idx[b])], asym_labels[b],
+        ])
+
+    # 连续统计量按名义尺度重缩放（~单位量级，供线性头学习）；
+    # 裁剪重尾。FC 9 维：4 个跨域一致的核心特征 + 5 个脑区均值
+    # （variability/trend 两特征在 CAUEEG 与 TUAB 的年龄相关性符号
+    # 相反，已剔除——见 WORK.md 诊断；hub-ness 同样破坏迁移，已剔除）
+    fc_stats = torch.stack([
+        strength / 0.3,
+        inter_ratio,
+        front_ratio,
+        asym / 0.05,
+        cent_mw / 0.3,
+        temp_mw / 0.3,
+        pari_mw / 0.3,
+        occ_mw / 0.3,
+        mid_mw / 0.3,
+    ], dim=-1)                                                 # (B, 9)
+    fc_stats = fc_stats.clamp(-5.0, 5.0)
+
+    if spectral is None:
+        return levels, fc_stats
+
+    # ── 频谱证据（CAER-v2）：量化 4 个频谱句 + 9 维连续频谱统计量 ──
+    spec = spectral.float().to(device)
+    rel_d, rel_t, rel_a, rel_b = spec[:, 0], spec[:, 1], spec[:, 2], spec[:, 3]
+    tb_ratio, a_dt, slowing, fa_pa, tt_total = (spec[:, 4], spec[:, 5],
+                                                spec[:, 6], spec[:, 7],
+                                                spec[:, 8])
+    with torch.no_grad():
+        slowing_labels = _quantize(
+            slowing, [0.6, 1.2], ['low', 'mid', 'high'])
+        alpha_labels = _quantize(
+            rel_a, [0.25, 0.5], ['low', 'mid', 'high'])
+        tb_labels = _quantize(
+            tb_ratio, [0.8, 1.6], ['low', 'mid', 'high'])
+        fb_idx = torch.where(
+            fa_pa < 0.8, torch.zeros_like(fa_pa, dtype=torch.long),
+            torch.where(fa_pa > 1.3, torch.full_like(fa_pa, 2, dtype=torch.long),
+                        torch.ones_like(fa_pa, dtype=torch.long)))
+        fb_words = ['front', 'even', 'back']
+    for b in range(B):
+        levels[b].extend([
+            slowing_labels[b], alpha_labels[b], tb_labels[b],
+            fb_words[int(fb_idx[b])],
+        ])
+
+    spec_stats = spec.clamp(-5.0, 5.0)
+    stats = torch.cat([fc_stats, spec_stats], dim=-1)           # (B, 18)
+
+    if morph is None:
+        return levels, stats
+
+    # ── 形态学证据（CAER-v3）：2 句证据文本 + 14 维连续统计量 ──
+    # 顺序: ll_mean ll_max sharp_mean sharp_max sharp_focal kurt_mean
+    #       kurt_max zcr_mean gamma_pow spike_mean spike_max apf apf_std slope
+    m = morph.float().to(device)
+    with torch.no_grad():
+        sharp_labels = _quantize(
+            m[:, 3], [6.0, 15.0], ['low', 'mid', 'high'])
+        apf_idx = torch.where(
+            m[:, 12] < 0.3, torch.zeros_like(m[:, 12], dtype=torch.long),
+            torch.where(m[:, 12] > 0.6,
+                        torch.full_like(m[:, 12], 2, dtype=torch.long),
+                        torch.ones_like(m[:, 12], dtype=torch.long)))
+        apf_words = ['smooth', 'mid', 'sharp']
+    for b in range(B):
+        levels[b].extend([
+            sharp_labels[b], apf_words[int(apf_idx[b])],
+        ])
+
+    # 按各特征典型量级缩放（~单位量级供线性头学习），裁剪重尾
+    _MORPH_SCALES = torch.tensor(
+        [0.3, 0.5, 0.4, 15.0, 4.0, 4.0, 10.0, 0.12, 0.03,
+         0.01, 0.03, 9.5, 0.5, 1.5], device=device)
+    morph_stats = (m / _MORPH_SCALES).clamp(-5.0, 5.0)
+    stats = torch.cat([stats, morph_stats], dim=-1)             # (B, 32)
+    return levels, stats
+
+
+# ── 证据句模板（槽位词均为 llama 词表的单 token，保证定长；
+#    固定前缀/后缀可多 token，不影响定长）──
+_EVIDENCE_TEMPLATES = [
+    ("Overall connectivity strength is ", ["low", "mid", "high"], "."),
+    (" Inter-hemispheric coupling is ", ["weak", "mid", "strong"], "."),
+    (" Frontal connectivity is ", ["low", "mid", "high"], "."),
+    (" Temporal variability is ", ["low", "mid", "high"], "."),
+    (" Connectivity ", ["down", "flat", "up"], " across windows."),
+    (" Hemispheric asymmetry is ", ["small", "mid", "large"], "."),
+]
+
+# 频谱证据句（CAER-v2；频谱统计量由数据集层确定性计算传入）
+_SPECTRAL_TEMPLATES = [
+    (" Diffuse slowing is ", ["low", "mid", "high"], "."),
+    (" Alpha activity is ", ["low", "mid", "high"], "."),
+    (" Theta-beta ratio is ", ["low", "mid", "high"], "."),
+    (" Frontal-posterior alpha balance is ", ["front", "even", "back"], "."),
+]
+
+# 形态学证据句（CAER-v3；形态统计量由数据集层确定性计算传入）
+_MORPH_TEMPLATES = [
+    (" Epileptiform sharpness is ", ["low", "mid", "high"], "."),
+    (" Alpha rhythm regularity is ", ["smooth", "mid", "sharp"], "."),
+]
+
+--- stats_prompt ---
+"""Stats prompt: format CAER-v3 evidence stats as text fed to the frozen LLM.
+
+每个样本的 18/32 维 display 统计量（已按固定尺度缩放、裁剪 [-5,5]，
+见 graph_evidence.compute_graph_evidence）被格式化成一段固定结构的
+英文文本，作为统计 prompt 插在任务 prompt 之后、DFC patches 之前。
+"""
+
+import math
+
+_STATS_HEADER = (
+    "EEG statistical prompt.\n"
+    "These continuous statistics summarize one EEG sample over 10 dynamic "
+    "windows.\n"
+    "Each displayed value is clip(raw_value / fixed_scale, -5, +5).\n"
+    "Relative powers are fractions. Alpha peak frequency is measured in Hz "
+    "before scaling."
+)
+_STATS_END = "End of EEG statistical prompt."
+
+_FC_GROUP = "Connectivity statistics:"
+_SPEC_GROUP = "Spectral statistics:"
+_MORPH_GROUP = "Morphology and periodicity statistics:"
+
+_FC_FIELDS = [
+    ("strength", "overall connectivity strength"),
+    ("inter_ratio", "inter-hemispheric coupling ratio"),
+    ("front_ratio", "frontal-to-posterior connectivity ratio"),
+    ("asym", "hemispheric asymmetry"),
+    ("cent_mw", "central connectivity"),
+    ("temp_mw", "temporal connectivity"),
+    ("pari_mw", "parietal connectivity"),
+    ("occ_mw", "occipital connectivity"),
+    ("mid_mw", "midline connectivity"),
+]
+
+_SPEC_FIELDS = [
+    ("rel_d", "delta relative power"),
+    ("rel_t", "theta relative power"),
+    ("rel_a", "alpha relative power"),
+    ("rel_b", "beta relative power"),
+    ("tb_ratio", "theta-to-beta power ratio"),
+    ("a_dt", "alpha-to-delta-plus-theta power ratio"),
+    ("slowing", "diffuse slowing index"),
+    ("fa_pa", "frontal-to-posterior alpha power ratio"),
+    ("tt_total", "temporal theta power fraction"),
+]
+
+_MORPH_FIELDS = [
+    ("ll_mean", "line length mean"),
+    ("ll_max", "line length maximum"),
+    ("sharp_mean", "sharpness mean"),
+    ("sharp_max", "sharpness maximum"),
+    ("sharp_focal", "sharpness focality"),
+    ("kurt_mean", "amplitude kurtosis mean"),
+    ("kurt_max", "amplitude kurtosis maximum"),
+    ("zcr_mean", "zero-crossing rate"),
+    ("gamma_pow", "gamma power fraction"),
+    ("spike_mean", "spike rate mean"),
+    ("spike_max", "spike rate maximum"),
+    ("apf", "alpha peak frequency"),
+    ("apf_std", "alpha peak frequency variability"),
+    ("slope", "aperiodic spectral slope"),
+]
+
+
+def get_stats_schema(stats_dim):
+    """按统计量宽度返回有序 (分组头, 字段表) 列表。
+
+    stats_dim: 9（仅 FC）/ 18（FC+频谱）/ 32（全三族）。
+    """
+    if stats_dim == 32:
+        return [
+            (_FC_GROUP, _FC_FIELDS),
+            (_SPEC_GROUP, _SPEC_FIELDS),
+            (_MORPH_GROUP, _MORPH_FIELDS),
+        ]
+    if stats_dim == 18:
+        return [(_FC_GROUP, _FC_FIELDS), (_SPEC_GROUP, _SPEC_FIELDS)]
+    if stats_dim == 9:
+        return [(_FC_GROUP, _FC_FIELDS)]
+    raise ValueError(f"Unexpected stats dim {stats_dim}")
+
+
+def _format_value(v):
+    """固定 4 位小数、强制正负号、无科学计数法；-0.0000 归正。"""
+    v = float(v)
+    if not math.isfinite(v):
+        v = 0.0
+    v = max(-5.0, min(5.0, v))
+    s = f"{v:+.4f}"
+    return "+0.0000" if s == "-0.0000" else s
+
+
+def build_stats_text(stats):
+    """stats: (B, D) display 值 → 每样本一段统计 prompt 文本。"""
+    groups = get_stats_schema(stats.shape[-1])
+    texts = []
+    for row in stats:
+        parts = [_STATS_HEADER]
+        offset = 0
+        for group_name, fields in groups:
+            parts.append(group_name)
+            for i, (key, name) in enumerate(fields):
+                parts.append(f"{name} [{key}] = {_format_value(row[offset + i])}")
+            offset += len(fields)
+        parts.append(_STATS_END)
+        texts.append("\n".join(parts))
+    return texts
+
+--- dataset refs ---
+data/dataset.py:317:    def spectral_stats(time_series, hz):
+data/dataset.py:367:    def morph_stats(time_series, hz):
+data/dataset.py:463:    def __getitem__(self, item):
+trainers.py:119:        if 'spectral' in inputs:
+trainers.py:120:            kwargs["spectral"] = inputs['spectral'].float().to(self.device)
+trainers.py:121:        if 'morph' in inputs:
+trainers.py:122:            kwargs["morph"] = inputs['morph'].float().to(self.device)
+
+exec
+/bin/bash -lc "sed -n '240,430p' model/TimeLLMPatch/TimeLLMPatch.py && sed -n '280,520p' data/dataset.py && sed -n '430,510p' data/dataset.py && sed -n '80,145p' trainers.py && git show e1d17d0:model/TimeLLMPatch/TimeLLMPatch.py | sed -n '1,430p'" in /root/autodl-tmp/LLM4FC
+ succeeded in 0ms:
+        reprogrammed = self.reprogramming_layer(
+            enc_out.to(dtype=reprogram_dtype),
+            source_embeddings.to(dtype=reprogram_dtype),
+            source_embeddings.to(dtype=reprogram_dtype),
+        ).to(dtype=torch.bfloat16)
+
+        start_tag = self.start_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
+        end_tag = self.end_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
+        task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(
+            B, -1, -1)
+
+        prompt_parts = [start_tag]
+        prompt_length = self.P_start
+        if self.config.use_task_prompt:
+            prompt_parts.append(task_prompt)
+            prompt_length += self.P_task
+        prompt_parts.append(end_tag)
+        prompt_length += self.P_end
+        prompt_parts.append(reprogrammed.to(dtype=task_prompt.dtype))
+
+        inputs_embeds = torch.cat(prompt_parts, dim=1)
+        sequence_length = inputs_embeds.shape[1]
+
+        if self.llm_type == 'chatglm':
+            causal_mask = torch.triu(
+                torch.ones(
+                    sequence_length, sequence_length,
+                    dtype=torch.bool, device=device),
+                diagonal=1,
+            )
+            attention_mask = causal_mask.unsqueeze(0).unsqueeze(0).expand(
+                B, 1, -1, -1)
+            global_pos = torch.arange(
+                sequence_length, dtype=torch.long, device=device
+            ).unsqueeze(0).repeat(B, 1)
+            if self.position_encoding_2d:
+                block_pos = torch.cat([
+                    torch.arange(
+                        prompt_length, dtype=torch.long, device=device),
+                    torch.arange(N * P, dtype=torch.long, device=device),
+                ]).unsqueeze(0).repeat(B, 1)
+                position_ids = torch.stack((global_pos, block_pos), dim=1)
+            else:
+                position_ids = global_pos
+
+            transformer_outputs = self._transformer(
+                input_ids=None,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                past_key_values=None,
+                inputs_embeds=inputs_embeds,
+                use_cache=False,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False,
+            )
+            hidden = transformer_outputs[0].transpose(0, 1)
+        else:
+            position_ids = torch.arange(
+                sequence_length, dtype=torch.long, device=device
+            ).unsqueeze(0).expand(B, -1)
+            transformer_outputs = self._transformer(
+                input_ids=None,
+                position_ids=position_ids,
+                attention_mask=None,
+                past_key_values=None,
+                inputs_embeds=inputs_embeds,
+                use_cache=False,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False,
+            )
+            hidden = transformer_outputs[0]
+
+        hidden_patches = hidden[:, prompt_length:, :self.config.d_ff].to(
+            dtype=self.output_projection[1].weight.dtype)
+
+        # (B, N*P, d_ff) -> (B, N, P, d_ff) -> channel mean-pool ->
+        # (B, P, d_ff) -> flatten -> scalar.
+        hidden_patches = hidden_patches.reshape(
+            B, N, self.config.patch_nums, -1)
+        hidden_patches = hidden_patches.mean(dim=1)
+        logits = self.output_projection(hidden_patches)
+
+        if self.task_type == 'regression':
+            prediction = logits.squeeze(-1)
+            if labels.dim() > 1 and labels.shape[-1] == 1:
+                labels = labels.squeeze(-1)
+            loss = F.huber_loss(
+                prediction, labels.float(), delta=1.0)
+        else:
+            if labels.dim() > 1 and labels.shape[-1] > 1:
+                labels = labels.argmax(dim=-1)
+            loss = F.cross_entropy(logits, labels)
+
+        return ModelOutputs(
+            logits=logits,
+            loss=loss,
+            hidden_state={
+                'patches': enc_out,
+                'reprogrammed': reprogrammed,
+                'HL_patches': hidden_patches,
+            },
+        )
+        if single:
+            fc = fc.unsqueeze(0)  # → (1, N, N)
+
+        B, N, _ = fc.shape
+        device = fc.device
+
+        fc_sparse = fc.clone()
+        fc_abs = fc.abs().clone()
+
+        # 临时清零对角线，避免自环参与 Top-K 竞争
+        idx = torch.arange(N, device=device)
+        fc_sparse[:, idx, idx] = 0.0
+        fc_abs[:, idx, idx] = 0.0
+
+        # ── Top-K 稀疏化：每张图独立选择绝对值最大的 keep_ratio 条边 ──
+        if keep_ratio < 1.0:
+            triu_idx = torch.triu_indices(N, N, offset=1)
+            for b in range(B):
+                vals = fc_abs[b, triu_idx[0], triu_idx[1]]
+                k = max(1, int(round(vals.shape[0] * keep_ratio)))
+                th = vals.topk(k).values[-1]
+                mask = (fc_abs[b] >= th)
+                fc_abs[b] = fc_abs[b] * mask
+                fc_sparse[b] = fc_sparse[b] * mask
+
+        # ── 阈值稀疏化 ──
+        if threshold > 0.0:
+            fc_sparse[fc_abs < threshold] = 0.0
+
+        # ── 恢复对角线为 1 ──
+        fc_sparse[:, idx, idx] = 1.0
+
+        if single:
+            fc_sparse = fc_sparse.squeeze(0)
+        return fc_sparse
+
+    @staticmethod
+    def spectral_stats(time_series, hz):
+        """CAER-v2: 确定性频谱证据（9 维，无监督规则）。
+
+        对 10 个滑窗（12s）做 Welch PSD（2s 分段、hanning 窗），
+        取全通道均值得到 delta/theta/alpha/beta 相对功率，以及
+        theta/beta、alpha/(d+t)、慢波指数 (d+t)/(a+b)、
+        额/枕 alpha 比、颞区 theta 占比。
+
+        Returns:
+            torch.Tensor shape (9,)
+        """
+        W = 12 * hz
+        step = (60 * hz - W) // 9
+        nperseg = 2 * hz
+        freqs = np.fft.rfftfreq(nperseg, 1 / hz)
+        bands = {'d': (0.5, 4.0), 't': (4.0, 8.0),
+                 'a': (8.0, 13.0), 'b': (13.0, 30.0)}
+        frontal = [0, 1, 5, 6, 10, 13]
+        posterior = [3, 4, 8, 9, 12, 15]
+        temporal = [11, 12, 14, 15]
+        win = np.hanning(nperseg)
+        rows = []
+        ts = time_series.detach().numpy().astype(np.float64)
+        nseg = W // nperseg
+        for k in range(10):
+            s = k * step
+            w = ts[:, s:s + W]
+            w = (w - w.mean(1, keepdims=True)) / (w.std(1, keepdims=True) + 1e-8)
+            pw = {bn: [] for bn in bands}
+            for ch in range(w.shape[0]):
+                seg = w[ch, :nseg * nperseg].reshape(nseg, nperseg)
+                ps = (np.abs(np.fft.rfft(seg * win, axis=1)) ** 2).mean(0)
+                for bn, (lo, hi) in bands.items():
+                    pw[bn].append(ps[(freqs >= lo) & (freqs < hi)].sum())
+            total = sum(np.mean(v) for v in pw.values())
+            rel = {bn: np.mean(v) / total for bn, v in pw.items()}
+            fa = sum(pw['a'][ch] for ch in frontal)
+            pa = sum(pw['a'][ch] for ch in posterior)
+            tt = sum(pw['t'][ch] for ch in temporal)
+            rows.append([
+                rel['d'], rel['t'], rel['a'], rel['b'],
+                rel['t'] / max(rel['b'], 1e-9),
+                rel['a'] / max(rel['d'] + rel['t'], 1e-9),
+                (rel['d'] + rel['t']) / max(rel['a'] + rel['b'], 1e-9),
+                fa / max(pa, 1e-9),
+                tt / total,
+            ])
+        return torch.tensor(np.array(rows).mean(0), dtype=torch.float32)
+
+    @staticmethod
+    def morph_stats(time_series, hz):
+        """CAER-v3: 确定性形态学/周期-非周期证据（14 维，无监督规则）。
+
+        时域形态（发作间期放电相关）:
+          ll_mean/ll_max      线长（|Δx| 均值，逐通道均值/最大）
+          sharp_mean/max/focal 锐度 |ΔΔx|（均值/最大/跨通道灶性 std）
+          kurt_mean/max       幅度峰度（瞬态尖波的厚尾特征）
+          zcr_mean            零交叉率
+          gamma_pow           30-45Hz 相对功率
+          spike_mean/max      |ΔΔx|>6×MAD 的棘波速率（均值/最大通道）
+        周期-非周期（年龄相关）:
+          apf / apf_std       alpha 峰值频率（7-13Hz，均值/跨通道 std）
+          slope               2-40Hz log-log PSD 非周期斜率
+
+        Returns:
+            torch.Tensor shape (14,)
+        """
+        ts = time_series.detach().numpy().astype(np.float64)
+        ts = (ts - ts.mean(1, keepdims=True)) / (ts.std(1, keepdims=True) + 1e-8)
+        C, N = ts.shape
+        W = 12 * hz
+        step = (60 * hz - W) // 9
+
+        d1 = np.abs(np.diff(ts, axis=1))
+        d2 = np.abs(np.diff(ts, n=2, axis=1))
+        ll = d1.sum(1) / (N - 1)
+        sharp = d2.mean(1)
+        sharp_max_ch = d2.max(1)
+        kurt = ((ts - ts.mean(1, keepdims=True)) ** 4).mean(1) / (
+            (ts ** 2).mean(1) ** 2 + 1e-12) - 3.0
+        zcr = (np.diff(ts > 0, axis=1) != 0).sum(1) / (N - 1)
+        mad = np.median(d2, axis=1) / 0.6745
+        spike = ((d2 > 6 * mad[:, None]).sum(1)) / (N - 2)
+
+        # PSD: 12s 窗 × 4s 分段 → 0.25Hz 分辨率
+        nperseg = 4 * hz
+        nseg = W // nperseg
+        freqs = np.fft.rfftfreq(nperseg, 1 / hz)
+        win = np.hanning(nperseg)
+        gmask = (freqs >= 30) & (freqs < 45)
+        amask = (freqs >= 7) & (freqs < 13)
+        smask = (freqs >= 2) & (freqs < 40)
+        lf = np.log(freqs[smask])
+        gamma_vals, apf_vals, slope_vals = [], [], []
+        for k in range(10):
+            s = k * step
+            w = ts[:, s:s + W]
+            w = (w - w.mean(1, keepdims=True)) / (w.std(1, keepdims=True) + 1e-8)
+            seg = w[:, :nseg * nperseg].reshape(C, nseg, nperseg)
+            ps = (np.abs(np.fft.rfft(seg * win, axis=2)) ** 2).mean(1)
+            tot = ps.sum(1) + 1e-12
+            gamma_vals.append((ps[:, gmask].sum(1) / tot).mean())
+            apf_vals.append(freqs[amask][ps[:, amask].argmax(1)].mean())
+            slope_vals.append(np.polyfit(lf, np.log(ps[:, smask].mean(0) + 1e-12), 1)[0])
+
+        return torch.tensor([
+            ll.mean(), ll.max(),
+            sharp.mean(), sharp_max_ch.max(), sharp_max_ch.std(),
+            kurt.mean(), kurt.max(),
+            zcr.mean(),
+            np.mean(gamma_vals),
+            spike.mean(), spike.max(),
+            np.mean(apf_vals), np.std(apf_vals),
+            np.mean(slope_vals),
+        ], dtype=torch.float32)
+
+    @staticmethod
+    def dynamic_connectivity(time_series, window_size, step_size):
+        """Compute dynamic FC via sliding windows.
+
+        Each window calls connectivity() (nilearn Pearson correlation).
+
+        Args:
+            time_series: (N, T) tensor.
+            window_size: int, samples per window.
+            step_size:   int, stride between window starts.
+
+        Returns:
+            (num_windows, N, N) tensor.
+        """
+        N, T = time_series.shape
+        num_windows = (T - window_size) // step_size + 1
+
+        dfc = []
+        for i in range(num_windows):
+            start = i * step_size
+            end = start + window_size
+            window_data = time_series[:, start:end]
+            dfc.append(BaseDataset.connectivity(window_data))
+
+        return torch.stack(dfc, dim=0)
+
+    def __len__(self):
+        return len(self._active_index)
+
+    @abstractmethod
+    def __getitem__(self, item):
+        pass
+            np.mean(slope_vals),
+        ], dtype=torch.float32)
+
+    @staticmethod
+    def dynamic_connectivity(time_series, window_size, step_size):
+        """Compute dynamic FC via sliding windows.
+
+        Each window calls connectivity() (nilearn Pearson correlation).
+
+        Args:
+            time_series: (N, T) tensor.
+            window_size: int, samples per window.
+            step_size:   int, stride between window starts.
+
+        Returns:
+            (num_windows, N, N) tensor.
+        """
+        N, T = time_series.shape
+        num_windows = (T - window_size) // step_size + 1
+
+        dfc = []
+        for i in range(num_windows):
+            start = i * step_size
+            end = start + window_size
+            window_data = time_series[:, start:end]
+            dfc.append(BaseDataset.connectivity(window_data))
+
+        return torch.stack(dfc, dim=0)
+
+    def __len__(self):
+        return len(self._active_index)
+
+    @abstractmethod
+    def __getitem__(self, item):
+        pass
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TimeLLMTrainer(Trainer):
+    """TimeLLM v2 trainer for dynamic-FC-based dementia classification.
+
+    Architecture: DFC → shared GCN per-window → (B, T*C, 128)
+    → Reprogramming (cross-attention to text prototypes) → frozen LLM
+    → Flatten → classifier.
+
+    Supports: Single GPU (AMP), Multi-GPU DDP, DeepSpeed ZeRO-2
+    """
+
+    def __init__(self, args, local_rank=0, task_id=0, episode_seed=None):
+        super().__init__(args, local_rank=local_rank, task_id=task_id,
+                         episode_seed=episode_seed)
+
+    def prepare_inputs_kwargs(self, inputs):
+        """Extract fields for TimeLLM v2 forward pass.
+
+        Uses dynamic FC (DFC) as main graph input;
+        static FC (correlation) for stats prompt.
+
+        按任务类型自适应：
+        - 分类：标签 → integer index
+        - 回归：标签 → float32
+        - 多值回归：DFC → DFC_input（前 k 个窗口），标签 → DFC_target
+        """
+        labels = inputs['labels']
+        if self.data_config.is_classification:
+            if labels.dim() > 1 and labels.shape[-1] > 1:
+                labels = labels.argmax(dim=-1)
+            labels = labels.long()
+        elif self.data_config.is_regression:
+            labels = labels.float()
+        kwargs = {
+            "DFC": inputs['DFC'].float().to(self.device),
+            "SFC": inputs['correlation'].float().to(self.device),
+            "labels": labels.to(self.device),
+        }
+        if 'spectral' in inputs:
+            kwargs["spectral"] = inputs['spectral'].float().to(self.device)
+        if 'morph' in inputs:
+            kwargs["morph"] = inputs['morph'].float().to(self.device)
+        return kwargs
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TimeLLMPatchTrainer — raw-EEG Time-LLM patching with a frozen LLM
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TimeLLMPatchTrainer(Trainer):
+    """TimeLLM raw-EEG patch trainer (Time-LLM-style reprogramming).
+
+    Architecture: raw EEG (B, 19, T) → per-channel z-score → patch embedding
+    → (B, N*P, 128) → Reprogramming (cross-attention to text prototypes)
+    → frozen LLM → channel mean-pool → flatten → regressor/classifier.
+    """
+
+    def __init__(self, args, local_rank=0, task_id=0, episode_seed=None):
+        super().__init__(args, local_rank=local_rank, task_id=task_id,
+                         episode_seed=episode_seed)
+
+    def prepare_inputs_kwargs(self, inputs):
+        """Extract fields for TimeLLMPatch forward pass.
+
+        Uses the raw EEG time series as the sole input (no DFC/SFC).
+from math import sqrt
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from transformers import AutoConfig, AutoModel, AutoTokenizer
+
+from ..base import BaseConfig, ModelOutputs
+from .prompts import get_prompt_config
+
+
+class PatchEmbedding(nn.Module):
+    """Time-LLM patching: replicate-pad, unfold, project each patch to d_model.
+
+    Mirrors the upstream Time-LLM PatchEmbedding (layers/Embed.py).
+    """
+
+    def __init__(self, d_model, patch_len, stride, dropout):
+        super().__init__()
+        self.patch_len = patch_len
+        self.stride = stride
+        self.padding_patch_layer = nn.ReplicationPad1d((0, stride))
+        self.value_embedding = nn.Conv1d(
+            patch_len, d_model, kernel_size=3,
+            padding=1, padding_mode='circular', bias=False)
+        nn.init.kaiming_normal_(
+            self.value_embedding.weight, mode='fan_in',
+            nonlinearity='leaky_relu')
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        # x: (B, N, T) raw EEG
+        n_vars = x.shape[1]
+        x = self.padding_patch_layer(x)
+        x = x.unfold(dimension=-1, size=self.patch_len, step=self.stride)
+        x = torch.reshape(x, (x.shape[0] * x.shape[1], x.shape[2], x.shape[3]))
+        x = self.value_embedding(x.permute(0, 2, 1)).transpose(1, 2)
+        return self.dropout(x), n_vars
+
+
+class TimeLLMPatchConfig(BaseConfig):
+    def __init__(self, node_size,
+                 time_series_size=12000,
+                 d_model=128,
+                 n_heads=8,
+                 d_ff=128,
+                 num_prototypes=1000,
+                 dropout=0.1,
+                 patch_len=512,
+                 patch_stride=512,
+                 task_type='classification',
+                 output_dim=2,
+                 dataset_name='CAUEEG',
+                 llm_type='chatglm',
+                 llm_path='./model/chatglm-6b',
+                 use_task_prompt=False,
+                 llm_init='pretrained'):
+        super().__init__(node_size=node_size, output_dim=output_dim)
+        self.time_series_size = time_series_size
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.d_ff = d_ff
+        self.num_prototypes = num_prototypes
+        self.dropout = dropout
+        self.patch_len = patch_len
+        self.patch_stride = patch_stride
+        self.task_type = task_type
+        self.output_dim = output_dim
+        self.dataset_name = dataset_name
+        self.llm_type = llm_type
+        self.llm_path = llm_path
+        self.llm_init = llm_init
+        self.use_task_prompt = use_task_prompt
+
+        # Patches per channel (replicate pad of `stride` adds one patch, and
+        # the final tail is kept): (T - patch_len) // stride + 2.
+        self.patch_nums = (time_series_size - patch_len) // patch_stride + 2
+        # Head sees channel mean-pooled patches: (B, patch_nums, d_ff).
+        self.head_nf = d_ff * self.patch_nums
+
+
+class ReprogrammingLayer(nn.Module):
+    def __init__(self, d_model, n_heads, d_keys=None, d_llm=None,
+                 attention_dropout=0.1):
+        super().__init__()
+        d_keys = d_keys or (d_model // n_heads)
+
+        self.query_projection = nn.Linear(d_model, d_keys * n_heads)
+        self.key_projection = nn.Linear(d_llm, d_keys * n_heads)
+        self.value_projection = nn.Linear(d_llm, d_keys * n_heads)
+        self.out_projection = nn.Linear(d_keys * n_heads, d_llm)
+        self.n_heads = n_heads
+        self.dropout = nn.Dropout(attention_dropout)
+
+    def forward(self, target_embedding, source_embedding, value_embedding):
+        B, L, _ = target_embedding.shape
+        S, _ = source_embedding.shape
+        H = self.n_heads
+
+        target_embedding = self.query_projection(target_embedding).view(
+            B, L, H, -1)
+        source_embedding = self.key_projection(source_embedding).view(S, H, -1)
+        value_embedding = self.value_projection(value_embedding).view(S, H, -1)
+
+        out = self._reprogramming(
+            target_embedding, source_embedding, value_embedding)
+        return self.out_projection(out.reshape(B, L, -1))
+
+    def _reprogramming(self, target_embedding, source_embedding,
+                       value_embedding):
+        _, _, _, E = target_embedding.shape
+        scale = 1. / sqrt(E)
+        scores = torch.einsum(
+            "blhe,she->bhls", target_embedding, source_embedding)
+        attention = self.dropout(torch.softmax(scale * scores, dim=-1))
+        return torch.einsum(
+            "bhls,she->blhe", attention, value_embedding)
+
+
+class Model(nn.Module):
+    def __init__(self, config: TimeLLMPatchConfig):
+        super().__init__()
+        self.config = config
+        self.d_model = config.d_model
+        self.num_prototypes = config.num_prototypes
+        self.n_heads = config.n_heads
+        self.d_llm = 4096
+        self.llm_type = config.llm_type
+        self.llm_path = config.llm_path
+
+        self.patch_embedding = PatchEmbedding(
+            d_model=config.d_model,
+            patch_len=config.patch_len,
+            stride=config.patch_stride,
+            dropout=config.dropout,
+        )
+
+        if self.llm_type == 'chatglm':
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.llm_path, trust_remote_code=True)
+            if config.llm_init == 'random':
+                llm_config = AutoConfig.from_pretrained(
+                    self.llm_path, trust_remote_code=True)
+                self.llm = AutoModel.from_config(
+                    llm_config, trust_remote_code=True).bfloat16()
+            else:
+                self.llm = AutoModel.from_pretrained(
+                    self.llm_path, trust_remote_code=True).bfloat16()
+            self.llm.transformer.gradient_checkpointing = False
+            self.position_encoding_2d = \
+                self.llm.transformer.position_encoding_2d
+            self._word_embeddings = self.llm.transformer.word_embeddings
+            self._transformer = self.llm.transformer
+        elif self.llm_type == 'llama':
+            self.tokenizer = AutoTokenizer.from_pretrained(self.llm_path)
+            if config.llm_init == 'random':
+                llm_config = AutoConfig.from_pretrained(self.llm_path)
+                self.llm = AutoModel.from_config(
+                    llm_config, torch_dtype=torch.bfloat16)
+            else:
+                self.llm = AutoModel.from_pretrained(
+                    self.llm_path, torch_dtype=torch.bfloat16)
+            self.llm.config.use_cache = False
+            self.position_encoding_2d = False
+            self._word_embeddings = self.llm.embed_tokens
+            self._transformer = self.llm
+        else:
+            raise ValueError(f"Unsupported llm_type: {self.llm_type}")
+
+        prompt_config = get_prompt_config(config.dataset_name)
+        task_ids = self.tokenizer.encode(prompt_config.prompt_task)
+        with torch.no_grad():
+            task_embeds = self._word_embeddings(torch.tensor(task_ids))
+        self.register_buffer("task_prompt_embeddings", task_embeds)
+        self.P_task = task_embeds.shape[0]
+
+        start_tag_ids = self.tokenizer.encode("<start_prompt>\n")
+        with torch.no_grad():
+            start_tag_embeds = self._word_embeddings(
+                torch.tensor(start_tag_ids))
+        self.register_buffer("start_tag_embeddings", start_tag_embeds)
+        self.P_start = start_tag_embeds.shape[0]
+
+        end_tag_ids = self.tokenizer.encode("\n<end_prompt>")
+        with torch.no_grad():
+            end_tag_embeds = self._word_embeddings(torch.tensor(end_tag_ids))
+        self.register_buffer("end_tag_embeddings", end_tag_embeds)
+        self.P_end = end_tag_embeds.shape[0]
+
+        self.word_embeddings = self._word_embeddings.weight
+        self.vocab_size = self.word_embeddings.shape[0]
+        self.mapping_layer = nn.Linear(
+            self.vocab_size, self.num_prototypes)
+        self.reprogramming_layer = ReprogrammingLayer(
+            d_model=config.d_model,
+            n_heads=config.n_heads,
+            d_llm=self.d_llm,
+            attention_dropout=config.dropout,
+        )
+
+        self.task_type = config.task_type
+        self.output_projection = nn.Sequential(
+            nn.Flatten(start_dim=1),
+            nn.Linear(config.head_nf, config.output_dim),
+            nn.Dropout(config.dropout),
+        )
+
+        for param in self.llm.parameters():
+            param.requires_grad = False
+
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+    def forward(self, x, labels):
+        B, N, T = x.shape
+        device = x.device
+
+        # Per-sample per-channel z-score: amplitude invariance is the key
+        # property for cross-domain zero-shot transfer.
+        mean = x.mean(dim=-1, keepdim=True)
+        std = x.std(dim=-1, keepdim=True)
+        x = (x - mean) / (std + 1e-5)
+
+        # Patch embedding, then channel-major flatten:
+        # [c0p0, ..., c0p(P-1), c1p0, ..., c(N-1)p(P-1)].
+        x = x.to(dtype=self.patch_embedding.value_embedding.weight.dtype)
+        enc_out, _ = self.patch_embedding(x)
+        P = enc_out.shape[1]
+        enc_out = enc_out.reshape(B, N * P, -1)
+
+        word_embeddings = self.word_embeddings.permute(1, 0).to(
+            dtype=self.mapping_layer.weight.dtype)
+        source_embeddings = self.mapping_layer(
+            word_embeddings).permute(1, 0)
+        source_embeddings = source_embeddings.to(
+            dtype=self.word_embeddings.dtype)
+
+        reprogram_dtype = \
+            self.reprogramming_layer.query_projection.weight.dtype
+        reprogrammed = self.reprogramming_layer(
+            enc_out.to(dtype=reprogram_dtype),
+            source_embeddings.to(dtype=reprogram_dtype),
+            source_embeddings.to(dtype=reprogram_dtype),
+        ).to(dtype=torch.bfloat16)
+
+        start_tag = self.start_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
+        end_tag = self.end_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
+        task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(
+            B, -1, -1)
+
+        prompt_parts = [start_tag]
+        prompt_length = self.P_start
+        if self.config.use_task_prompt:
+            prompt_parts.append(task_prompt)
+            prompt_length += self.P_task
+        prompt_parts.append(end_tag)
+        prompt_length += self.P_end
+        prompt_parts.append(reprogrammed.to(dtype=task_prompt.dtype))
+
+        inputs_embeds = torch.cat(prompt_parts, dim=1)
+        sequence_length = inputs_embeds.shape[1]
+
+        if self.llm_type == 'chatglm':
+            causal_mask = torch.triu(
+                torch.ones(
+                    sequence_length, sequence_length,
+                    dtype=torch.bool, device=device),
+                diagonal=1,
+            )
+            attention_mask = causal_mask.unsqueeze(0).unsqueeze(0).expand(
+                B, 1, -1, -1)
+            global_pos = torch.arange(
+                sequence_length, dtype=torch.long, device=device
+            ).unsqueeze(0).repeat(B, 1)
+            if self.position_encoding_2d:
+                block_pos = torch.cat([
+                    torch.arange(
+                        prompt_length, dtype=torch.long, device=device),
+                    torch.arange(N * P, dtype=torch.long, device=device),
+                ]).unsqueeze(0).repeat(B, 1)
+                position_ids = torch.stack((global_pos, block_pos), dim=1)
+            else:
+                position_ids = global_pos
+
+            transformer_outputs = self._transformer(
+                input_ids=None,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                past_key_values=None,
+                inputs_embeds=inputs_embeds,
+                use_cache=False,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False,
+            )
+            hidden = transformer_outputs[0].transpose(0, 1)
+        else:
+            position_ids = torch.arange(
+                sequence_length, dtype=torch.long, device=device
+            ).unsqueeze(0).expand(B, -1)
+            transformer_outputs = self._transformer(
+                input_ids=None,
+                position_ids=position_ids,
+                attention_mask=None,
+                past_key_values=None,
+                inputs_embeds=inputs_embeds,
+                use_cache=False,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False,
+            )
+            hidden = transformer_outputs[0]
+
+        hidden_patches = hidden[:, prompt_length:, :self.config.d_ff].to(
+            dtype=self.output_projection[1].weight.dtype)
+
+        # (B, N*P, d_ff) -> (B, N, P, d_ff) -> channel mean-pool ->
+        # (B, P, d_ff) -> flatten -> scalar.
+        hidden_patches = hidden_patches.reshape(
+            B, N, self.config.patch_nums, -1)
+        hidden_patches = hidden_patches.mean(dim=1)
+        logits = self.output_projection(hidden_patches)
+
+        if self.task_type == 'regression':
+            prediction = logits.squeeze(-1)
+            if labels.dim() > 1 and labels.shape[-1] == 1:
+                labels = labels.squeeze(-1)
+            loss = F.huber_loss(
+                prediction, labels.float(), delta=1.0)
+        else:
+            if labels.dim() > 1 and labels.shape[-1] > 1:
+                labels = labels.argmax(dim=-1)
+            loss = F.cross_entropy(logits, labels)
+
+        return ModelOutputs(
+            logits=logits,
+            loss=loss,
+            hidden_state={
+                'patches': enc_out,
+                'reprogrammed': reprogrammed,
+                'HL_patches': hidden_patches,
+            },
+        )
+
+exec
+/bin/bash -lc "sed -n '135,185p' trainers.py && git show HEAD:model/TimeLLM/graph_evidence.py | sed -n '1,240p' && git show HEAD:model/TimeLLM/stats_prompt.py | sed -n '1,220p' && git status --short && git log --oneline -8" in /root/autodl-tmp/LLM4FC
+ succeeded in 0ms:
+    → frozen LLM → channel mean-pool → flatten → regressor/classifier.
+    """
+
+    def __init__(self, args, local_rank=0, task_id=0, episode_seed=None):
+        super().__init__(args, local_rank=local_rank, task_id=task_id,
+                         episode_seed=episode_seed)
+
+    def prepare_inputs_kwargs(self, inputs):
+        """Extract fields for TimeLLMPatch forward pass.
+
+        Uses the raw EEG time series as the sole input (no DFC/SFC).
+
+        按任务类型自适应：
+        - 分类：标签 → integer index
+        - 回归：标签 → float32
+        """
+        labels = inputs['labels']
+        if self.data_config.is_classification:
+            if labels.dim() > 1 and labels.shape[-1] > 1:
+                labels = labels.argmax(dim=-1)
+            labels = labels.long()
+        elif self.data_config.is_regression:
+            labels = labels.float()
+        kwargs = {
+            "x": inputs['time_series'].float().to(self.device),
+            "labels": labels.to(self.device),
+        }
+        return kwargs
+fatal: path 'model/TimeLLM/graph_evidence.py' exists on disk, but not in 'HEAD'
+fatal: path 'model/TimeLLM/stats_prompt.py' exists on disk, but not in 'HEAD'
+ M __pycache__/config.cpython-312.pyc
+ M __pycache__/trainers.cpython-312.pyc
+ M config.py
+ M data/__pycache__/dataset.cpython-312.pyc
+ M data/caueeg/__pycache__/age_caueeg.cpython-312.pyc
+ M data/caueeg/__pycache__/disease_caueeg.cpython-312.pyc
+ M data/caueeg/age_caueeg.py
+ M data/caueeg/disease_caueeg.py
+ M data/dataset.py
+ M data/tuab/__pycache__/age_tuab.cpython-312.pyc
+ M data/tuab/__pycache__/disease_tuab.cpython-312.pyc
+ M data/tuab/age_tuab.py
+ M data/tuab/disease_tuab.py
+ M data/tuep/__pycache__/age_tuep.cpython-312.pyc
+ M data/tuep/__pycache__/disease_tuep.cpython-312.pyc
+ M data/tuep/age_tuep.py
+ M data/tuep/disease_tuep.py
+ M model/TimeLLM/TimeLLM.py
+ M model/TimeLLM/__pycache__/TimeLLM.cpython-312.pyc
+ M trainers.py
+?? .codex-answer-knowledge-compiler.txt
+?? .codex-review-knowledge-compiler.txt
+?? .codex-review-stats-prompt.txt
+?? model/TimeLLM/__pycache__/graph_evidence.cpython-312.pyc
+?? model/TimeLLM/__pycache__/stats_prompt.cpython-312.pyc
+?? model/TimeLLM/graph_evidence.py
+?? model/TimeLLM/stats_prompt.py
+?? scripts/train_TimeLLMStatsPrompt.sh
+e1d17d0 实现了TimeLLMPatch并跑出了年龄实验
+f412c09 提出了一些无用方法/模块/trick
+48da400 添加了时序编码器和llm不同的初始化方案并跑出了试验结果
+f78db1e 跑出了在AgeTUAB上有无cvib的试验
+08dcdd4 优化了cvib_kl函数
+c6f965b 删除了CVIB的对比模式，但未检查运行时BUG
+5fe693d 设置beta为0.1，精度下降
+c4c936c 将beta设置为1e-2，精度提升
+
+exec
+/bin/bash -lc "rg -n \"use_task_prompt|TimeLLMPatch|llm_type|task prompt\" config.py main.py scripts | head -180 && rg -n \"TimeLLMPatchConfig|TimeLLMPatchTrainer|Model\\(\" model config.py main.py | head -180" in /root/autodl-tmp/LLM4FC
+ succeeded in 0ms:
+config.py:67:            llm_type=args.llm_type,
+config.py:70:            use_task_prompt=args.use_task_prompt,
+config.py:74:    elif args.model == 'TimeLLMPatch':
+config.py:75:        model_config = TimeLLMPatchConfig(
+config.py:88:            llm_type=args.llm_type,
+config.py:91:            use_task_prompt=args.use_task_prompt,
+config.py:93:        model = TimeLLMPatchModel(model_config)
+config.py:186:    model_group.add_argument("--llm_type", default="chatglm", type=str,
+config.py:196:    model_group.add_argument("--patch_stride", default=5, type=int, help="Patch stride (TimeLLMPatch raw-EEG patching; legacy DFC subsampling for TimeLLM v1)")
+config.py:200:    model_group.add_argument("--use_task_prompt", action="store_true",
+config.py:206:    model_group.add_argument("--patch_len", default=512, type=int, help="Patch length in raw samples (TimeLLMPatch)")
+scripts/eval_TimeLLMPatch_zs.sh:3:# TimeLLMPatch zero-shot evaluation script (single-GPU, no training)
+scripts/eval_TimeLLMPatch_zs.sh:5:# Run: sh scripts/eval_TimeLLMPatch_zs.sh
+scripts/eval_TimeLLMPatch_zs.sh:9:PRETRAIN_PATH="./output_dir/TimeLLMPatch_AgeCAUEEG_train"
+scripts/eval_TimeLLMPatch_zs.sh:12:    --model "TimeLLMPatch" \
+scripts/eval_TimeLLMPatch_zs.sh:21:    --llm_type llama \
+scripts/eval_TimeLLMPatch_zs.sh:24:    --use_task_prompt \
+scripts/train_TimeLLM.sh:25:    --llm_type llama \
+scripts/train_TimeLLM.sh:31:    --use_task_prompt \
+scripts/train_TimeLLMStatsPrompt.sh:25:    --llm_type llama \
+scripts/train_TimeLLMStatsPrompt.sh:31:    --use_task_prompt \
+scripts/train_TimeLLMPatch.sh:3:# TimeLLMPatch (raw-EEG patch + reprogramming + frozen LLM) training script
+scripts/train_TimeLLMPatch.sh:5:# Run: sh scripts/train_TimeLLMPatch.sh
+scripts/train_TimeLLMPatch.sh:12:    --model "TimeLLMPatch" \
+scripts/train_TimeLLMPatch.sh:24:    --llm_type llama \
+scripts/train_TimeLLMPatch.sh:27:    --use_task_prompt \
+model/base/model.py:7:class BaseModel(nn.Module):
+model/TimeLLMPatch/TimeLLMPatch.py:41:class TimeLLMPatchConfig(BaseConfig):
+model/TimeLLMPatch/TimeLLMPatch.py:120:class Model(nn.Module):
+model/TimeLLMPatch/TimeLLMPatch.py:121:    def __init__(self, config: TimeLLMPatchConfig):
+model/TimeLLMPatch/__init__.py:2:from .TimeLLMPatch import TimeLLMPatchConfig
+model/TimeLLM/TimeLLM.py:99:class Model(nn.Module):
+model/chatglm-6b/modeling_chatglm.py.bak:663:class ChatGLMPreTrainedModel(PreTrainedModel):
+model/chatglm-6b/modeling_chatglm.py.bak:787:class ChatGLMModel(ChatGLMPreTrainedModel):
+model/chatglm-6b/modeling_chatglm.py.bak:1050:        self.transformer = ChatGLMModel(config, empty_init=empty_init)
+model/chatglm-6b/configuration_chatglm.py:51:    >>> model = ChatGLMModel(configuration)
+model/chatglm-6b/modeling_chatglm.py:663:class ChatGLMPreTrainedModel(PreTrainedModel):
+model/chatglm-6b/modeling_chatglm.py:787:class ChatGLMModel(ChatGLMPreTrainedModel):
+model/chatglm-6b/modeling_chatglm.py:1050:        self.transformer = ChatGLMModel(config, empty_init=empty_init)
+config.py:73:        model = Model(model_config)
+config.py:75:        model_config = TimeLLMPatchConfig(
+config.py:93:        model = TimeLLMPatchModel(model_config)
+
+exec
+/bin/bash -lc "sed -n '1,120p' config.py && sed -n '170,220p' config.py && rg -n \"spectral_stats\\(|morph_stats\\(|'spectral'|\\\"spectral\\\"|morph\" data | head -240" in /root/autodl-tmp/LLM4FC
+ succeeded in 0ms:
+from model import *
+import torch.nn as nn
+from data import DataConfig
+import argparse
+import sys
+
+import pdb
+
+
+def init_model_config(args, data_config: DataConfig):
+    if args.model == "BNT":
+        model_config = BNTConfig(node_size=data_config.node_size,
+                                 sizes=(data_config.node_size, data_config.node_size // 2),
+                                 pooling=(False, True),
+                                 pos_encoding=None,  # identity, none
+                                 orthogonal=True,
+                                 # freeze_center=True,
+                                 freeze_center=False,
+                                 project_assignment=True,
+                                 num_heads=args.num_heads,
+                                 pos_embed_dim=data_config.node_size,
+                                 dim_feedforward=1024,
+                                 task_type=data_config.task_type,
+                                 output_dim=data_config.output_dim,
+                                 )
+        model = BNT(model_config)
+    elif args.model == 'BrainNetCNN':
+        model_config = BrainNetCNNConfig(node_size=data_config.node_size,
+                                         task_type=data_config.task_type,
+                                         output_dim=data_config.output_dim)
+        model = BrainNetCNN(model_config)
+    elif args.model == "ALTER":
+        model_config = ALTERConfig(node_size=data_config.node_size,
+                                 # sizes=(data_config.node_size, data_config.node_size // 2),
+                                 sizes=(360, 100),
+                                 pooling=(False, True),
+                                 pos_encoding="rrwp",  # identity, none
+                                 orthogonal=True,
+                                 freeze_center=False,
+                                 project_assignment=True,
+                                 num_heads=args.num_heads,
+                                 # pos_embed_dim=data_config.node_size,
+                                 pos_embed_dim=32,
+                                 dim_feedforward=1024,
+                                 task_type=data_config.task_type,
+                                 output_dim=data_config.output_dim,
+                                 )
+        model = ALTER(model_config)
+    elif args.model == 'GCDGCN':
+        model_config = GCDGCNConfig(node_size=data_config.node_size,
+                                         task_type=data_config.task_type,
+                                         output_dim=data_config.output_dim)
+        model = GCDGCN(model_config)
+    elif args.model == 'TimeLLM':
+        model_config = TimeLLMConfig(
+            node_size=data_config.node_size,
+            d_model=args.d_model,
+            n_heads=args.num_heads,
+            d_ff=args.d_ff,
+            num_prototypes=args.num_prototypes,
+            num_gcn_layers=args.num_gcn_layers,
+            dropout=args.dropout,
+            num_windows=args.num_windows,
+            task_type=data_config.task_type,
+            output_dim=data_config.output_dim,
+            dataset_name=args.dataset,
+            llm_type=args.llm_type,
+            llm_path=args.llm_path,
+            llm_init=args.llm_init,
+            use_task_prompt=args.use_task_prompt,
+            use_stats_prompt=args.use_stats_prompt,
+        )
+        model = Model(model_config)
+    elif args.model == 'TimeLLMPatch':
+        model_config = TimeLLMPatchConfig(
+            node_size=data_config.node_size,
+            time_series_size=data_config.time_series_size,
+            d_model=args.d_model,
+            n_heads=args.num_heads,
+            d_ff=args.d_ff,
+            num_prototypes=args.num_prototypes,
+            dropout=args.dropout,
+            patch_len=args.patch_len,
+            patch_stride=args.patch_stride,
+            task_type=data_config.task_type,
+            output_dim=data_config.output_dim,
+            dataset_name=args.dataset,
+            llm_type=args.llm_type,
+            llm_path=args.llm_path,
+            llm_init=args.llm_init,
+            use_task_prompt=args.use_task_prompt,
+        )
+        model = TimeLLMPatchModel(model_config)
+    else:
+        model = None
+        model_config = None
+    if model is not None:
+        init_parameters(model, model_config)
+    return model, model_config
+
+
+def init_parameters(model, model_config):
+    if model_config.initializer is not None:
+        for p in model.parameters():
+            if p.dim() > 1:
+                if model.config.initializer == 'xavier':
+                    nn.init.xavier_uniform_(p)
+                elif model.config.initializer == 'orthogonal':
+                    nn.init.orthogonal_(p)
+
+
+class TrackingArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser that records which options were explicitly passed on
+    the command line (both ``--opt value`` and ``--opt=value`` forms)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.explicit_options = set()
+
+    def parse_known_args(self, args=None, namespace=None):
+    model_group.add_argument("--k", default=5, type=int, help="")
+    model_group.add_argument("--num_kernels", default=5, type=int, help="")
+    model_group.add_argument("--sparsity", default=0.7, type=float, help="")
+    model_group.add_argument("--dynamic_stride", default=1, type=int, help="")
+    model_group.add_argument("--hidden_dim", default=1024, type=int, help="")
+    model_group.add_argument("--num_heads", default=1, type=int, help="")
+    model_group.add_argument("--abla_channel", default=-1, type=int, help="Channel Ablation EXP")
+    model_group.add_argument("--abla_vae", default="n", type=str, help="Vae Ablation EXP")
+    model_group.add_argument("--num_layers", default=2, type=int, help="")
+    model_group.add_argument("--attention_depth", default=2, type=int, help="")
+    model_group.add_argument("--activation", default="gelu", type=str, help="")
+    model_group.add_argument("--model_dir", default="output_dir", type=str, help="")
+    model_group.add_argument("--dropout", default=0.5, type=float, help="")
+    model_group.add_argument("--distill", action="store_true", help="")
+    model_group.add_argument("--initializer", default=None, type=str, help="")
+    model_group.add_argument("--integration", default=None, type=str, help="")
+    model_group.add_argument("--llm_type", default="chatglm", type=str,
+                             choices=["chatglm", "llama"],
+                             help="LLM backbone: chatglm (default) or llama")
+    model_group.add_argument("--llm_path", default="./model/chatglm-6b", type=str,
+                             help="Path to pretrained LLM directory")
+    model_group.add_argument("--llm_init", default="pretrained", type=str,
+                             choices=["pretrained", "random"],
+                             help="LLM weight init for ablation: 'pretrained' (default) "
+                                  "or 'random' (same arch, randomly-initialized weights, "
+                                  "to test whether pretrained knowledge contributes)")
+    model_group.add_argument("--patch_stride", default=5, type=int, help="Patch stride (TimeLLMPatch raw-EEG patching; legacy DFC subsampling for TimeLLM v1)")
+    model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
+    model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
+    model_group.add_argument("--num_gcn_layers", default=1, type=int, help="Number of GCN layers (TimeLLM)")
+    model_group.add_argument("--use_task_prompt", action="store_true",
+                             help="TimeLLM: include task description prompt")
+    model_group.add_argument("--use_stats_prompt", action="store_true",
+                             help="TimeLLM: include CAER-v3 statistics as a "
+                                  "text prompt before the DFC patches")
+    model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
+    model_group.add_argument("--patch_len", default=512, type=int, help="Patch length in raw samples (TimeLLMPatch)")
+
+    train_group = parser.add_argument_group(title="train", description="")
+    train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
+    train_group.add_argument("--pretrain_path", default="", type=str,
+                             help="Pretrained checkpoint dir for transfer-learning "
+                                  "few-shot / zero-shot")
+    train_group.add_argument("--do_train", action="store_true", help="")
+    train_group.add_argument("--do_parallel", action="store_true", help="")
+    train_group.add_argument("--deepspeed", action="store_true", help="Enable DeepSpeed ZeRO-2/3")
+    train_group.add_argument("--deepspeed_config", default="ds_config_zero3.json", type=str, help="DeepSpeed config JSON path")
+    train_group.add_argument("--local_rank", default=0, type=int, help="Local rank (set by DeepSpeed launcher)")
+    train_group.add_argument("--device", default="cuda", type=str, help="")
+    train_group.add_argument("--save_steps", default=200, type=int, help="")
+    train_group.add_argument("--epsilon_ls", default=0, type=float, help=" label_smoothing")
+data/dataset.py:317:    def spectral_stats(time_series, hz):
+data/dataset.py:367:    def morph_stats(time_series, hz):
+data/tuab/age_tuab.py:150:                'spectral': self.spectral_stats(time_series, self.hz),
+data/tuab/age_tuab.py:151:                'morph': self.morph_stats(time_series, self.hz),
+data/tuab/disease_tuab.py:154:                'spectral': self.spectral_stats(time_series, self.hz),
+data/tuab/disease_tuab.py:155:                'morph': self.morph_stats(time_series, self.hz),
+data/caueeg/disease_caueeg.py:79:                'spectral': self.spectral_stats(time_series, self.hz),
+data/caueeg/disease_caueeg.py:80:                'morph': self.morph_stats(time_series, self.hz),
+data/caueeg/age_caueeg.py:102:                'spectral': self.spectral_stats(time_series, self.hz),
+data/caueeg/age_caueeg.py:103:                'morph': self.morph_stats(time_series, self.hz),
+data/tuep/age_tuep.py:147:                'spectral': self.spectral_stats(time_series, self.hz),
+data/tuep/age_tuep.py:148:                'morph': self.morph_stats(time_series, self.hz),
+data/tuep/disease_tuep.py:152:                'spectral': self.spectral_stats(time_series, self.hz),
+data/tuep/disease_tuep.py:153:                'morph': self.morph_stats(time_series, self.hz),
+
+exec
+/bin/bash -lc "rg -n \"def load_model|load_state_dict|dataset_prompt_embeddings|task_prompt_embeddings\" utils model | head -180 && sed -n '300,400p' utils/trainer.py" in /root/autodl-tmp/LLM4FC
+ succeeded in 0ms:
+utils/trainer.py:885:    _PROMPT_BUFFER_KEYS = {'task_prompt_embeddings'}
+utils/trainer.py:887:    def load_model(self, path=None):
+utils/early_stopping.py:72:    def load_state_dict(self, d: dict) -> None:
+utils/schedule.py:75:    def load_state_dict(self, state_dict):
+utils/schedule.py:105:    def load_state_dict(self, state_dict):
+model/TimeLLMPatch/TimeLLMPatch.py:174:        self.register_buffer("task_prompt_embeddings", task_embeds)
+model/TimeLLMPatch/TimeLLMPatch.py:248:        task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(
+model/TimeLLM/TimeLLM.py:153:        self.register_buffer("task_prompt_embeddings", task_embeds)
+model/TimeLLM/TimeLLM.py:231:        task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(
+            logger.info("  Num val   examples = %d",
+                        len(self.data_loaders['val']))
+            logger.info("  Num test  examples = %d",
+                        len(self.data_loaders['test']))
+            logger.info("  Max fine-tune epochs = %d", epochs)
+            logger.info("  Fine-tune lr = %g", self.args.learning_rate)
+        if self.args.deepspeed:
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = self.args.learning_rate
+            self.scheduler = None
+        else:
+            self.optimizer = init_optimizer(self.model, self.args)
+            self.scheduler = None
+
+        # ── 早停指标：动态推断（与 train() 保持一致）──
+        from utils.early_stopping import EarlyStopping
+        metric_name = self.args.early_stop_metric
+        LOWER_IS_BETTER = {'Loss', 'MAE'}
+        HIGHER_IS_BETTER = {'Accuracy', 'AUC', 'Precision', 'Sensitivity',
+                           'Specificity', 'Recall', 'F_score', 'R2', 'PearsonR',
+                           'PearsonR_mean'}
+        if metric_name in LOWER_IS_BETTER:
+            mode = 'min'
+        elif metric_name in HIGHER_IS_BETTER:
+            mode = 'max'
+        else:
+            mode = 'min'
+
+        early_stopper = EarlyStopping(
+            patience=self.args.early_stop_patience,
+            mode=mode,
+        )
+        best_model_dir = os.path.join(self.args.model_dir,
+                                      self._get_save_dir_name() + '_best')
+        stop_requested = False
+
+        # ── Epoch loop with validation ──
+        for epoch in tqdm(range(1, epochs + 1), desc="ft-epoch", ncols=0):
+            if self.args.deepspeed:
+                train_sampler = getattr(self.data_loaders['train'].sampler,
+                                        'set_epoch', None)
+                if train_sampler is not None:
+                    train_sampler(epoch)
+
+            start_time = timer()
+            train_loss = self.train_epoch(epoch)
+            end_time = timer()
+
+            # ── Validate on full val set (not reduced by few-shot) ──
+            val_result = self.evaluate(dataloader_key='val')
+
+            if is_rank_0 and val_result is not None:
+                val_metric = val_result.get(metric_name)
+                if val_metric is None:
+                    logger.warning(
+                        f"Metric '{metric_name}' not in eval result; "
+                        f"falling back to 'Loss'")
+                    val_metric = val_result.get('Loss', float('inf'))
+                val_loss = val_result.get('Loss', float('inf'))
+                improved = early_stopper.step(val_metric)
+
+                if improved:
+                    self.save_model(path=best_model_dir)
+                    logger.info("Best model saved (val %s=%.4f, epoch=%d)",
+                                metric_name, early_stopper.best_score, epoch)
+
+                msg = (f"FT Epoch: {epoch}/{epochs}, "
+                       f"Train Loss: {train_loss:.5f}, "
+                       f"Val Loss: {val_loss:.5f}, "
+                       f"Val {metric_name}: {val_metric:.4f}, "
+                       f"Best {metric_name}: {early_stopper.best_score:.4f}, "
+                       f"No improve: {early_stopper.counter}/{early_stopper.patience}, "
+                       f"Time: {(end_time - start_time):.1f}s")
+                tqdm.write(msg)
+                logger.info(msg)
+
+                if early_stopper.early_stop:
+                    stop_requested = True
+
+            # ── Broadcast early stop across ranks ──
+            if self.args.deepspeed and torch.distributed.is_initialized():
+                stop_tensor = torch.tensor([1 if stop_requested else 0],
+                                           device=self.device, dtype=torch.int)
+                torch.distributed.broadcast(stop_tensor, src=0)
+                if stop_tensor.item() == 1:
+                    logger.info("Early stopping triggered at epoch %d", epoch)
+                    break
+            elif stop_requested:
+                break
+
+        # ── Load best checkpoint (if one was saved) ──
+        best_path = os.path.join(best_model_dir,
+                                 f'{self.args.model}-{self.task_id}.bin')
+        if os.path.exists(best_path):
+            self.load_model(path=best_model_dir)
+            if is_rank_0:
+                logger.info("Loaded best checkpoint from %s", best_model_dir)
+        else:
+            if is_rank_0:
+                logger.info("No best checkpoint found at %s, "
+                            "using current weights", best_path)
+
+exec
+/bin/bash -lc "sed -n '860,930p' utils/trainer.py" in /root/autodl-tmp/LLM4FC
+ succeeded in 0ms:
+            buffer_names = {n for n, _ in model.named_buffers()}
+            state_dict = {}
+            for k, v in model.state_dict().items():
+                if k in trainable_names or k in buffer_names:
+                    state_dict[k] = v.cpu()
+            torch.save(state_dict,
+                       os.path.join(path, f'{self.args.model}-{self.task_id}.bin'))
+
+        if save_optimizer and self.optimizer is not None:
+            ckpt = {
+                'epoch': getattr(self, '_current_epoch', None),
+                'optimizer': self.optimizer.state_dict(),
+                'scheduler': self.scheduler.state_dict() if self.scheduler else None,
+            }
+            torch.save(ckpt,
+                       os.path.join(path, f'optimizer-{self.task_id}.bin'))
+
+        if torch.distributed.is_initialized() and torch.distributed.get_rank() != 0:
+            return
+        args_dict = {k: v for k, v in self.args.__dict__.items()}
+        with open(os.path.join(path, "config.json"), 'w') as f:
+            json.dump(args_dict, f, indent=2)
+        logger.info("Model saved to %s", path)
+
+    # 跨数据集加载时不应覆盖目标任务的 prompt
+    _PROMPT_BUFFER_KEYS = {'task_prompt_embeddings'}
+
+    def load_model(self, path=None):
+        if path is None:
+            path = os.path.join(self.args.model_dir, self._get_save_dir_name())
+
+        do_dp = self.args.do_parallel or self.args.deepspeed
+        model = self.model.module if hasattr(self.model, 'module') else self.model
+        bin_path = os.path.join(path, f'{self.args.model}-{self.task_id}.bin')
+
+        if not os.path.exists(bin_path):
+            logger.info("Model checkpoint doesn't exist: %s — skip loading", bin_path)
+            return
+
+        saved_state = torch.load(bin_path, map_location=self.device,
+                                weights_only=False)
+
+        n_skipped_prompt = 0
+
+        if self.args.deepspeed:
+            import deepspeed
+            trainable = [p for p in model.parameters() if p.requires_grad]
+            with deepspeed.zero.GatheredParameters(trainable, modifier_rank=None):
+                current_state = model.state_dict()
+                missing, unexpected = [], []
+                for k, v in saved_state.items():
+                    if k in self._PROMPT_BUFFER_KEYS:
+                        n_skipped_prompt += 1
+                        continue
+                    if k in current_state:
+                        if current_state[k].shape == v.shape:
+                            current_state[k].copy_(v)
+                        else:
+                            logger.warning("  Shape mismatch for %s: saved %s vs current %s — skipped",
+                                           k, tuple(v.shape), tuple(current_state[k].shape))
+                    else:
+                        unexpected.append(k)
+                for k in current_state:
+                    if k not in saved_state:
+                        missing.append(k)
+        else:
+            current_state = model.state_dict()
+            missing, unexpected = [], []
+            for k, v in saved_state.items():
+                if k in self._PROMPT_BUFFER_KEYS:
+                    n_skipped_prompt += 1
+
+tokens used
+119,468
+我先核对当前实现里的输入形状、prompt/位置编码和统计量接口，再按“模块维度 → 序列布局 → 统计量计算 → 训练与消融 → 实现顺序”给出可直接落地的设计。只做方案，不改代码。

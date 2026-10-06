@@ -76,6 +76,8 @@ class DiseaseCAUEEGDataset(BaseDataset):
                 'DFC': DFC,
                 'correlation': SFC,  # SFC, for backward compat
                 'labels': labels,
+                'spectral': self.spectral_stats(time_series, self.hz),
+                'morph': self.morph_stats(time_series, self.hz),
         }
 
 

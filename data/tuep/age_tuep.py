@@ -144,6 +144,8 @@ class AgeTUEPDataset(BaseDataset):
                 'DFC': DFC,
                 'correlation': SFC,
                 'labels': labels,
+                'spectral': self.spectral_stats(time_series, self.hz),
+                'morph': self.morph_stats(time_series, self.hz),
         }
 
 

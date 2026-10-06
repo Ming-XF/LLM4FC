@@ -1,0 +1,28 @@
+你是深度学习与 LLM 应用的实现设计专家。只做设计建议，不要修改代码。**不要调用任何工具/命令，也不要探索仓库——以下描述已包含你需要的全部信息，直接输出设计建议。**
+
+【背景：已定方案 v4（领域知识 Token 编译器）】
+- 整分钟 EEG → 32 个 display stats（FC 9 + 频谱 9 + 形态 14，名义尺度缩放、clip ±5）。
+- 每统计量 i：phrase_i (4096) = 短语 token 冻结词表 embedding 求平均 + RMS 对齐（buffer）；value_i (4096) = W_i × s_i（独立 Linear(1,4096,bias=False)）；u_i = RMSNorm(phrase_i + value_i)。
+- 变体 ReprogrammingLayer：query_projection Linear(4096→128)，key 4096→128，value 保持 4096，注意力在 128（8 头×16），softmax 只在 prototype bank 维度，输出 (B,32,4096)。
+- 序列 [start][task][end][knowledge 32][READOUT]；READOUT 为可学习 4096 维读出 token，读出取它 hidden → RMSNorm(4096) → Linear(4096,out)。冻结 LLM（llama 8B，causal，全局 RoPE）。
+- 无 mixer，各统计量独立。
+
+【用户的修改疑问（回答这个，勿讨论整体可行性）】
+用户提出：统计数值是否不必映射到 4096 维，而是映射到 128 维，在 reprogram 过程中于 128 维空间求和？即：
+
+方案 B（用户提议）：
+  p_i = shared_Linear(4096→128)(phrase_i)     # 短语投影到 128
+  v_i = W_i × s_i，W_i 为独立 Linear(1,128,bias=False)   # 数值直接映射到 128
+  q_i = p_i + v_i                              # 在 128 维求和
+  q (B,32,128) → 原版 ReprogrammingLayer（query 侧就是 128，无需变体）→ (B,32,4096)
+
+对比方案 A（v4 现状）：
+  u_i = RMSNorm_4096(phrase_i + W_i^4096 × s_i) → shared_Linear(4096→128) → q_i
+
+【请回答】
+1. A 与 B 的表达能力是否等价？我的分析：shared P 是线性层时 P(a+b)=P(a)+P(b)，方案 A 中数值对 query 的贡献为 P(W4096·s)（1→128 的映射），方案 B 为 W128·s（同为 1→128 的映射），二者张成的贡献子空间相同——唯一实质区别是 A 里 RMSNorm 在求和之后（非线性，会耦合短语与数值的尺度，形成隐式门控），B 没有这个耦合。这个分析对吗？RMSNorm 的这个耦合是有益（尺度自适应门控）还是无益（引入不必要的非线性干扰）？
+2. 若采纳 B：短语投影 P 共享一个还是每统计量独立？数值 encoder 初始化（N(0,0.02) 在 128 维是否合适，是否需要对 s_i 的典型 RMS 缩放）？q_i 进入 reprogram 前要不要加 RMSNorm(128)？加或不加的影响？
+3. 若采纳 B，phrase 的 4096 维信息只有通过 P 投影后的 128 维进入注意力——这对保留短语语义是否有损失？还是说 A 方案最终进入注意力的也只有 128 维（P 的输出），所以二者对注意力的输入维度相同、语义损失相同？
+4. B 方案可否直接用原版 ReprogrammingLayer（query_projection Linear(128,128) 保留原样）？还是建议删掉 query_projection 或设为 identity？
+5. 训练稳定性、dtype（fp32/bf16 边界）、初始化等其他需同步调整的细节。
+6. 明确最终推荐：A 还是 B？给出理由与最终模块维度（按实现顺序）。

@@ -1,0 +1,19 @@
+你是深度学习与 LLM 应用的实现设计专家。只做设计建议，不要修改任何代码。项目在 /root/autodl-tmp/LLM4FC（EEG 分析，TimeLLM 式重编程：DFC → GCN → 冻结 DeepSeek-R1-Distill-Llama-8B → 线性头）。可用 git show 查看历史（37ebacc:CAER-v3.md、37ebacc:model/TimeLLM/graph_evidence.py）。
+
+【需求已定，勿讨论可行性】
+把 EEG 统计特征制作成一段文本，作为"统计 prompt"（类似现有任务 prompt），插入冻结 LLM 的输入序列。请直接给出这个统计 prompt 的具体设计。
+
+【现状】
+1. 现有任务 prompt 机制（model/TimeLLM/prompts.py + TimeLLM.py）：固定任务文本（如 "Given 19-channel dynamic functional connectivity matrices (10 time windows), predict the subject's age."）→ tokenize → word embedding buffer → 插在序列前部。序列布局：[start][task prompt][end][DFC patches]（patches=190 个 soft token），读出只取 patches 位置隐状态接线性头，LLM 冻结、其余端到端训练。
+2. 统计特征（CAER-v3 确定性证据，无学习参数，见 graph_evidence.py 的 compute_graph_evidence）：每样本 = 10 个时间窗。窗口级 32 维 = FC 9（连接强度/半球间比/额后比/不对称/5 脑区均值）+ 频谱 9（δθαβ 相对功率、θ/β、α/(δ+θ)、慢波指数、额枕 α 比、颞 θ）+ 形态 14（线长/锐度/灶性/峰度/零交叉/γ 功率/棘波速率/APF/APF-std/非周期斜率）。每个特征都有确定的中文/英文含义（连接强度、半球间耦合、额叶/后部比值等）。年龄任务用全 32 维；疾病任务只用 FC+spec 18 维。
+3. 统计量的值域：多数比值类特征在 0-2 量级，个别百分位/斜率有量纲；值在样本间连续变化。
+4. 模型侧 forward 里能从 DFC 现算 FC 统计量，频谱/形态由数据集 __getitem__ 提供（data/dataset.py 有 spectral_stats/morph_stats 的历史版本可从 git 恢复）。
+
+【请设计，回答以下问题】
+1. 文本模板：用自然语言句式（每个特征一句，"Overall connectivity strength is X, inter-hemispheric coupling is Y, ..."）还是紧凑列表（feature=value 每行一个）？哪种对 8B 作为上下文更好？给出一个完整模板示例（32 维全部写出来，特征名要能对应 graph_evidence.py 里的 32 个统计量）。
+2. 数值格式：直接写原始值，还是归一化/缩放后的值？定点几位小数？正负号？是否需要单位？是否需要说明"10 个窗口上的均值"？
+3. 聚合粒度：10 个窗口聚合成一个主体级统计 prompt（32 个数字），还是每窗口一段（10 段×32 数字）？考虑序列长度预算（当前序列约 200 tokens，8B 上下文足够，但要权衡）与信息完整性。
+4. 与任务 prompt 的关系：独立的一段（[task prompt][stats prompt] 两段拼一起）还是合并成一段？统计 prompt 插在 patches 之前还是之后？读出仍只取 patches 位置可以吗，还是建议顺带读统计 prompt 位置？
+5. 实现要点：数字每次前向都要 tokenize（数值随样本变化），prompt_length/位置编码（llama 全局 RoPE、ChatGLM 2D rotary 的 block 位置）如何处理；是否在 __getitem__ 就把文本生成好（省前向开销）还是 forward 里现生成；数值转文本用 Python 格式化即可还是需要定制的分词策略。
+6. 最小对照与验证：无统计 prompt 基线（同位置放固定占位 token 做位置匹配）、统计数字打乱、pretrained vs random LLM——哪个对照最必要？还需要什么？
+请给出可直接落地的完整设计（模板全文、格式化规则、插入位置、读出方案、实现步骤），按实现顺序排列。

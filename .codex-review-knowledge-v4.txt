@@ -1,0 +1,25 @@
+你是深度学习与 LLM 应用的实现设计专家。只做设计建议，不要修改代码。**不要调用任何工具/命令，也不要探索仓库——以下描述已包含你需要的全部信息，直接输出设计建议。**
+
+【背景：已定的方案 v3（领域知识 Token 编译器，纯知识版，无 patch 路径）】
+模型：整分钟 EEG x (B,19,12000) → forward 内 z-score → 静态 Pearson FC (B,19,19) → compute_graph_evidence 得 32 个 display stats (B,32)（FC 9 + 频谱 9 + 形态 14，已按名义尺度缩放、clip ±5；频谱/形态由数据集层整分钟 15×4s Welch 计算）。
+每统计量 i：
+- phrase_i (4096) = 短语 token 冻结词表 embedding 求平均 + RMS 对齐，__init__ 存 buffer；
+- value_i (4096) = W_i × s_i，32 个独立 Linear(1,4096,bias=False)，初始化 N(0,0.02)；
+- u_i = RMSNorm(phrase_i + value_i) → 共享 Linear(4096→128)；
+- 原方案：1 层双向 TransformerEncoder mixer（d=128, 8 heads, ff=512）让 32 个统计量交互；
+- knowledge ReprogrammingLayer（query 侧 d_model=128，key/value 从 4096 维 prototypes 降维，注意力在 128，out 回 4096）→ (B,32,4096) soft prompt。
+LLM：冻结 llama 8B，bf16，causal 注意力 + 全局 RoPE；序列 [start_tag][task prompt][end_tag][knowledge 32]（tags 只包文本任务 prompt，knowledge 在软 token 区域，与原 patches 位置一致）。
+原读出：软 token 区域 32 个位置 hidden → 均值池化 → Linear(d_ff=128, out)；loss 在 forward 里算（回归 huber / 分类 CE）。训练：冻结 LLM/词表/phrase buffer，其余全部训练；knowledge 路径 fp32、拼接前转 bf16。
+
+【用户的修改决定（已定，勿讨论可行性）】
+1. 去掉 mixer：担心双向 self-attention 会把各统计量独立的领域知识"打乱"（每个统计量的短语+数值组合向量失去独立身份）。
+2. 预测头改为：只取 LLM 序列最后一个 token 输出的 hidden state 做预测（causal 下最后一个位置天然看过全部 32 个统计量与任务指令）。
+
+【请回答】
+1. 去掉 mixer + 末 token 读出是否成立？有无隐患？特别地：序列末尾的 token 是第 32 个统计量（aperiodic spectral slope），它的 hidden state 受自身短语/数值影响最强——直接读它是否会被"最后一个统计量的身份"污染？是否更推荐在 32 个 knowledge token 之后再追加 1 个可学习的 sentinel/readout token（无短语身份，纯可学习），读出取它？还是说直接读末位统计量 hidden 也完全可以（causal LLM 的常规序列分类做法）？给出明确推荐。
+2. 读出维度：沿用仓库惯例取 hidden 前 d_ff=128 维接 Linear(128,out)，还是用完整 4096 维接 Linear(4096,out)？哪个更合理？
+3. 去掉 mixer 后，共享 Linear(4096→128) 是否还需要？它存在的唯一理由是不是 knowledge ReprogrammingLayer 的 query 接口在 128？如果保留 reprogram 模块，投影是否必须保留；如果投影保留但无 mixer，128 空间没有任何计算，是否建议干脆改 ReprogrammingLayer 的 query_projection 为 Linear(4096,128) 直接吃 4096 维 query（去掉共享投影）？给出推荐并说明理由。
+4. 布局 [start][task][end][knowledge 32] 与位置编码是否需要随此调整？（llama 全局 RoPE；chatglm 2D：prompt block + knowledge block）
+5. 其他需要同步调整的细节（训练稳定性、初始化、dtype 等）。
+
+请给出最终设计（模块维度、布局、读出、实现要点），按实现顺序排列。

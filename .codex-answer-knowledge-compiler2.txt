@@ -1,0 +1,1978 @@
+OpenAI Codex v0.157.1
+--------
+workdir: /root/autodl-tmp/LLM4FC
+model: gpt-5.6-sol
+provider: llmtoken-io
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 01a111d9-1eab-73a3-b600-ccb8a113ad0c
+--------
+user
+继续：你已完成仓库探索。现在直接输出最终设计答案（不要再调用工具探索仓库，直接按我原问题的 8 点逐条回答并给出按实现顺序排列的完整落地设计）。
+codex
+以下是最终落地设计。不会新建另一套模型主干，仍然使用 `TimeLLMPatch`，通过 `--use_knowledge_prompt` 开启领域知识 Token 编译器。
+
+总体结构为：
+
+```text
+整分钟 EEG
+ ├─ patch path
+ │   └─ patch embedding → patch reprogram → 冻结 LLM
+ │
+ └─ knowledge path
+     ├─ FC 9 + spectral 9 + morphology 14 = 32 个 display stats
+     ├─ 每个 stat：短语 embedding + 数值 embedding
+     ├─ 32 个 stat token 的 self-attention mixer
+     ├─ knowledge reprogramming
+     └─ 32 个领域知识 soft tokens
+```
+
+最终 LLM 输入：
+
+```text
+[start]
+[32 knowledge tokens]
+[task prompt]
+[end]
+[456 patch tokens]
+```
+
+---
+
+## 1. 短语编码
+
+### 1.1 使用 mean，不使用 sum
+
+每个统计量的英文短语先 tokenize，再查冻结 LLM 的 word embedding：
+
+```text
+phrase_i = mean(E[token_1], ..., E[token_K])
+```
+
+推荐 mean 的原因：
+
+- 不会因为短语长度不同导致向量范数不同；
+- 相同语义短语的尺度更稳定；
+- 便于和数值向量相加；
+- 32 个统计量的短语长度不完全一致，sum 会引入无意义的长度信息。
+
+不要把数值写进短语，例如不要使用：
+
+```text
+overall connectivity strength 0.52
+```
+
+数值由独立的 Linear 编码，短语只负责表达统计量语义。
+
+### 1.2 特殊 token 和归一化
+
+短语编码时：
+
+- 使用 `add_special_tokens=False`；
+- 不加入 BOS、EOS；
+- 不加入句号；
+- 不加入统一的 `"EEG "`、`"the "`、`"is "` 等前后缀；
+- 对 Llama 类 tokenizer，可统一添加一个前导空格，以保持词边界；
+- 每个短语最多控制在约 6 个 subword token 以内。
+
+mean 之后做固定的 RMS 对齐：
+
+```text
+p_i = mean_embedding_i
+p_i = p_i / RMS(p_i) * reference_rms
+```
+
+`reference_rms` 使用冻结 LLM 词表 embedding 行的中位 RMS，或者使用现有 task/start/end prompt embedding 的平均 RMS。
+
+这样得到的每个短语向量都是 4096 维，并且尺度接近真实 LLM token embedding。
+
+### 1.3 推荐短语清单
+
+固定顺序必须和 `compute_graph_evidence` 输出顺序完全一致。
+
+FC 9 维：
+
+```text
+1  overall connectivity strength
+2  interhemispheric coupling ratio
+3  frontal posterior connectivity ratio
+4  hemispheric asymmetry
+5  central connectivity
+6  temporal connectivity
+7  parietal connectivity
+8  occipital connectivity
+9  midline connectivity
+```
+
+频谱 9 维：
+
+```text
+10 delta relative power
+11 theta relative power
+12 alpha relative power
+13 beta relative power
+14 theta beta power ratio
+15 alpha delta theta power ratio
+16 diffuse slowing index
+17 frontal posterior alpha power ratio
+18 temporal theta power fraction
+```
+
+形态 14 维：
+
+```text
+19 line length mean
+20 line length maximum
+21 sharpness mean
+22 sharpness maximum
+23 sharpness focality
+24 amplitude kurtosis mean
+25 amplitude kurtosis maximum
+26 zero crossing rate
+27 gamma power fraction
+28 spike rate mean
+29 spike rate maximum
+30 alpha peak frequency
+31 alpha peak frequency variability
+32 aperiodic spectral slope
+```
+
+短语 embedding 在模型初始化时查表一次，保存为 buffer，不在 forward 中重复 tokenize。
+
+### 1.4 在 4096 维相加，再投影到 128
+
+推荐：
+
+```text
+phrase_i: 4096
+value_i: 4096
+phrase_i + value_i: 4096
+shared projection: 4096 → 128
+```
+
+不要先分别投影到 128 再相加。
+
+原因：
+
+- 4096 维是 LLM 原生语义空间；
+- 短语 embedding 和数值 embedding 在同一空间相加，语义更直接；
+- 先压缩到 128 会让 phrase 语义和数值映射同时竞争低维容量；
+- 4096→128 的共享投影可以学习统一的领域知识压缩方式。
+
+组合后使用一个共享的 `RMSNorm(4096)`，然后进入 `Linear(4096,128)`。
+
+---
+
+## 2. 数值编码
+
+### 2.1 输入使用 display 值
+
+数值输入直接使用 `compute_graph_evidence` 输出的 display stats：
+
+```text
+s_i ∈ [-5, 5]
+```
+
+也就是：
+
+- FC 使用固定名义尺度缩放；
+- 频谱和形态使用既定尺度；
+- 最终 clip 到 `[-5,5]`；
+- 不在 knowledge compiler 中再次缩放；
+- 不使用数据集拟合的 min/max；
+- 不把原始 `0.52` 直接送入 Linear。
+
+这样可以保证跨数据集 transfer 时数值含义稳定。
+
+特别注意：如果 `compute_graph_evidence` 已经完成缩放和 clip，后续不能重复除以 scale。
+
+### 2.2 每个统计量使用独立 Linear
+
+主方案：
+
+```text
+value_encoder_i = Linear(1, 4096, bias=False)
+i = 1 ... 32
+```
+
+逻辑上是 32 个独立 Linear；也可以底层实现成一个形状为 `(32,4096)` 的参数矩阵，但语义上必须保持每个统计量独立。
+
+不要使用一个完全共享的 `Linear(1,4096)`，因为：
+
+- FC、频谱、形态的含义不同；
+- 每个统计量的 display 分布不同；
+- 同样的数值大小，在不同统计量中应有不同方向；
+- 独立 Linear 只有约 `32×4096` 个权重，参数量很小。
+
+### 2.3 不使用 bias
+
+推荐 `bias=False`，并令：
+
+```text
+value_i = W_i * s_i
+```
+
+理由：
+
+- 当 `s_i=0` 时，数值分支真正没有样本特定贡献；
+- 便于做数值置零消融；
+- 避免 bias 学到源域统计量先验，损害跨域迁移；
+- 统计量的身份已经由 phrase embedding 表达，不需要 numeric bias 再表达一次身份。
+
+### 2.4 数值 Linear 的初始化
+
+设：
+
+```text
+r_phrase = 归一化后 phrase embedding 的典型 RMS
+r_i      = 第 i 个 display stat 在训练集上的 RMS
+```
+
+推荐初始化：
+
+```text
+W_i ~ Normal(0, σ_i)
+σ_i = r_phrase / max(r_i, 1.0)
+```
+
+并设置一个合理上限，例如避免 `σ_i` 过大。
+
+如果不想预扫描训练统计量，直接使用：
+
+```text
+W_i ~ Normal(0, 0.02)
+```
+
+即可。不要初始化为全零，否则数值分支早期完全没有梯度方向差异。
+
+初始化顺序应注意：如果仓库的全局 `initializer` 会覆盖参数，knowledge value encoder 必须在全局初始化之后重新执行上述初始化。
+
+---
+
+## 3. Reprogram 模块
+
+### 3.1 不能只复用一个 ReprogrammingLayer
+
+现有 `ReprogrammingLayer` 逐 token 做 query-to-prototype attention，本身不会让 32 个统计量互相交互。
+
+如果完全依赖冻结 LLM：
+
+- knowledge token 之间只有单向 causal 交互；
+- 前面的统计量无法看到后面的统计量；
+- FC、频谱、形态之间的组合关系只能交给冻结 LLM 临时处理。
+
+因此主方案增加一个轻量的知识 token mixer。
+
+### 3.2 推荐结构
+
+对每个统计量：
+
+```text
+u_i = RMSNorm(phrase_i + value_i)       # 4096
+q_i = Linear(4096, 128)                 # 128
+```
+
+得到：
+
+```text
+q: (B, 32, 128)
+```
+
+然后使用一层双向 self-attention：
+
+```text
+TransformerEncoderLayer(
+    d_model=128,
+    nhead=8,
+    dim_feedforward=512,
+    norm_first=True,
+    dropout=0.1
+)
+```
+
+建议：
+
+- 只使用 1 层；
+- 最多 2 层；
+- 不加入额外 positional embedding；
+- 统计量身份已经由 phrase embedding 表达；
+- 不使用 per-token MLP 代替 self-attention，因为 MLP 不会建模统计量之间的关系。
+
+得到：
+
+```text
+mixed_knowledge: (B, 32, 128)
+```
+
+### 3.3 knowledge 使用独立 ReprogrammingLayer
+
+使用新的：
+
+```text
+knowledge_reprogramming_layer
+```
+
+而不是和 patch 共享整层。
+
+输入输出：
+
+```text
+query:  (B, 32, 128)
+source: (M, 4096)
+value:  (M, 4096)
+output: (B, 32, 4096)
+```
+
+其中 `M` 是现有 prototype 数量，通常为 500 或 1000。prototype 原始空间是 `M×4096`，进入 attention 后由 key/value projection 映射到多头维度。
+
+推荐：
+
+- patch reprogram 和 knowledge reprogram 使用两套 query/key/value/out projection；
+- 两者可以共享现有的 vocabulary-to-prototype `mapping_layer`；
+- 共享 prototype bank 可以维持同一个 LLM 语义锚点；
+- 不共享整个 ReprogrammingLayer，避免 raw EEG patch 和统计量 token 的分布互相干扰。
+
+最终：
+
+```text
+knowledge_tokens: (B, 32, 4096)
+```
+
+### 3.4 每个统计量一个 soft token 是合理的
+
+32 个 token 足够：
+
+- 统计量身份由 phrase embedding 表达；
+- 数值由独立 Linear 表达；
+- self-attention 负责统计量之间的交互；
+- 不需要把一个统计量拆成多个 token；
+- 不需要把短语作为真实 LLM token 序列再次展开。
+
+不要额外添加 3 个 group header token 作为主设计。FC、频谱、形态的语义已经出现在 phrase 中，额外 group token 可以留作后续消融。
+
+---
+
+## 4. 序列布局和位置编码
+
+### 4.1 使用知识在前的布局
+
+主布局固定为：
+
+```text
+[start_tag]
+[knowledge_1 ... knowledge_32]
+[task_prompt]
+[end_tag]
+[patch_1 ... patch_456]
+```
+
+即：
+
+```text
+[start][knowledge][task][end][patches]
+```
+
+这符合“第一部分领域知识，第二部分任务 prompt”的要求。
+
+如果保留现有 `--use_task_prompt` 语义：
+
+- knowledge 模式的正式实验应开启 `--use_task_prompt`；
+- `--use_task_prompt=False` 时，布局退化为 `[start][knowledge][end][patches]`；
+- 不改变现有 task prompt 的内容和 embedding 方式。
+
+### 4.2 Llama 位置编码
+
+Llama 直接使用全局连续位置：
+
+```text
+0, 1, 2, ..., sequence_length - 1
+```
+
+不重置 knowledge、task 或 patch 的位置。
+
+### 4.3 ChatGLM 2D position
+
+ChatGLM 的 prompt block 必须包括：
+
+```text
+start + knowledge + task + end
+```
+
+因此：
+
+```text
+prompt_length =
+    P_start + 32 + P_task + P_end
+```
+
+`block_pos`：
+
+```text
+prompt 部分: 0 ... prompt_length-1
+patch 部分: 0 ... N*P-1
+```
+
+`global_pos` 仍然对整个序列连续递增。
+
+不要把 knowledge 当作 patch block，也不要给 knowledge 单独重置一个第三种 block。
+
+### 4.4 仍然只读 patch hidden states
+
+读出方案保持不变：
+
+```text
+hidden[:, prompt_length:, :d_ff]
+→ reshape(B, 19, P, d_ff)
+→ channel mean pooling
+→ flatten
+→ linear head
+```
+
+不把 knowledge hidden state 直接平均进输出头。
+
+这样可以保持：
+
+- 输出头维度不变；
+- baseline 和 knowledge 模型的 patch head 结构一致；
+- knowledge 通过 LLM attention 影响 patch hidden states，而不是直接绕过 LLM。
+
+### 4.5 causal attention 很重要
+
+知识放在 patch 前面是必要的。
+
+由于 Llama 和 ChatGLM 使用 causal attention：
+
+```text
+patch token 可以看到前面的 knowledge 和 task prompt
+```
+
+如果 knowledge 放在 patch 后面，patch hidden state 看不到 knowledge，领域知识 prompt 基本失去作用。
+
+知识 token 自身无法看到后面的统计量，所以前面的 self-attention mixer 用来提供双向统计量交互。
+
+---
+
+## 5. 统计量计算
+
+### 5.1 FC 9 维：forward 中计算合理
+
+forward 中使用整分钟静态 FC：
+
+```text
+x: (B, 19, 12000)
+→ 每通道整分钟 z-score
+→ SFC: (B, 19, 19)
+→ SFC.unsqueeze(1): (B, 1, 19, 19)
+→ compute_graph_evidence(...)
+```
+
+建议使用与数据集 `connectivity()` 相同的 Pearson 相关定义：
+
+```text
+SFC = x_z @ x_z.transpose(-1, -2) / (T - 1)
+```
+
+并在 fp32、`torch.no_grad()` 下计算。
+
+这样做合理，因为：
+
+- FC 计算量很小；
+- 不需要保存到数据集；
+- 可以保证模型实际收到的 raw EEG 与 FC 使用同一份数据；
+- 不需要让统计量分支反向传播到 EEG。
+
+需要给 `W=1` 增加安全处理：
+
+- `variability` 设为 0；
+- trend slope 设为 0；
+- 避免单窗口 `std` 和斜率分母产生 NaN；
+- 即使最终只使用 FC 9 维，也不能让中间计算出现 NaN。
+
+### 5.2 频谱 9 维：改为整分钟 4 秒分段
+
+不再使用 10 个 12 秒滑窗。
+
+推荐：
+
+```text
+60 秒 EEG
+→ 15 个非重叠 4 秒 segment
+→ 每段 nperseg=4*hz 的 Hann FFT/Welch
+→ 每段计算频谱统计
+→ 15 段聚合
+```
+
+保留现有频带定义：
+
+```text
+delta: 0.5–4 Hz
+theta: 4–8 Hz
+alpha: 8–13 Hz
+beta: 13–30 Hz
+```
+
+9 个特征顺序不变：
+
+```text
+delta relative power
+theta relative power
+alpha relative power
+beta relative power
+theta/beta
+alpha/(delta+theta)
+slowing index
+frontal/posterior alpha ratio
+temporal theta fraction
+```
+
+建议保持原有“每段先计算比值，再对 15 段求均值”的语义，减少历史统计定义变化。
+
+### 5.3 形态 14 维：时间域整分钟，PSD 特征按 4 秒段
+
+时间域特征在整分钟上计算：
+
+- line length；
+- sharpness；
+- kurtosis；
+- zero crossing；
+- spike rate。
+
+PSD 相关特征使用同一套 15 个 4 秒 segment：
+
+- gamma power；
+- alpha peak frequency；
+- alpha peak frequency variability；
+- aperiodic spectral slope。
+
+`apf_std` 使用 15 个 segment-level APF 的标准差，避免继续代表旧的 10 个 12 秒窗。
+
+### 5.4 统计量 schema 必须固定为 32 维
+
+主设计不再根据任务返回 18 维或 32 维：
+
+```text
+FC 9 + spectral 9 + morphology 14 = 32
+```
+
+分类和回归都使用同一套 32 个统计量。
+
+如果某个数据集确实没有某个形态字段，不能直接用 0 冒充真实统计量。应当：
+
+- 优先把形态统计真正计算出来；
+- 或额外加入 validity mask 和 learned null embedding。
+
+正式主实验建议所有数据集统一返回 32 维。
+
+---
+
+## 6. 训练、梯度和 dtype
+
+### 6.1 word embedding 查表必须 no_grad
+
+短语 embedding 在模型初始化时完成：
+
+```text
+tokenize phrase
+→ word embedding lookup
+→ mean
+→ RMS 对齐
+→ register_buffer
+```
+
+这部分：
+
+- 不参与梯度；
+- 不在 forward 中重复 tokenize；
+- 不更新冻结 LLM 的 word embedding。
+
+`mapping_layer` 和两个 ReprogrammingLayer 仍然可以训练。
+
+### 6.2 bf16 处理方式
+
+推荐 knowledge compiler 内部使用 fp32：
+
+```text
+stats                 → fp32
+phrase buffer         → fp32
+numeric Linear        → fp32
+4096 维相加和 RMSNorm  → fp32
+4096 → 128 projection → fp32
+knowledge mixer       → fp32
+```
+
+进入 ReprogrammingLayer 时显式转换为该层权重 dtype。
+
+最终在拼接 LLM 输入前转换为冻结 LLM embedding dtype：
+
+```text
+knowledge_tokens → bf16
+task/start/end   → bf16
+patch_tokens     → bf16
+```
+
+不要在 Pearson、RMSNorm、数值相加阶段直接使用 bf16。
+
+### 6.3 梯度范围
+
+冻结：
+
+```text
+LLM backbone
+LLM word embedding
+phrase embedding buffer
+```
+
+训练：
+
+```text
+patch embedding
+patch mapping/reprogram
+knowledge numeric encoders
+knowledge 4096→128 projection
+knowledge mixer
+knowledge reprogram
+output head
+shared prototype mapping_layer
+```
+
+### 6.4 统计量必须透传给 TimeLLMPatch
+
+`TimeLLMPatchTrainer.prepare_inputs_kwargs()` 需要在 knowledge 模式下传入：
+
+```text
+x
+labels
+spectral
+morph
+```
+
+模型 forward 形式应支持：
+
+```text
+forward(x, labels, spectral=None, morph=None)
+```
+
+当 `use_knowledge_prompt=False` 时，不计算也不使用这些字段，保证旧 baseline 路径不变。
+
+---
+
+## 7. 最小必要消融
+
+建议最小实验集如下。
+
+### A. 无知识 prompt baseline
+
+```text
+use_knowledge_prompt=False
+```
+
+完全等于现有 `TimeLLMPatch`：
+
+```text
+patch → patch reprogram → frozen LLM → head
+```
+
+这是所有结果的基准。
+
+### B. 完整 knowledge compiler
+
+```text
+phrase + numeric
+→ mixer
+→ knowledge reprogram
+→ [knowledge][task][patches]
+```
+
+这是主模型。
+
+### C. 数值打乱
+
+保留 phrase embedding，但在 batch 内打乱每个统计量的数值：
+
+```text
+s_i[b] ← s_i[perm(b)]
+```
+
+建议每个 feature 独立使用同一个 batch permutation。
+
+它检验模型是否使用了“当前样本的数值”，而不是只利用固定 phrase token 和额外序列长度。
+
+这是比置零更重要的数值消融。
+
+### D. 数值置零
+
+```text
+s_i = 0
+```
+
+得到 phrase-only knowledge prompt。
+
+它检验：
+
+- phrase 语义本身是否有帮助；
+- 性能提升是否主要来自数值；
+- numeric encoder 是否真正工作。
+
+如果 Linear 使用 `bias=False`，置零时数值分支确实没有贡献，解释最干净。
+
+### E. 去掉 knowledge reprogram
+
+保留：
+
+```text
+phrase + value
+→ 4096→128
+→ mixer
+```
+
+将 knowledge reprogram 替换成普通：
+
+```text
+Linear(128,4096)
+```
+
+输出仍为 32×4096，然后插入 LLM。
+
+这样可以单独验证 prototype-based reprogramming 的价值，而不是把 mixer、projection、额外 token 数量全部一起移除。
+
+### F. pretrained LLM vs random LLM
+
+主模型使用：
+
+```text
+llm_init=pretrained
+```
+
+再运行完全相同结构：
+
+```text
+llm_init=random
+```
+
+这项主要回答：
+
+- 性能是否来自 LLM 预训练语义；
+- 还是仅仅来自额外的可训练模块和序列长度。
+
+最小预算下，随机 LLM 只需要在完整 knowledge compiler 上运行一次。更严格时再补充无知识 baseline 的 random LLM。
+
+### 最小核心集合
+
+真正必要的核心组合是：
+
+```text
+1. 无知识 baseline
+2. 完整 knowledge compiler
+3. 数值打乱
+4. 去掉 knowledge reprogram
+5. pretrained vs random LLM
+```
+
+数值置零建议一起做，因为成本低，而且能区分 phrase-only 与 value-dependent 效果。
+
+所有消融保持：
+
+- 相同数据划分；
+- 相同 seed；
+- 相同 patch 参数；
+- 相同 prompt；
+- 相同 LLM；
+- 相同训练步数和早停规则。
+
+---
+
+## 8. 命名与开关
+
+推荐继续使用现有模型类：
+
+```text
+TimeLLMPatch
+```
+
+新增：
+
+```text
+--use_knowledge_prompt
+```
+
+不建议新建 `TimeLLMKnowledge` 模型类，原因是：
+
+- patch path 没有改变；
+- output head 没有改变；
+- LLM backbone 没有改变；
+- baseline 可以通过一个 flag 精确复现；
+- checkpoint 和 trainer 逻辑更容易维护。
+
+建议在配置中增加以下字段：
+
+```text
+use_knowledge_prompt=True/False
+knowledge_num_stats=32
+knowledge_llm_dim=4096
+knowledge_model_dim=128
+knowledge_mixer_layers=1
+knowledge_mixer_heads=8
+knowledge_stats_version="minute_v1"
+knowledge_phrase_version="v1"
+```
+
+实验目录名称必须包含 knowledge 开关，避免覆盖 baseline，例如：
+
+```text
+TimeLLMPatch_AgeCAUEEG_train
+TimeLLMPatchKnowledge_AgeCAUEEG_train
+```
+
+checkpoint 中必须记录：
+
+- 32 个统计量的顺序；
+- phrase list 版本；
+- fixed scaling 版本；
+- 整分钟频谱/形态计算版本；
+- `use_knowledge_prompt`；
+- LLM 初始化方式；
+- `use_lora`、`use_gc_lora`；
+- token order；
+- `d_model`、`d_ff`、prototype 数量。
+
+旧 baseline checkpoint：
+
+- 在 `use_knowledge_prompt=False` 时应完全兼容；
+- 不应直接当作完整 knowledge 模型 checkpoint 使用；
+- knowledge checkpoint 做跨域 transfer 时，目标域必须保持同一统计量 schema 和 phrase 版本。
+
+---
+
+# 按实现顺序落地
+
+## 第一步：固定统计量协议
+
+先固定：
+
+```text
+32 维顺序
+display scale
+clip [-5,5]
+phrase list
+stats_version="minute_v1"
+```
+
+任何训练、transfer、zero-shot 实验都使用同一协议。
+
+## 第二步：修改统计量生成定义
+
+数据层：
+
+- spectral 改为整分钟 15 个 4 秒 segment；
+- morph 的时间域部分使用整分钟；
+- morph 的 PSD 部分使用 15 个 4 秒 segment；
+- 所有数据集都返回 spectral 9 维和 morph 14 维。
+
+forward：
+
+- 整分钟 z-score；
+- 静态 Pearson FC；
+- 通过 `W=1` 安全版 `compute_graph_evidence` 得到 FC 9；
+- 拼接 spectral 和 morph 得到 32 维 display stats。
+
+## 第三步：加入 knowledge 配置和输入透传
+
+新增 `--use_knowledge_prompt`。
+
+patch trainer 在开启该开关时透传：
+
+```text
+spectral
+morph
+```
+
+关闭开关时保持旧输入路径。
+
+## 第四步：初始化 phrase bank
+
+模型初始化阶段：
+
+```text
+tokenize 32 个 phrase
+→ no_grad word embedding lookup
+→ token mean
+→ RMS 对齐
+→ register_buffer
+```
+
+不要使用 `stats_prompt.py` 的自然语言文本格式；这里是 soft embedding compiler，不是文字 prompt。
+
+## 第五步：实现数值编译器
+
+每个统计量：
+
+```text
+display scalar
+→ independent Linear(1,4096,bias=False)
+```
+
+然后：
+
+```text
+phrase embedding + numeric embedding
+→ RMSNorm(4096)
+→ shared Linear(4096,128)
+```
+
+## 第六步：加入知识 mixer 和独立 reprogram
+
+```text
+(B,32,128)
+→ 1-layer TransformerEncoder
+→ knowledge ReprogrammingLayer
+→ (B,32,4096)
+```
+
+patch reprogram 保持不变。
+
+## 第七步：替换序列拼接
+
+严格使用：
+
+```text
+[start]
+[knowledge 32]
+[task prompt]
+[end]
+[patches]
+```
+
+同步修改：
+
+- `prompt_length`；
+- patch hidden slice；
+- ChatGLM `block_pos`；
+- Llama global position；
+- patch reshape 索引。
+
+## 第八步：做形状、NaN 和 dtype 检查
+
+至少验证：
+
+```text
+stats:                  (B,32)
+knowledge_combined:     (B,32,4096)
+knowledge_projected:    (B,32,128)
+knowledge_reprogrammed: (B,32,4096)
+patches:                (B,19*P,4096)
+```
+
+同时检查：
+
+- `W=1` FC 不产生 NaN；
+- 统计量没有 inf；
+- bf16 拼接无 dtype error；
+- patch hidden 数量仍为 `19×P`；
+- baseline 开关关闭时输出路径不变。
+
+## 第九步：运行最小消融集
+
+按以下顺序运行：
+
+```text
+baseline
+full knowledge
+value shuffle
+value zero
+no knowledge reprogram
+pretrained vs random LLM
+```
+
+报告时把这些结果明确区分为：
+
+- same-domain；
+- cross-domain；
+- zero-shot；
+- few-shot。
+
+不要把 knowledge prompt 在同域上的提升直接表述为跨数据集泛化。
+tokens used
+152,021
+以下是最终落地设计。不会新建另一套模型主干，仍然使用 `TimeLLMPatch`，通过 `--use_knowledge_prompt` 开启领域知识 Token 编译器。
+
+总体结构为：
+
+```text
+整分钟 EEG
+ ├─ patch path
+ │   └─ patch embedding → patch reprogram → 冻结 LLM
+ │
+ └─ knowledge path
+     ├─ FC 9 + spectral 9 + morphology 14 = 32 个 display stats
+     ├─ 每个 stat：短语 embedding + 数值 embedding
+     ├─ 32 个 stat token 的 self-attention mixer
+     ├─ knowledge reprogramming
+     └─ 32 个领域知识 soft tokens
+```
+
+最终 LLM 输入：
+
+```text
+[start]
+[32 knowledge tokens]
+[task prompt]
+[end]
+[456 patch tokens]
+```
+
+---
+
+## 1. 短语编码
+
+### 1.1 使用 mean，不使用 sum
+
+每个统计量的英文短语先 tokenize，再查冻结 LLM 的 word embedding：
+
+```text
+phrase_i = mean(E[token_1], ..., E[token_K])
+```
+
+推荐 mean 的原因：
+
+- 不会因为短语长度不同导致向量范数不同；
+- 相同语义短语的尺度更稳定；
+- 便于和数值向量相加；
+- 32 个统计量的短语长度不完全一致，sum 会引入无意义的长度信息。
+
+不要把数值写进短语，例如不要使用：
+
+```text
+overall connectivity strength 0.52
+```
+
+数值由独立的 Linear 编码，短语只负责表达统计量语义。
+
+### 1.2 特殊 token 和归一化
+
+短语编码时：
+
+- 使用 `add_special_tokens=False`；
+- 不加入 BOS、EOS；
+- 不加入句号；
+- 不加入统一的 `"EEG "`、`"the "`、`"is "` 等前后缀；
+- 对 Llama 类 tokenizer，可统一添加一个前导空格，以保持词边界；
+- 每个短语最多控制在约 6 个 subword token 以内。
+
+mean 之后做固定的 RMS 对齐：
+
+```text
+p_i = mean_embedding_i
+p_i = p_i / RMS(p_i) * reference_rms
+```
+
+`reference_rms` 使用冻结 LLM 词表 embedding 行的中位 RMS，或者使用现有 task/start/end prompt embedding 的平均 RMS。
+
+这样得到的每个短语向量都是 4096 维，并且尺度接近真实 LLM token embedding。
+
+### 1.3 推荐短语清单
+
+固定顺序必须和 `compute_graph_evidence` 输出顺序完全一致。
+
+FC 9 维：
+
+```text
+1  overall connectivity strength
+2  interhemispheric coupling ratio
+3  frontal posterior connectivity ratio
+4  hemispheric asymmetry
+5  central connectivity
+6  temporal connectivity
+7  parietal connectivity
+8  occipital connectivity
+9  midline connectivity
+```
+
+频谱 9 维：
+
+```text
+10 delta relative power
+11 theta relative power
+12 alpha relative power
+13 beta relative power
+14 theta beta power ratio
+15 alpha delta theta power ratio
+16 diffuse slowing index
+17 frontal posterior alpha power ratio
+18 temporal theta power fraction
+```
+
+形态 14 维：
+
+```text
+19 line length mean
+20 line length maximum
+21 sharpness mean
+22 sharpness maximum
+23 sharpness focality
+24 amplitude kurtosis mean
+25 amplitude kurtosis maximum
+26 zero crossing rate
+27 gamma power fraction
+28 spike rate mean
+29 spike rate maximum
+30 alpha peak frequency
+31 alpha peak frequency variability
+32 aperiodic spectral slope
+```
+
+短语 embedding 在模型初始化时查表一次，保存为 buffer，不在 forward 中重复 tokenize。
+
+### 1.4 在 4096 维相加，再投影到 128
+
+推荐：
+
+```text
+phrase_i: 4096
+value_i: 4096
+phrase_i + value_i: 4096
+shared projection: 4096 → 128
+```
+
+不要先分别投影到 128 再相加。
+
+原因：
+
+- 4096 维是 LLM 原生语义空间；
+- 短语 embedding 和数值 embedding 在同一空间相加，语义更直接；
+- 先压缩到 128 会让 phrase 语义和数值映射同时竞争低维容量；
+- 4096→128 的共享投影可以学习统一的领域知识压缩方式。
+
+组合后使用一个共享的 `RMSNorm(4096)`，然后进入 `Linear(4096,128)`。
+
+---
+
+## 2. 数值编码
+
+### 2.1 输入使用 display 值
+
+数值输入直接使用 `compute_graph_evidence` 输出的 display stats：
+
+```text
+s_i ∈ [-5, 5]
+```
+
+也就是：
+
+- FC 使用固定名义尺度缩放；
+- 频谱和形态使用既定尺度；
+- 最终 clip 到 `[-5,5]`；
+- 不在 knowledge compiler 中再次缩放；
+- 不使用数据集拟合的 min/max；
+- 不把原始 `0.52` 直接送入 Linear。
+
+这样可以保证跨数据集 transfer 时数值含义稳定。
+
+特别注意：如果 `compute_graph_evidence` 已经完成缩放和 clip，后续不能重复除以 scale。
+
+### 2.2 每个统计量使用独立 Linear
+
+主方案：
+
+```text
+value_encoder_i = Linear(1, 4096, bias=False)
+i = 1 ... 32
+```
+
+逻辑上是 32 个独立 Linear；也可以底层实现成一个形状为 `(32,4096)` 的参数矩阵，但语义上必须保持每个统计量独立。
+
+不要使用一个完全共享的 `Linear(1,4096)`，因为：
+
+- FC、频谱、形态的含义不同；
+- 每个统计量的 display 分布不同；
+- 同样的数值大小，在不同统计量中应有不同方向；
+- 独立 Linear 只有约 `32×4096` 个权重，参数量很小。
+
+### 2.3 不使用 bias
+
+推荐 `bias=False`，并令：
+
+```text
+value_i = W_i * s_i
+```
+
+理由：
+
+- 当 `s_i=0` 时，数值分支真正没有样本特定贡献；
+- 便于做数值置零消融；
+- 避免 bias 学到源域统计量先验，损害跨域迁移；
+- 统计量的身份已经由 phrase embedding 表达，不需要 numeric bias 再表达一次身份。
+
+### 2.4 数值 Linear 的初始化
+
+设：
+
+```text
+r_phrase = 归一化后 phrase embedding 的典型 RMS
+r_i      = 第 i 个 display stat 在训练集上的 RMS
+```
+
+推荐初始化：
+
+```text
+W_i ~ Normal(0, σ_i)
+σ_i = r_phrase / max(r_i, 1.0)
+```
+
+并设置一个合理上限，例如避免 `σ_i` 过大。
+
+如果不想预扫描训练统计量，直接使用：
+
+```text
+W_i ~ Normal(0, 0.02)
+```
+
+即可。不要初始化为全零，否则数值分支早期完全没有梯度方向差异。
+
+初始化顺序应注意：如果仓库的全局 `initializer` 会覆盖参数，knowledge value encoder 必须在全局初始化之后重新执行上述初始化。
+
+---
+
+## 3. Reprogram 模块
+
+### 3.1 不能只复用一个 ReprogrammingLayer
+
+现有 `ReprogrammingLayer` 逐 token 做 query-to-prototype attention，本身不会让 32 个统计量互相交互。
+
+如果完全依赖冻结 LLM：
+
+- knowledge token 之间只有单向 causal 交互；
+- 前面的统计量无法看到后面的统计量；
+- FC、频谱、形态之间的组合关系只能交给冻结 LLM 临时处理。
+
+因此主方案增加一个轻量的知识 token mixer。
+
+### 3.2 推荐结构
+
+对每个统计量：
+
+```text
+u_i = RMSNorm(phrase_i + value_i)       # 4096
+q_i = Linear(4096, 128)                 # 128
+```
+
+得到：
+
+```text
+q: (B, 32, 128)
+```
+
+然后使用一层双向 self-attention：
+
+```text
+TransformerEncoderLayer(
+    d_model=128,
+    nhead=8,
+    dim_feedforward=512,
+    norm_first=True,
+    dropout=0.1
+)
+```
+
+建议：
+
+- 只使用 1 层；
+- 最多 2 层；
+- 不加入额外 positional embedding；
+- 统计量身份已经由 phrase embedding 表达；
+- 不使用 per-token MLP 代替 self-attention，因为 MLP 不会建模统计量之间的关系。
+
+得到：
+
+```text
+mixed_knowledge: (B, 32, 128)
+```
+
+### 3.3 knowledge 使用独立 ReprogrammingLayer
+
+使用新的：
+
+```text
+knowledge_reprogramming_layer
+```
+
+而不是和 patch 共享整层。
+
+输入输出：
+
+```text
+query:  (B, 32, 128)
+source: (M, 4096)
+value:  (M, 4096)
+output: (B, 32, 4096)
+```
+
+其中 `M` 是现有 prototype 数量，通常为 500 或 1000。prototype 原始空间是 `M×4096`，进入 attention 后由 key/value projection 映射到多头维度。
+
+推荐：
+
+- patch reprogram 和 knowledge reprogram 使用两套 query/key/value/out projection；
+- 两者可以共享现有的 vocabulary-to-prototype `mapping_layer`；
+- 共享 prototype bank 可以维持同一个 LLM 语义锚点；
+- 不共享整个 ReprogrammingLayer，避免 raw EEG patch 和统计量 token 的分布互相干扰。
+
+最终：
+
+```text
+knowledge_tokens: (B, 32, 4096)
+```
+
+### 3.4 每个统计量一个 soft token 是合理的
+
+32 个 token 足够：
+
+- 统计量身份由 phrase embedding 表达；
+- 数值由独立 Linear 表达；
+- self-attention 负责统计量之间的交互；
+- 不需要把一个统计量拆成多个 token；
+- 不需要把短语作为真实 LLM token 序列再次展开。
+
+不要额外添加 3 个 group header token 作为主设计。FC、频谱、形态的语义已经出现在 phrase 中，额外 group token 可以留作后续消融。
+
+---
+
+## 4. 序列布局和位置编码
+
+### 4.1 使用知识在前的布局
+
+主布局固定为：
+
+```text
+[start_tag]
+[knowledge_1 ... knowledge_32]
+[task_prompt]
+[end_tag]
+[patch_1 ... patch_456]
+```
+
+即：
+
+```text
+[start][knowledge][task][end][patches]
+```
+
+这符合“第一部分领域知识，第二部分任务 prompt”的要求。
+
+如果保留现有 `--use_task_prompt` 语义：
+
+- knowledge 模式的正式实验应开启 `--use_task_prompt`；
+- `--use_task_prompt=False` 时，布局退化为 `[start][knowledge][end][patches]`；
+- 不改变现有 task prompt 的内容和 embedding 方式。
+
+### 4.2 Llama 位置编码
+
+Llama 直接使用全局连续位置：
+
+```text
+0, 1, 2, ..., sequence_length - 1
+```
+
+不重置 knowledge、task 或 patch 的位置。
+
+### 4.3 ChatGLM 2D position
+
+ChatGLM 的 prompt block 必须包括：
+
+```text
+start + knowledge + task + end
+```
+
+因此：
+
+```text
+prompt_length =
+    P_start + 32 + P_task + P_end
+```
+
+`block_pos`：
+
+```text
+prompt 部分: 0 ... prompt_length-1
+patch 部分: 0 ... N*P-1
+```
+
+`global_pos` 仍然对整个序列连续递增。
+
+不要把 knowledge 当作 patch block，也不要给 knowledge 单独重置一个第三种 block。
+
+### 4.4 仍然只读 patch hidden states
+
+读出方案保持不变：
+
+```text
+hidden[:, prompt_length:, :d_ff]
+→ reshape(B, 19, P, d_ff)
+→ channel mean pooling
+→ flatten
+→ linear head
+```
+
+不把 knowledge hidden state 直接平均进输出头。
+
+这样可以保持：
+
+- 输出头维度不变；
+- baseline 和 knowledge 模型的 patch head 结构一致；
+- knowledge 通过 LLM attention 影响 patch hidden states，而不是直接绕过 LLM。
+
+### 4.5 causal attention 很重要
+
+知识放在 patch 前面是必要的。
+
+由于 Llama 和 ChatGLM 使用 causal attention：
+
+```text
+patch token 可以看到前面的 knowledge 和 task prompt
+```
+
+如果 knowledge 放在 patch 后面，patch hidden state 看不到 knowledge，领域知识 prompt 基本失去作用。
+
+知识 token 自身无法看到后面的统计量，所以前面的 self-attention mixer 用来提供双向统计量交互。
+
+---
+
+## 5. 统计量计算
+
+### 5.1 FC 9 维：forward 中计算合理
+
+forward 中使用整分钟静态 FC：
+
+```text
+x: (B, 19, 12000)
+→ 每通道整分钟 z-score
+→ SFC: (B, 19, 19)
+→ SFC.unsqueeze(1): (B, 1, 19, 19)
+→ compute_graph_evidence(...)
+```
+
+建议使用与数据集 `connectivity()` 相同的 Pearson 相关定义：
+
+```text
+SFC = x_z @ x_z.transpose(-1, -2) / (T - 1)
+```
+
+并在 fp32、`torch.no_grad()` 下计算。
+
+这样做合理，因为：
+
+- FC 计算量很小；
+- 不需要保存到数据集；
+- 可以保证模型实际收到的 raw EEG 与 FC 使用同一份数据；
+- 不需要让统计量分支反向传播到 EEG。
+
+需要给 `W=1` 增加安全处理：
+
+- `variability` 设为 0；
+- trend slope 设为 0；
+- 避免单窗口 `std` 和斜率分母产生 NaN；
+- 即使最终只使用 FC 9 维，也不能让中间计算出现 NaN。
+
+### 5.2 频谱 9 维：改为整分钟 4 秒分段
+
+不再使用 10 个 12 秒滑窗。
+
+推荐：
+
+```text
+60 秒 EEG
+→ 15 个非重叠 4 秒 segment
+→ 每段 nperseg=4*hz 的 Hann FFT/Welch
+→ 每段计算频谱统计
+→ 15 段聚合
+```
+
+保留现有频带定义：
+
+```text
+delta: 0.5–4 Hz
+theta: 4–8 Hz
+alpha: 8–13 Hz
+beta: 13–30 Hz
+```
+
+9 个特征顺序不变：
+
+```text
+delta relative power
+theta relative power
+alpha relative power
+beta relative power
+theta/beta
+alpha/(delta+theta)
+slowing index
+frontal/posterior alpha ratio
+temporal theta fraction
+```
+
+建议保持原有“每段先计算比值，再对 15 段求均值”的语义，减少历史统计定义变化。
+
+### 5.3 形态 14 维：时间域整分钟，PSD 特征按 4 秒段
+
+时间域特征在整分钟上计算：
+
+- line length；
+- sharpness；
+- kurtosis；
+- zero crossing；
+- spike rate。
+
+PSD 相关特征使用同一套 15 个 4 秒 segment：
+
+- gamma power；
+- alpha peak frequency；
+- alpha peak frequency variability；
+- aperiodic spectral slope。
+
+`apf_std` 使用 15 个 segment-level APF 的标准差，避免继续代表旧的 10 个 12 秒窗。
+
+### 5.4 统计量 schema 必须固定为 32 维
+
+主设计不再根据任务返回 18 维或 32 维：
+
+```text
+FC 9 + spectral 9 + morphology 14 = 32
+```
+
+分类和回归都使用同一套 32 个统计量。
+
+如果某个数据集确实没有某个形态字段，不能直接用 0 冒充真实统计量。应当：
+
+- 优先把形态统计真正计算出来；
+- 或额外加入 validity mask 和 learned null embedding。
+
+正式主实验建议所有数据集统一返回 32 维。
+
+---
+
+## 6. 训练、梯度和 dtype
+
+### 6.1 word embedding 查表必须 no_grad
+
+短语 embedding 在模型初始化时完成：
+
+```text
+tokenize phrase
+→ word embedding lookup
+→ mean
+→ RMS 对齐
+→ register_buffer
+```
+
+这部分：
+
+- 不参与梯度；
+- 不在 forward 中重复 tokenize；
+- 不更新冻结 LLM 的 word embedding。
+
+`mapping_layer` 和两个 ReprogrammingLayer 仍然可以训练。
+
+### 6.2 bf16 处理方式
+
+推荐 knowledge compiler 内部使用 fp32：
+
+```text
+stats                 → fp32
+phrase buffer         → fp32
+numeric Linear        → fp32
+4096 维相加和 RMSNorm  → fp32
+4096 → 128 projection → fp32
+knowledge mixer       → fp32
+```
+
+进入 ReprogrammingLayer 时显式转换为该层权重 dtype。
+
+最终在拼接 LLM 输入前转换为冻结 LLM embedding dtype：
+
+```text
+knowledge_tokens → bf16
+task/start/end   → bf16
+patch_tokens     → bf16
+```
+
+不要在 Pearson、RMSNorm、数值相加阶段直接使用 bf16。
+
+### 6.3 梯度范围
+
+冻结：
+
+```text
+LLM backbone
+LLM word embedding
+phrase embedding buffer
+```
+
+训练：
+
+```text
+patch embedding
+patch mapping/reprogram
+knowledge numeric encoders
+knowledge 4096→128 projection
+knowledge mixer
+knowledge reprogram
+output head
+shared prototype mapping_layer
+```
+
+### 6.4 统计量必须透传给 TimeLLMPatch
+
+`TimeLLMPatchTrainer.prepare_inputs_kwargs()` 需要在 knowledge 模式下传入：
+
+```text
+x
+labels
+spectral
+morph
+```
+
+模型 forward 形式应支持：
+
+```text
+forward(x, labels, spectral=None, morph=None)
+```
+
+当 `use_knowledge_prompt=False` 时，不计算也不使用这些字段，保证旧 baseline 路径不变。
+
+---
+
+## 7. 最小必要消融
+
+建议最小实验集如下。
+
+### A. 无知识 prompt baseline
+
+```text
+use_knowledge_prompt=False
+```
+
+完全等于现有 `TimeLLMPatch`：
+
+```text
+patch → patch reprogram → frozen LLM → head
+```
+
+这是所有结果的基准。
+
+### B. 完整 knowledge compiler
+
+```text
+phrase + numeric
+→ mixer
+→ knowledge reprogram
+→ [knowledge][task][patches]
+```
+
+这是主模型。
+
+### C. 数值打乱
+
+保留 phrase embedding，但在 batch 内打乱每个统计量的数值：
+
+```text
+s_i[b] ← s_i[perm(b)]
+```
+
+建议每个 feature 独立使用同一个 batch permutation。
+
+它检验模型是否使用了“当前样本的数值”，而不是只利用固定 phrase token 和额外序列长度。
+
+这是比置零更重要的数值消融。
+
+### D. 数值置零
+
+```text
+s_i = 0
+```
+
+得到 phrase-only knowledge prompt。
+
+它检验：
+
+- phrase 语义本身是否有帮助；
+- 性能提升是否主要来自数值；
+- numeric encoder 是否真正工作。
+
+如果 Linear 使用 `bias=False`，置零时数值分支确实没有贡献，解释最干净。
+
+### E. 去掉 knowledge reprogram
+
+保留：
+
+```text
+phrase + value
+→ 4096→128
+→ mixer
+```
+
+将 knowledge reprogram 替换成普通：
+
+```text
+Linear(128,4096)
+```
+
+输出仍为 32×4096，然后插入 LLM。
+
+这样可以单独验证 prototype-based reprogramming 的价值，而不是把 mixer、projection、额外 token 数量全部一起移除。
+
+### F. pretrained LLM vs random LLM
+
+主模型使用：
+
+```text
+llm_init=pretrained
+```
+
+再运行完全相同结构：
+
+```text
+llm_init=random
+```
+
+这项主要回答：
+
+- 性能是否来自 LLM 预训练语义；
+- 还是仅仅来自额外的可训练模块和序列长度。
+
+最小预算下，随机 LLM 只需要在完整 knowledge compiler 上运行一次。更严格时再补充无知识 baseline 的 random LLM。
+
+### 最小核心集合
+
+真正必要的核心组合是：
+
+```text
+1. 无知识 baseline
+2. 完整 knowledge compiler
+3. 数值打乱
+4. 去掉 knowledge reprogram
+5. pretrained vs random LLM
+```
+
+数值置零建议一起做，因为成本低，而且能区分 phrase-only 与 value-dependent 效果。
+
+所有消融保持：
+
+- 相同数据划分；
+- 相同 seed；
+- 相同 patch 参数；
+- 相同 prompt；
+- 相同 LLM；
+- 相同训练步数和早停规则。
+
+---
+
+## 8. 命名与开关
+
+推荐继续使用现有模型类：
+
+```text
+TimeLLMPatch
+```
+
+新增：
+
+```text
+--use_knowledge_prompt
+```
+
+不建议新建 `TimeLLMKnowledge` 模型类，原因是：
+
+- patch path 没有改变；
+- output head 没有改变；
+- LLM backbone 没有改变；
+- baseline 可以通过一个 flag 精确复现；
+- checkpoint 和 trainer 逻辑更容易维护。
+
+建议在配置中增加以下字段：
+
+```text
+use_knowledge_prompt=True/False
+knowledge_num_stats=32
+knowledge_llm_dim=4096
+knowledge_model_dim=128
+knowledge_mixer_layers=1
+knowledge_mixer_heads=8
+knowledge_stats_version="minute_v1"
+knowledge_phrase_version="v1"
+```
+
+实验目录名称必须包含 knowledge 开关，避免覆盖 baseline，例如：
+
+```text
+TimeLLMPatch_AgeCAUEEG_train
+TimeLLMPatchKnowledge_AgeCAUEEG_train
+```
+
+checkpoint 中必须记录：
+
+- 32 个统计量的顺序；
+- phrase list 版本；
+- fixed scaling 版本；
+- 整分钟频谱/形态计算版本；
+- `use_knowledge_prompt`；
+- LLM 初始化方式；
+- `use_lora`、`use_gc_lora`；
+- token order；
+- `d_model`、`d_ff`、prototype 数量。
+
+旧 baseline checkpoint：
+
+- 在 `use_knowledge_prompt=False` 时应完全兼容；
+- 不应直接当作完整 knowledge 模型 checkpoint 使用；
+- knowledge checkpoint 做跨域 transfer 时，目标域必须保持同一统计量 schema 和 phrase 版本。
+
+---
+
+# 按实现顺序落地
+
+## 第一步：固定统计量协议
+
+先固定：
+
+```text
+32 维顺序
+display scale
+clip [-5,5]
+phrase list
+stats_version="minute_v1"
+```
+
+任何训练、transfer、zero-shot 实验都使用同一协议。
+
+## 第二步：修改统计量生成定义
+
+数据层：
+
+- spectral 改为整分钟 15 个 4 秒 segment；
+- morph 的时间域部分使用整分钟；
+- morph 的 PSD 部分使用 15 个 4 秒 segment；
+- 所有数据集都返回 spectral 9 维和 morph 14 维。
+
+forward：
+
+- 整分钟 z-score；
+- 静态 Pearson FC；
+- 通过 `W=1` 安全版 `compute_graph_evidence` 得到 FC 9；
+- 拼接 spectral 和 morph 得到 32 维 display stats。
+
+## 第三步：加入 knowledge 配置和输入透传
+
+新增 `--use_knowledge_prompt`。
+
+patch trainer 在开启该开关时透传：
+
+```text
+spectral
+morph
+```
+
+关闭开关时保持旧输入路径。
+
+## 第四步：初始化 phrase bank
+
+模型初始化阶段：
+
+```text
+tokenize 32 个 phrase
+→ no_grad word embedding lookup
+→ token mean
+→ RMS 对齐
+→ register_buffer
+```
+
+不要使用 `stats_prompt.py` 的自然语言文本格式；这里是 soft embedding compiler，不是文字 prompt。
+
+## 第五步：实现数值编译器
+
+每个统计量：
+
+```text
+display scalar
+→ independent Linear(1,4096,bias=False)
+```
+
+然后：
+
+```text
+phrase embedding + numeric embedding
+→ RMSNorm(4096)
+→ shared Linear(4096,128)
+```
+
+## 第六步：加入知识 mixer 和独立 reprogram
+
+```text
+(B,32,128)
+→ 1-layer TransformerEncoder
+→ knowledge ReprogrammingLayer
+→ (B,32,4096)
+```
+
+patch reprogram 保持不变。
+
+## 第七步：替换序列拼接
+
+严格使用：
+
+```text
+[start]
+[knowledge 32]
+[task prompt]
+[end]
+[patches]
+```
+
+同步修改：
+
+- `prompt_length`；
+- patch hidden slice；
+- ChatGLM `block_pos`；
+- Llama global position；
+- patch reshape 索引。
+
+## 第八步：做形状、NaN 和 dtype 检查
+
+至少验证：
+
+```text
+stats:                  (B,32)
+knowledge_combined:     (B,32,4096)
+knowledge_projected:    (B,32,128)
+knowledge_reprogrammed: (B,32,4096)
+patches:                (B,19*P,4096)
+```
+
+同时检查：
+
+- `W=1` FC 不产生 NaN；
+- 统计量没有 inf；
+- bf16 拼接无 dtype error；
+- patch hidden 数量仍为 `19×P`；
+- baseline 开关关闭时输出路径不变。
+
+## 第九步：运行最小消融集
+
+按以下顺序运行：
+
+```text
+baseline
+full knowledge
+value shuffle
+value zero
+no knowledge reprogram
+pretrained vs random LLM
+```
+
+报告时把这些结果明确区分为：
+
+- same-domain；
+- cross-domain；
+- zero-shot；
+- few-shot。
+
+不要把 knowledge prompt 在同域上的提升直接表述为跨数据集泛化。

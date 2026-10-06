@@ -1,0 +1,34 @@
+你是深度学习与 LLM 应用的实现设计专家。只做设计建议，不要修改任何代码。项目在 /root/autodl-tmp/LLM4FC（EEG 分析，Time-LLM 式重编程：patch 编码 → 冻结 DeepSeek-R1-Distill-Llama-8B → 线性头）。可用 git show 查看历史（e1d17d0:model/TimeLLMPatch/TimeLLMPatch.py、HEAD:model/TimeLLM/graph_evidence.py、HEAD:model/TimeLLM/stats_prompt.py、HEAD:data/dataset.py）。
+
+【需求已定，勿讨论可行性】
+把现有 TimeLLMPatch 模型改进为「领域知识 Token 编译器」：
+LLM 输入 = 第一部分「领域知识 soft prompt」+ 第二部分「任务 prompt」（与现有任务 prompt 保持一致）。
+领域知识部分：在整个 1 分钟 EEG 上（不再划分窗口）计算三方面统计数值（FC 9 维 + 频谱 9 维 + 形态 14 维）。针对每个统计数值（如平均连接强度 0.52）：
+1. 将该统计量的英文短语（如 "overall connectivity strength"）tokenize，取各 token 的 word embedding 求和，得到短语向量；
+2. 将数值 0.52 通过一个 linear 层嵌入到与短语向量相同的 d 维空间，得到数值向量；
+3. 两个向量相加，得到该统计量的组合 embedding；
+4. 所有统计量的组合 embedding 再经过一个 reprogram 模块，获得最终的领域知识 soft prompt。
+
+【现状（TimeLLMPatch，e1d17d0，model/TimeLLMPatch/TimeLLMPatch.py）】
+1. 输入：原始 EEG (B, 19, 12000@200Hz)。patch embedding（patch_len=512, stride=512, Conv1d）→ (B, N*P, d_model=128)。
+2. ReprogrammingLayer（Time-LLM 原版）：query=patch (B,L,128)，source/value=可学习 text prototypes（mapping_layer(词表 embedding) → 1000×128），cross-attention → (B,L,d_llm=4096)。
+3. 序列布局：[start_tag][task prompt][end_tag][patches]，patches=456 个 soft token（19 通道×24 patch）。llama：全局 RoPE 位置编码；chatglm：2D rotary（prompt 段 block 位置 + patches 段 block 位置）。读出只取 patches 位置隐状态（截取前 d_ff=128 维）→ 通道均值池化 → 线性头。LLM 冻结，其余端到端训练，loss 在 forward 里算。
+4. 统计量基础设施（graph_evidence.py compute_graph_evidence，无学习参数）：
+   - 输入 (B,W,C,C) DFC + spectral(B,9) + morph(B,14)，输出连续 display 统计量 stats (B,32)（回归）/ (B,18)（分类，无形态族），已按名义尺度缩放、clip [-5,5]。
+   - FC 9 维：strength/0.3、inter_ratio、front_ratio、asym/0.05、cent/temp/pari/occ/mid 五个脑区均值/0.3。全是静态 FC 可算的（无需窗口）。
+   - 频谱 9 维：δθαβ 相对功率、θ/β、α/(δ+θ)、慢波指数、额枕 α 比、颞 θ 占比。
+   - 形态 14 维：线长/锐度/灶性/峰度/零交叉/γ 功率/棘波速率/APF/APF-std/非周期斜率。
+   - 现有 data/dataset.py 的 spectral_stats/morph_stats 用 10 个 12s 滑窗内部 Welch 计算，需求要求改为整分钟（不再划分窗口）。
+5. 数据集 __getitem__ 已返回 spectral/morph 字段（trainers.py TimeLLMTrainer 已透传；TimeLLMPatchTrainer 目前只传 x 和 labels）。
+
+【请设计，回答以下问题】
+1. 短语编码：token 求和（sum）还是 mean？是否需归一化/缩放？短语如何选择（长度、是否加前后缀）？短语向量 4096 维与数值 linear 的 d 维如何对齐——建议在 4096 维相加后共享投影到 d_model=128 再进 reprogram，还是先在低维相加？
+2. 数值编码：每统计量独立 Linear(1,d) 还是全部共享一个？输入用原始值（如 0.52）还是缩放后的 display 值（strength/0.3≈1.73，clip ±5）？要不要 bias？d=128 还是 4096？
+3. Reprogram 模块：复用现有 ReprogrammingLayer（query=组合 embedding 投影到 128，source/value=text prototypes）即可，还是需要别的（MLP / self-attention 让 32 个统计量交互）？与 patches 的 reprogramming 层共享还是各用一份？知识 soft prompt 每统计量 1 个 token 是否合理？
+4. 序列布局与位置编码：[start][knowledge][task][end][patches] 还是 [start][task][knowledge][end][patches]？读出仍只取 patches 位置可以吗？llama 全局 RoPE 直接顺延即可？chatglm 2D 的 block 位置（目前 prompt 段=start+task+end）要把 knowledge 并入 prompt 段吗？patch 侧 causal 注意力能看到 knowledge（知识在前）是否重要？
+5. 统计量计算：FC 9 维在 forward 里由整分钟静态 FC（z-score 后 (B,19,12000) 直接 corr，W=1 复用 compute_graph_evidence）现算；spectral/morph 在数据集层改为整分钟 Welch（不再 10 滑窗，整段 60s 按 4s 分段）——这个分工合理吗？
+6. 训练细节：word embedding 查表需 no_grad；bf16 下组合 embedding 的 dtype 处理；32 个独立 Linear(1,d) 的初始化策略。
+7. 最小消融对照（不讨论可行性，但请给出验证设计的必要最小集）：无知识 prompt 基线（=现有 TimeLLMPatch）、数值打乱/置零、随机 LLM vs 预训练、去掉 reprogram——哪些最必要？
+8. 命名与开关：在 TimeLLMPatch 里加 --use_knowledge_prompt 开关，还是新建模型类？
+
+请给出可直接落地的完整设计（短语清单规则、数值格式化/缩放规则、各模块维度、插入位置、读出方案、实现步骤），按实现顺序排列。

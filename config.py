@@ -68,6 +68,7 @@ def init_model_config(args, data_config: DataConfig):
             llm_path=args.llm_path,
             llm_init=args.llm_init,
             use_task_prompt=args.use_task_prompt,
+            use_stats_prompt=args.use_stats_prompt,
         )
         model = Model(model_config)
     elif args.model == 'TimeLLMPatch':
@@ -198,6 +199,9 @@ def init_config():
     model_group.add_argument("--num_gcn_layers", default=1, type=int, help="Number of GCN layers (TimeLLM)")
     model_group.add_argument("--use_task_prompt", action="store_true",
                              help="TimeLLM: include task description prompt")
+    model_group.add_argument("--use_stats_prompt", action="store_true",
+                             help="TimeLLM: include CAER-v3 statistics as a "
+                                  "text prompt before the DFC patches")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
     model_group.add_argument("--patch_len", default=512, type=int, help="Patch length in raw samples (TimeLLMPatch)")
 
