@@ -1,13 +1,17 @@
-"""Knowledge compiler: 32 个 CAER-v3 display stats → LLM query 向量。
+"""Knowledge compiler v2: 统计数值分支 + raw EEG patch 分支 → 知识 query。
 
-每个统计量完全独立编译（无任何 token 间混合）：
-  q_i = P(phrase_i) + W_i * s_i          (d_model 维)
-phrase_i 由冻结词表查表求平均 + RMS 对齐得到（buffer，no_grad）；
-W_i 为每统计量独立的数值轴（等价 32 个 Linear(1, d_model, bias=False)）。
+每统计量独立编译（无 token 间混合）：
+  q_i = g_num·RMSNorm(W_i·s_i) + g_raw·RMSNorm(R_i·Stem(EEG块))   (d_model 维)
+g_num/g_raw 为 softplus 非负 gate（初始均 1.0，两分支约 50/50）；
+phrase 不再进入 q——phrase 在 reprogram 之后于 4096 维与 soft prompt
+gated 求和（见 TimeLLMKnowledge.py），只作统计量身份/语言锚点（冻结）。
 """
+
+import math
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 # 32 个短语，顺序与 compute_graph_evidence 输出的 stats 顺序一一对应：
 # FC 9 + 频谱 9 + 形态 14
@@ -52,22 +56,36 @@ _PHRASES = [
 _EPS = 1e-8
 
 
-class KnowledgeCompiler(nn.Module):
-    """Phrase bank + 数值 encoder + 共享短语投影。
+def rms_norm(x, eps=1e-6):
+    """固定 RMS 归一化（无参数，沿最后一维）。"""
+    return x / (x.pow(2).mean(-1, keepdim=True).add(eps).sqrt())
 
-    forward(s): (B, num_stats) display 值 → q: (B, num_stats, d_model)
+
+def _softplus_inv(v):
+    return math.log(math.exp(v) - 1.0)
+
+
+class KnowledgeCompiler(nn.Module):
+    """数值轴 + raw 投影 + 分支 gate。
+
+    forward(stats, raw_feat):
+        stats:    (B, num_stats) display 值（clip ±5，经 nan_to_num）
+        raw_feat: (B, d_feat) PatchStem 输出（fp32）
+        → q: (B, num_stats, d_model)
     """
 
     def __init__(self, d_llm, d_model, num_stats, tokenizer,
-                 word_embeddings, llm_type='llama', numeric_init_std=0.02):
+                 word_embeddings, llm_type='llama', d_feat=256,
+                 numeric_init_std=0.02):
         super().__init__()
         self.d_llm = d_llm
         self.d_model = d_model
         self.num_stats = num_stats
+        self.d_feat = d_feat
         assert num_stats == len(_PHRASES), \
             f"num_stats={num_stats} 与短语表 {len(_PHRASES)} 不一致"
 
-        # ── phrase bank：tokenize → 冻结词表查表 → mean → RMS 对齐 ──
+        # ── phrase bank：tokenize → 冻结词表查表 → mean → RMS 对齐（冻结）──
         ids_list = []
         for phrase in _PHRASES:
             text = " " + phrase if llm_type == 'llama' else phrase
@@ -83,21 +101,35 @@ class KnowledgeCompiler(nn.Module):
         self.register_buffer("phrase_bank",
                              torch.stack(phrase_bank))       # (32, d_llm)
 
-        # 共享短语投影：d_llm → d_model（bias=False，保证线性分解成立）
-        self.phrase_projection = nn.Linear(d_llm, d_model, bias=False)
-        nn.init.xavier_uniform_(self.phrase_projection.weight)
-
-        # 每统计量独立数值轴（bias=False：s_i=0 时数值分支严格为零）
+        # ── 数值分支：每统计量独立数值轴（bias=False：s_i=0 时严格为零）──
         self.value_weights = nn.Parameter(
             torch.empty(num_stats, d_model))
         nn.init.normal_(self.value_weights, std=numeric_init_std)
-        # 注：数值分支初始 RMS ≈ std × RMS(s_i) ≈ 0.02 ≪ 短语分支，
-        # 避免数值一开始淹没短语身份。若需按训练集逐统计量校准，
-        # 可用 σ_i = α·ρ_p/ρ_s,i（α≈0.5~1.0，源域校准，勿用目标域）。
 
-    def forward(self, stats):
-        """stats: (B, num_stats) display 值（clip ±5）→ (B, num_stats, d_model)"""
-        p = self.phrase_projection(self.phrase_bank)         # (32, d_model)
-        p = p.unsqueeze(0).expand(stats.shape[0], -1, -1)
-        v = stats.unsqueeze(-1) * self.value_weights         # (B, 32, d_model)
-        return p + v
+        # ── raw 分支：d_feat → 每统计量独立投影（bias=False）──
+        self.raw_projection = nn.Linear(d_feat, num_stats * d_model,
+                                        bias=False)
+        nn.init.normal_(self.raw_projection.weight, std=0.02)
+
+        # ── 分支 gate：softplus 非负，初始 1.0（约 50/50）──
+        self.num_gate = nn.Parameter(torch.tensor(_softplus_inv(1.0)))
+        self.raw_gate = nn.Parameter(torch.tensor(_softplus_inv(1.0)))
+
+        # 分支开关（由模型 config 注入）
+        self.use_numeric_branch = True
+        self.use_raw_branch = True
+
+    def forward(self, stats, raw_feat):
+        """stats: (B, num_stats)；raw_feat: (B, d_feat) → (B, num_stats, d_model)。"""
+        B = stats.shape[0]
+        q = None
+        if self.use_numeric_branch:
+            v = stats.unsqueeze(-1) * self.value_weights    # (B, S, d_model)
+            q = F.softplus(self.num_gate) * rms_norm(v)
+        if self.use_raw_branch:
+            u = self.raw_projection(raw_feat).view(
+                B, self.num_stats, self.d_model)
+            q_raw = F.softplus(self.raw_gate) * rms_norm(u)
+            q = q_raw if q is None else q + q_raw
+        assert q is not None, "数值分支与 raw 分支至少开启一个"
+        return q

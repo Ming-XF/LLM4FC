@@ -1,12 +1,24 @@
-"""TimeLLMKnowledge: 领域知识 Token 编译器（纯知识版，无 patch 路径）。
+"""TimeLLMKnowledge v2: 全局+局部知识 Token 编译器（patch 编码 + 捷径解除）。
 
-整分钟 EEG → 静态 FC + 数据集层频谱/形态统计 → 32 个 display stats
-→ 每统计量独立编译（短语 mean 向量与数值线性嵌入在 128 维求和）
-→ 知识 soft prompt → 冻结 LLM → 最后 K 层 READOUT 位置聚合读出 → 线性头。
+输入三段：
+  整分钟 EEG → 静态 FC + 数据集层频谱/形态统计 → 32 个全局 display stats
+  6 个 10s 片段 → torch 内计算每片段 32 个局部 display stats（同 schema）
+  任务 prompt（不变）
 
-序列布局：[start_tag][task prompt][end_tag][knowledge 1..32][READOUT]
-（tags 只包文本任务 prompt；READOUT 为可学习读出 token，是序列真正的
-最后位置，其 hidden state 经多层聚合后进输出头。）
+编码（全局块与局部块共享编译器参数）：
+  q_i = g_num·RMSNorm(W_i·s_i) + g_raw·RMSNorm(R_i·Stem(EEG块))     (128)
+  q → reprogram（跨注意力到词表原型）→ soft prompt (4096)
+  k_i = ref_rms·RMSNorm(soft_prompt_i + β·phrase_i)   ← phrase 只作身份锚点
+
+序列：[start][task][end][全局 32][局部 6×32][READOUT(固定 token)] → 冻结 LLM
+→ 末 K 层 READOUT 位置聚合 → 线性头（bias 固定源域先验）+ 知识 bypass 头。
+
+捷径解除（codex 评审配套）：
+  - READOUT 为固定文本 token 词表向量（不可学习）；
+  - 层聚合权重默认固定均匀（learn_layer_weights=False）；
+  - 输出头 bias 冻结在归一化标签先验（回归 0.5 / 分类 0）；
+  - bypass：z = mean_pool(q) → 小线性头 → y = y_llm + λ·y_bypass，
+    λ 初始 0.1，给知识路径一条不经过冻结 LLM 的直连监督。
 """
 
 from math import sqrt
@@ -18,12 +30,13 @@ from transformers import AutoConfig, AutoModel, AutoTokenizer
 
 from ..base import BaseConfig, ModelOutputs
 from ..TimeLLM.graph_evidence import compute_graph_evidence
-from .knowledge_compiler import KnowledgeCompiler
+from .knowledge_compiler import KnowledgeCompiler, rms_norm
+from .local_stats import segment_spectral_stats, segment_morph_stats
 from .prompts import get_prompt_config
 
 _EPS = 1e-8
 
-# 层权重聚合：α = β·e_last + (1-β)·softmax(a/T)，最终层锚定防权重塌缩
+# 层权重聚合（learn_layer_weights=True 时）：α = β·e_last + (1-β)·softmax(a/T)
 _LAYER_BETA = 0.4
 _LAYER_TEMP = 1.5
 
@@ -83,6 +96,27 @@ class ReprogrammingLayer(nn.Module):
         return out.mean(dim=2)                                   # (B,L,d_llm)
 
 
+class PatchStem(nn.Module):
+    """raw EEG 块 (B, C, T) → (B, d_feat)：Conv1d 下采样 + 自适应池化 + RMSNorm。
+
+    60s 全局块与 10s 局部块共享：时间维池化到固定 8 桶，输出维度恒定。
+    无 BatchNorm（跨域稳健，LayerNorm 系归一化）。
+    """
+
+    def __init__(self, in_channels, d_feat=256, kernel=25):
+        super().__init__()
+        self.conv = nn.Conv1d(in_channels, 32, kernel_size=kernel,
+                              stride=kernel)
+        nn.init.kaiming_normal_(self.conv.weight, nonlinearity='relu')
+        self.d_feat = d_feat
+        assert d_feat == 32 * 8, "d_feat 需为 32×池化桶数(8)"
+
+    def forward(self, x):
+        h = F.gelu(self.conv(x))                      # (B, 32, ~T/kernel)
+        h = F.adaptive_avg_pool1d(h, 8)               # (B, 32, 8)
+        return rms_norm(h.flatten(1))                 # (B, d_feat)
+
+
 class TimeLLMKnowledgeConfig(BaseConfig):
     def __init__(self, node_size,
                  time_series_size=12000,
@@ -92,6 +126,17 @@ class TimeLLMKnowledgeConfig(BaseConfig):
                  dropout=0.1,
                  num_stats=32,
                  readout_layers=4,
+                 d_feat=256,
+                 hz=200,
+                 num_local_segments=6,
+                 use_local_knowledge=True,
+                 use_raw_branch=True,
+                 use_numeric_branch=True,
+                 use_knowledge_bypass=True,
+                 freeze_head_bias=True,
+                 learn_layer_weights=False,
+                 phrase_beta_init=0.25,
+                 bypass_gate_init=0.1,
                  task_type='classification',
                  output_dim=2,
                  dataset_name='CAUEEG',
@@ -109,6 +154,17 @@ class TimeLLMKnowledgeConfig(BaseConfig):
         self.dropout = dropout
         self.num_stats = num_stats
         self.readout_layers = readout_layers
+        self.d_feat = d_feat
+        self.hz = hz
+        self.num_local_segments = num_local_segments
+        self.use_local_knowledge = use_local_knowledge
+        self.use_raw_branch = use_raw_branch
+        self.use_numeric_branch = use_numeric_branch
+        self.use_knowledge_bypass = use_knowledge_bypass
+        self.freeze_head_bias = freeze_head_bias
+        self.learn_layer_weights = learn_layer_weights
+        self.phrase_beta_init = phrase_beta_init
+        self.bypass_gate_init = bypass_gate_init
         self.task_type = task_type
         self.output_dim = output_dim
         self.dataset_name = dataset_name
@@ -186,7 +242,13 @@ class Model(nn.Module):
         self.word_embeddings = self._word_embeddings.weight
         self.vocab_size = self.word_embeddings.shape[0]
 
-        # ── 知识编译器 + reprogram + READOUT + 输出头 ──
+        # ── 词表 embedding 尺度参照（RMS 中位数）──
+        ref_rms = self.word_embeddings.detach().float().pow(2).mean(
+            -1).sqrt().median().clamp_min(_EPS)
+        self.register_buffer("ref_rms", ref_rms)
+
+        # ── PatchStem + 知识编译器 + reprogram ──
+        self.patch_stem = PatchStem(config.node_size, d_feat=config.d_feat)
         self.knowledge_compiler = KnowledgeCompiler(
             d_llm=self.d_llm,
             d_model=config.d_model,
@@ -194,7 +256,12 @@ class Model(nn.Module):
             tokenizer=self.tokenizer,
             word_embeddings=self._word_embeddings,
             llm_type=self.llm_type,
+            d_feat=config.d_feat,
         )
+        self.knowledge_compiler.use_numeric_branch = \
+            config.use_numeric_branch
+        self.knowledge_compiler.use_raw_branch = config.use_raw_branch
+
         self.mapping_layer = nn.Linear(self.vocab_size, self.num_prototypes)
         self.reprogramming_layer = ReprogrammingLayer(
             d_model=config.d_model,
@@ -203,22 +270,46 @@ class Model(nn.Module):
             attention_dropout=config.dropout,
         )
 
-        # READOUT：零均值随机初始化，RMS 对齐到词表 embedding 尺度
-        ref_rms = self.word_embeddings.detach().float().pow(2).mean(
-            -1).sqrt().median().clamp_min(_EPS)
-        self.readout_embedding = nn.Parameter(torch.empty(self.d_llm))
-        nn.init.normal_(self.readout_embedding, std=float(ref_rms))
+        # phrase 融合系数（初始 0.25，phrase 只作身份锚点，不参与 q）
+        self.phrase_beta = nn.Parameter(
+            torch.tensor(config.phrase_beta_init))
 
-        # 最后 K 层聚合权重（锚定 softmax，见 _layer_weights）
-        self.layer_logits = nn.Parameter(
-            torch.zeros(config.readout_layers))
+        # ── READOUT：固定文本 token 词表向量（不可学习，焊死捷径）──
+        readout_ids = self.tokenizer.encode(
+            " age", add_special_tokens=False)
+        if not readout_ids:
+            readout_ids = self.tokenizer.encode(
+                "age", add_special_tokens=False)
+        if not readout_ids:
+            readout_ids = [self.tokenizer.eos_token_id]
+        with torch.no_grad():
+            rv = self._word_embeddings(
+                torch.tensor(readout_ids)).mean(0).float()
+        rms = rv.pow(2).mean().sqrt().clamp_min(_EPS)
+        self.register_buffer("readout_embedding", rv / rms * ref_rms)
 
+        # ── 最后 K 层聚合权重：默认固定均匀；learn=True 时锚定 softmax ──
+        self.layer_logits = (
+            nn.Parameter(torch.zeros(config.readout_layers))
+            if config.learn_layer_weights else None)
+
+        # ── 输出头：bias 冻结在归一化标签先验（均值预测"送分项"提前给）──
         self.task_type = config.task_type
         self.output_head = nn.Sequential(
             RMSNorm(self.d_llm, learnable=True),
             nn.Linear(self.d_llm, config.output_dim),
             nn.Dropout(config.dropout),
         )
+        if config.freeze_head_bias:
+            prior = 0.5 if self.task_type == 'regression' else 0.0
+            with torch.no_grad():
+                self.output_head[1].bias.fill_(prior)
+            self.output_head[1].bias.requires_grad_(False)
+
+        # ── 知识 bypass 头：mean_pool(q) → 线性头，直连监督知识路径 ──
+        self.bypass_head = nn.Linear(config.d_model, config.output_dim)
+        self.bypass_gate = nn.Parameter(
+            torch.tensor(config.bypass_gate_init))
 
         for param in self.llm.parameters():
             param.requires_grad = False
@@ -236,13 +327,37 @@ class Model(nn.Module):
         return self
 
     def _layer_weights(self):
-        """α = β·e_last + (1-β)·softmax(a/T)，最终层权重下限 β。"""
+        """α = 固定均匀(1/K) 或 β·e_last + (1-β)·softmax(a/T)（learn 时）。"""
         K = self.config.readout_layers
+        if self.layer_logits is None:
+            return torch.full((K,), 1.0 / K,
+                              device=self.readout_embedding.device,
+                              dtype=torch.float32)
         a = self.layer_logits
         w = torch.softmax(a / _LAYER_TEMP, dim=0)
         anchor = torch.zeros(K, device=a.device, dtype=a.dtype)
         anchor[-1] = 1.0
         return _LAYER_BETA * anchor + (1 - _LAYER_BETA) * w
+
+    def _local_stats(self, x_z):
+        """整分钟 z-scored EEG → (B*nseg, 32) 局部 display stats。
+
+        6 个 10s 段：每段静态 FC + torch 版频谱/形态统计量，
+        经 compute_graph_evidence 统一缩放裁剪（与全局同 schema）。
+        """
+        cfg = self.config
+        seg_len = 10 * cfg.hz
+        nseg = min(cfg.num_local_segments, x_z.shape[-1] // seg_len)
+        xl = x_z[:, :, :nseg * seg_len]
+        xl = xl.view(xl.shape[0], xl.shape[1], nseg, seg_len)
+        xl = xl.permute(0, 2, 1, 3).contiguous().view(-1, xl.shape[1], seg_len)
+        fc_l = torch.bmm(xl, xl.transpose(1, 2)) / (seg_len - 1)
+        spec_l = segment_spectral_stats(xl, cfg.hz)
+        morph_l = segment_morph_stats(xl, cfg.hz)
+        _, stats_l = compute_graph_evidence(
+            fc_l.unsqueeze(1), spec_l, morph_l)
+        stats_l = torch.nan_to_num(stats_l, nan=0.0)
+        return stats_l, nseg, xl                     # (B*nseg, 32)
 
     def forward(self, x, labels, spectral=None, morph=None):
         B, N, T = x.shape
@@ -251,42 +366,76 @@ class Model(nn.Module):
         # ── 逐通道 z-score（幅度不变性：跨域零样本迁移的关键）──
         mean = x.mean(dim=-1, keepdim=True)
         std = x.std(dim=-1, keepdim=True)
-        x = (x - mean) / (std + 1e-5)
+        x_z = (x - mean) / (std + 1e-5)
+        x_z = x_z.to(torch.float32)
 
-        # ── 整分钟静态 FC → 32 维 display stats（fp32）──
+        # ── 全局知识：整分钟静态 FC + 数据集层频谱/形态 → (B, 32) ──
         if spectral is None or morph is None:
             raise ValueError(
                 "TimeLLMKnowledge requires spectral and morph stats; "
                 "make sure the dataset returns them")
-        x_z = x.to(torch.float32)
         static_fc = torch.bmm(x_z, x_z.transpose(1, 2)) / (T - 1)
-        _, stats = compute_graph_evidence(
-            static_fc.unsqueeze(1), spectral, morph)             # (B, 32)
-        # 兜底：全平样本的 nan 统计量置 0（inf 已被 clamp 到 ±5），
-        # 防止 nan 经 softmax 污染整个 batch 的梯度
-        stats = torch.nan_to_num(stats, nan=0.0)
+        _, stats_g = compute_graph_evidence(
+            static_fc.unsqueeze(1), spectral, morph)            # (B, 32)
+        stats_g = torch.nan_to_num(stats_g, nan=0.0)
 
-        # ── 知识编译 → soft prompt (B, 32, 4096) ──
-        q = self.knowledge_compiler(stats)
+        # ── 局部知识：6 个 10s 段 → (B, nseg*32) ──
+        nseg = 0
+        if self.config.use_local_knowledge:
+            stats_l, nseg, xl = self._local_stats(x_z)          # (B*nseg, 32)
+
+        # ── 知识编译：q = gated(数值分支 + raw 分支) ──
+        raw_g = self.patch_stem(x_z)                            # (B, d_feat)
+        q_g = self.knowledge_compiler(stats_g, raw_g)           # (B, 32, d)
+        if nseg > 0:
+            raw_l = self.patch_stem(xl)                         # (B*nseg, d_feat)
+            q_l = self.knowledge_compiler(stats_l, raw_l)       # (B*nseg, 32, d)
+
+        # ── reprogram → soft prompt (4096) ──
         word_embeddings = self.word_embeddings.permute(1, 0).to(
             dtype=self.mapping_layer.weight.dtype)
         source_embeddings = self.mapping_layer(
-            word_embeddings).permute(1, 0)                       # (M, 4096)
+            word_embeddings).permute(1, 0)                      # (M, 4096)
         reprogram_dtype = \
             self.reprogramming_layer.query_projection.weight.dtype
-        knowledge = self.reprogramming_layer(
-            q.to(dtype=reprogram_dtype),
+        soft_g = self.reprogramming_layer(
+            q_g.to(dtype=reprogram_dtype),
             source_embeddings.to(dtype=reprogram_dtype),
-            source_embeddings.to(dtype=reprogram_dtype),
-        ).to(dtype=torch.bfloat16)
+            source_embeddings.to(dtype=reprogram_dtype))        # (B, 32, 4096)
+        knowledge = soft_g
+        q_all = q_g
+        if nseg > 0:
+            soft_l = self.reprogramming_layer(
+                q_l.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype)
+            ).view(B, nseg * self.config.num_stats, self.d_llm)
+            knowledge = torch.cat([soft_g, soft_l], dim=1)      # (B, S_k, 4096)
+            q_all = torch.cat(
+                [q_g, q_l.view(B, nseg * self.config.num_stats, self.d_model)],
+                dim=1)
 
-        # ── 组装序列：[start][task][end][knowledge 32][READOUT] ──
+        # ── phrase 融合：k = ref_rms·RMSNorm(soft + β·phrase)，phrase 冻结 ──
+        phrase_g = self.knowledge_compiler.phrase_bank.unsqueeze(0).expand(
+            B, -1, -1)
+        phrase = phrase_g
+        if nseg > 0:
+            phrase_l = self.knowledge_compiler.phrase_bank.unsqueeze(
+                0).unsqueeze(0).expand(
+                    B, nseg, -1, -1).reshape(
+                        B, nseg * self.config.num_stats, self.d_llm)
+            phrase = torch.cat([phrase_g, phrase_l], dim=1)
+        knowledge = self.ref_rms * rms_norm(
+            knowledge + self.phrase_beta * phrase)
+        S_k = knowledge.shape[1]
+
+        # ── 组装序列：[start][task][end][knowledge][READOUT(固定)] ──
         start_tag = self.start_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
         end_tag = self.end_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
         task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(
             B, -1, -1)
         readout = self.readout_embedding.unsqueeze(0).unsqueeze(0).expand(
-            B, 1, -1).to(dtype=knowledge.dtype)
+            B, 1, -1).to(dtype=torch.bfloat16)
 
         prompt_parts = [start_tag]
         prompt_length = self.P_start
@@ -295,12 +444,12 @@ class Model(nn.Module):
             prompt_length += self.P_task
         prompt_parts.append(end_tag)
         prompt_length += self.P_end
-        prompt_parts.append(knowledge)
+        prompt_parts.append(knowledge.to(dtype=torch.bfloat16))
         prompt_parts.append(readout)
 
         inputs_embeds = torch.cat(prompt_parts, dim=1)
         sequence_length = inputs_embeds.shape[1]
-        readout_idx = prompt_length + self.config.num_stats  # = S - 1
+        readout_idx = prompt_length + S_k                      # = S - 1
 
         if self.llm_type == 'chatglm':
             causal_mask = torch.triu(
@@ -319,8 +468,7 @@ class Model(nn.Module):
                     torch.arange(
                         prompt_length, dtype=torch.long, device=device),
                     torch.arange(
-                        self.config.num_stats + 1,
-                        dtype=torch.long, device=device),
+                        S_k + 1, dtype=torch.long, device=device),
                 ]).unsqueeze(0).repeat(B, 1)
                 position_ids = torch.stack((global_pos, block_pos), dim=1)
             else:
@@ -360,11 +508,17 @@ class Model(nn.Module):
             [h[:, readout_idx, :].float() for h in all_hidden[-K:]], dim=1)
         # 逐层固定 RMS 归一化（无参数，防各层范数差异主导聚合）
         hs = hs / (hs.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
-        alpha = self._layer_weights()                            # (K,)
-        agg = (hs * alpha.view(1, -1, 1)).sum(1)                 # (B, 4096)
+        alpha = self._layer_weights()                           # (K,)
+        agg = (hs * alpha.view(1, -1, 1)).sum(1)                # (B, 4096)
 
         logits = self.output_head(
             agg.to(dtype=self.output_head[1].weight.dtype))
+
+        # ── 知识 bypass：mean_pool(q) → 线性头，λ 加权 ──
+        if self.config.use_knowledge_bypass:
+            z = q_all.mean(dim=1)                               # (B, d_model)
+            y_bypass = self.bypass_head(z)
+            logits = logits + self.bypass_gate * y_bypass
 
         if self.task_type == 'regression':
             prediction = logits.squeeze(-1)
@@ -381,9 +535,13 @@ class Model(nn.Module):
             logits=logits,
             loss=loss,
             hidden_state={
-                'q': q,
+                'q': q_all,
                 'knowledge': knowledge,
                 'readout_agg': agg,
                 'layer_weights': alpha,
+                'bypass_gate': self.bypass_gate,
+                'num_gate': self.knowledge_compiler.num_gate,
+                'raw_gate': self.knowledge_compiler.raw_gate,
+                'phrase_beta': self.phrase_beta,
             },
         )

@@ -107,6 +107,12 @@ def init_model_config(args, data_config: DataConfig):
             llm_init=args.llm_init,
             use_task_prompt=args.use_task_prompt,
             readout_layers=args.readout_layers,
+            use_local_knowledge=args.use_local_knowledge,
+            use_raw_branch=args.use_raw_branch,
+            use_numeric_branch=args.use_numeric_branch,
+            use_knowledge_bypass=args.use_knowledge_bypass,
+            freeze_head_bias=args.freeze_head_bias,
+            learn_layer_weights=args.learn_layer_weights,
         )
         model = TimeLLMKnowledgeModel(model_config)
     else:
@@ -225,6 +231,24 @@ def init_config():
     model_group.add_argument("--readout_layers", default=4, type=int,
                              help="TimeLLMKnowledge: number of final LLM layers "
                                   "aggregated for READOUT position readout (K)")
+    model_group.add_argument("--use_local_knowledge",
+                             action=argparse.BooleanOptionalAction, default=True,
+                             help="TimeLLMKnowledge: append 6x10s local knowledge blocks")
+    model_group.add_argument("--use_raw_branch",
+                             action=argparse.BooleanOptionalAction, default=True,
+                             help="TimeLLMKnowledge: patch-embedded raw EEG branch in knowledge compiler")
+    model_group.add_argument("--use_numeric_branch",
+                             action=argparse.BooleanOptionalAction, default=True,
+                             help="TimeLLMKnowledge: display-stats numeric branch in knowledge compiler")
+    model_group.add_argument("--use_knowledge_bypass",
+                             action=argparse.BooleanOptionalAction, default=True,
+                             help="TimeLLMKnowledge: mean-pool(q) residual head with gate lambda")
+    model_group.add_argument("--freeze_head_bias",
+                             action=argparse.BooleanOptionalAction, default=True,
+                             help="TimeLLMKnowledge: freeze output-head bias at normalized label prior")
+    model_group.add_argument("--learn_layer_weights",
+                             action=argparse.BooleanOptionalAction, default=False,
+                             help="TimeLLMKnowledge: learn anchored layer-aggregation weights (default: fixed uniform)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
