@@ -262,6 +262,9 @@ class Model(nn.Module):
         static_fc = torch.bmm(x_z, x_z.transpose(1, 2)) / (T - 1)
         _, stats = compute_graph_evidence(
             static_fc.unsqueeze(1), spectral, morph)             # (B, 32)
+        # 兜底：全平样本的 nan 统计量置 0（inf 已被 clamp 到 ±5），
+        # 防止 nan 经 softmax 污染整个 batch 的梯度
+        stats = torch.nan_to_num(stats, nan=0.0)
 
         # ── 知识编译 → soft prompt (B, 32, 4096) ──
         q = self.knowledge_compiler(stats)

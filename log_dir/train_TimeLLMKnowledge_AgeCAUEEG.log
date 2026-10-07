@@ -1,0 +1,229 @@
+10/07/2026 19:34:40 - INFO - __main__ -   ########## Repeat:0 ##########
+10/07/2026 19:34:40 - INFO - __main__ -   ==================== Explicit args ====================
+  d_model: 128
+  dataset: AgeCAUEEG
+  deepspeed: True
+  deepspeed_config: deepspeed/train_patch.json
+  do_evaluate: True
+  do_test: True
+  do_train: True
+  dropout: 0.1
+  early_stop_metric: R2
+  early_stop_patience: 20
+  llm_init: pretrained
+  llm_path: ./model/deepseek-r1-distill-llama-8B
+  llm_type: llama
+  local_rank: 0
+  model: TimeLLMKnowledge
+  num_epochs: 200
+  num_heads: 8
+  num_prototypes: 1000
+  num_repeat: 1
+  readout_layers: 4
+  save_steps: 25
+  schedule: cos
+  use_task_prompt: True
+  [effective] batch_size: 48, learning_rate: 0.0001
+10/07/2026 19:34:40 - INFO - utils.trainer -   ***** Running training *****
+10/07/2026 19:34:40 - INFO - utils.trainer -     Num examples = 41
+10/07/2026 19:34:40 - INFO - utils.trainer -     Num Epochs = 200
+10/07/2026 19:34:40 - INFO - utils.trainer -     Total train batch size = 48
+10/07/2026 19:34:40 - INFO - utils.trainer -     warmup steps = 400
+10/07/2026 19:34:40 - INFO - utils.trainer -     Total optimization steps = 8200
+10/07/2026 19:34:40 - INFO - utils.trainer -     Save steps = 25
+10/07/2026 19:35:01 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:35:07 - INFO - utils.trainer -   Loss: 0.01979
+10/07/2026 19:35:07 - INFO - utils.trainer -   MAE: 12.14374
+10/07/2026 19:35:07 - INFO - utils.trainer -   R2: -0.87774
+10/07/2026 19:35:08 - INFO - utils.trainer -   Model saved to output_dir/TimeLLMKnowledge_AgeCAUEEG_train
+10/07/2026 19:35:08 - INFO - utils.trainer -   Best model saved (val_R2=-0.8777)
+10/07/2026 19:35:08 - INFO - utils.trainer -   Epoch: 1, Loss: 0.08724, Val loss: 0.01979, Val R2: -0.8777, Best val R2: -0.8777, No improve: 0/20, Time: 21.0s
+10/07/2026 19:35:28 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:35:34 - INFO - utils.trainer -   Loss: 0.01035
+10/07/2026 19:35:34 - INFO - utils.trainer -   MAE: 8.46487
+10/07/2026 19:35:34 - INFO - utils.trainer -   R2: -0.00426
+10/07/2026 19:35:37 - INFO - utils.trainer -   Model saved to output_dir/TimeLLMKnowledge_AgeCAUEEG_train
+10/07/2026 19:35:37 - INFO - utils.trainer -   Best model saved (val_R2=-0.0043)
+10/07/2026 19:35:37 - INFO - utils.trainer -   Epoch: 2, Loss: 0.03023, Val loss: 0.01035, Val R2: -0.0043, Best val R2: -0.0043, No improve: 0/20, Time: 20.2s
+10/07/2026 19:35:58 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:36:04 - INFO - utils.trainer -   Loss: 0.01087
+10/07/2026 19:36:04 - INFO - utils.trainer -   MAE: 8.72256
+10/07/2026 19:36:04 - INFO - utils.trainer -   R2: -0.05213
+10/07/2026 19:36:04 - INFO - utils.trainer -   Epoch: 3, Loss: 0.02781, Val loss: 0.01087, Val R2: -0.0521, Best val R2: -0.0043, No improve: 1/20, Time: 20.6s
+10/07/2026 19:36:25 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:36:31 - INFO - utils.trainer -   Loss: 0.01090
+10/07/2026 19:36:31 - INFO - utils.trainer -   MAE: 8.79773
+10/07/2026 19:36:31 - INFO - utils.trainer -   R2: -0.05169
+10/07/2026 19:36:31 - INFO - utils.trainer -   Epoch: 4, Loss: 0.02859, Val loss: 0.01090, Val R2: -0.0517, Best val R2: -0.0043, No improve: 2/20, Time: 20.9s
+10/07/2026 19:36:52 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:36:58 - INFO - utils.trainer -   Loss: 0.01050
+10/07/2026 19:36:58 - INFO - utils.trainer -   MAE: 8.58059
+10/07/2026 19:36:58 - INFO - utils.trainer -   R2: -0.01461
+10/07/2026 19:36:58 - INFO - utils.trainer -   Epoch: 5, Loss: 0.03220, Val loss: 0.01050, Val R2: -0.0146, Best val R2: -0.0043, No improve: 3/20, Time: 20.8s
+10/07/2026 19:37:19 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:37:25 - INFO - utils.trainer -   Loss: 0.01080
+10/07/2026 19:37:25 - INFO - utils.trainer -   MAE: 8.71228
+10/07/2026 19:37:25 - INFO - utils.trainer -   R2: -0.04342
+10/07/2026 19:37:25 - INFO - utils.trainer -   Epoch: 6, Loss: 0.02892, Val loss: 0.01080, Val R2: -0.0434, Best val R2: -0.0043, No improve: 4/20, Time: 20.7s
+10/07/2026 19:37:46 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:37:52 - INFO - utils.trainer -   Loss: 0.01417
+10/07/2026 19:37:52 - INFO - utils.trainer -   MAE: 10.12992
+10/07/2026 19:37:52 - INFO - utils.trainer -   R2: -0.34997
+10/07/2026 19:37:52 - INFO - utils.trainer -   Epoch: 7, Loss: 0.02894, Val loss: 0.01417, Val R2: -0.3500, Best val R2: -0.0043, No improve: 5/20, Time: 20.7s
+10/07/2026 19:38:12 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:38:18 - INFO - utils.trainer -   Loss: 0.01065
+10/07/2026 19:38:18 - INFO - utils.trainer -   MAE: 8.66757
+10/07/2026 19:38:18 - INFO - utils.trainer -   R2: -0.02872
+10/07/2026 19:38:18 - INFO - utils.trainer -   Epoch: 8, Loss: 0.02961, Val loss: 0.01065, Val R2: -0.0287, Best val R2: -0.0043, No improve: 6/20, Time: 20.6s
+10/07/2026 19:38:39 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:38:45 - INFO - utils.trainer -   Loss: 0.01069
+10/07/2026 19:38:45 - INFO - utils.trainer -   MAE: 8.64710
+10/07/2026 19:38:45 - INFO - utils.trainer -   R2: -0.03534
+10/07/2026 19:38:45 - INFO - utils.trainer -   Epoch: 9, Loss: 0.03488, Val loss: 0.01069, Val R2: -0.0353, Best val R2: -0.0043, No improve: 7/20, Time: 20.4s
+10/07/2026 19:39:06 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:39:12 - INFO - utils.trainer -   Loss: 0.01788
+10/07/2026 19:39:12 - INFO - utils.trainer -   MAE: 11.47763
+10/07/2026 19:39:12 - INFO - utils.trainer -   R2: -0.69752
+10/07/2026 19:39:12 - INFO - utils.trainer -   Epoch: 10, Loss: 0.03176, Val loss: 0.01788, Val R2: -0.6975, Best val R2: -0.0043, No improve: 8/20, Time: 20.7s
+10/07/2026 19:39:33 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:39:39 - INFO - utils.trainer -   Loss: 0.01043
+10/07/2026 19:39:39 - INFO - utils.trainer -   MAE: 8.51785
+10/07/2026 19:39:39 - INFO - utils.trainer -   R2: -0.01099
+10/07/2026 19:39:39 - INFO - utils.trainer -   Epoch: 11, Loss: 0.03270, Val loss: 0.01043, Val R2: -0.0110, Best val R2: -0.0043, No improve: 9/20, Time: 20.6s
+10/07/2026 19:40:00 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:40:06 - INFO - utils.trainer -   Loss: 0.01300
+10/07/2026 19:40:06 - INFO - utils.trainer -   MAE: 9.68860
+10/07/2026 19:40:06 - INFO - utils.trainer -   R2: -0.24195
+10/07/2026 19:40:06 - INFO - utils.trainer -   Epoch: 12, Loss: 0.03336, Val loss: 0.01300, Val R2: -0.2420, Best val R2: -0.0043, No improve: 10/20, Time: 20.6s
+10/07/2026 19:40:27 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:40:33 - INFO - utils.trainer -   Loss: 0.01135
+10/07/2026 19:40:33 - INFO - utils.trainer -   MAE: 9.04705
+10/07/2026 19:40:33 - INFO - utils.trainer -   R2: -0.09183
+10/07/2026 19:40:33 - INFO - utils.trainer -   Epoch: 13, Loss: 0.02924, Val loss: 0.01135, Val R2: -0.0918, Best val R2: -0.0043, No improve: 11/20, Time: 20.5s
+10/07/2026 19:40:54 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:41:00 - INFO - utils.trainer -   Loss: 0.01026
+10/07/2026 19:41:00 - INFO - utils.trainer -   MAE: 8.32289
+10/07/2026 19:41:00 - INFO - utils.trainer -   R2: 0.00032
+10/07/2026 19:41:03 - INFO - utils.trainer -   Model saved to output_dir/TimeLLMKnowledge_AgeCAUEEG_train
+10/07/2026 19:41:03 - INFO - utils.trainer -   Best model saved (val_R2=0.0003)
+10/07/2026 19:41:03 - INFO - utils.trainer -   Epoch: 14, Loss: 0.03444, Val loss: 0.01026, Val R2: 0.0003, Best val R2: 0.0003, No improve: 0/20, Time: 20.9s
+10/07/2026 19:41:24 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:41:30 - INFO - utils.trainer -   Loss: 0.02192
+10/07/2026 19:41:30 - INFO - utils.trainer -   MAE: 12.88556
+10/07/2026 19:41:30 - INFO - utils.trainer -   R2: -1.07778
+10/07/2026 19:41:30 - INFO - utils.trainer -   Epoch: 15, Loss: 0.03318, Val loss: 0.02192, Val R2: -1.0778, Best val R2: 0.0003, No improve: 1/20, Time: 20.6s
+10/07/2026 19:41:51 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:41:57 - INFO - utils.trainer -   Loss: 0.01522
+10/07/2026 19:41:57 - INFO - utils.trainer -   MAE: 10.54251
+10/07/2026 19:41:57 - INFO - utils.trainer -   R2: -0.44864
+10/07/2026 19:41:57 - INFO - utils.trainer -   Epoch: 16, Loss: 0.03492, Val loss: 0.01522, Val R2: -0.4486, Best val R2: 0.0003, No improve: 2/20, Time: 20.6s
+10/07/2026 19:42:17 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:42:23 - INFO - utils.trainer -   Loss: 0.01076
+10/07/2026 19:42:23 - INFO - utils.trainer -   MAE: 8.69642
+10/07/2026 19:42:23 - INFO - utils.trainer -   R2: -0.03898
+10/07/2026 19:42:23 - INFO - utils.trainer -   Epoch: 17, Loss: 0.03202, Val loss: 0.01076, Val R2: -0.0390, Best val R2: 0.0003, No improve: 3/20, Time: 20.5s
+10/07/2026 19:42:44 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:42:51 - INFO - utils.trainer -   Loss: 0.01055
+10/07/2026 19:42:51 - INFO - utils.trainer -   MAE: 8.56800
+10/07/2026 19:42:51 - INFO - utils.trainer -   R2: -0.02219
+10/07/2026 19:42:51 - INFO - utils.trainer -   Epoch: 18, Loss: 0.02854, Val loss: 0.01055, Val R2: -0.0222, Best val R2: 0.0003, No improve: 4/20, Time: 20.7s
+10/07/2026 19:43:11 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:43:17 - INFO - utils.trainer -   Loss: 0.01216
+10/07/2026 19:43:17 - INFO - utils.trainer -   MAE: 8.86771
+10/07/2026 19:43:17 - INFO - utils.trainer -   R2: -0.20229
+10/07/2026 19:43:17 - INFO - utils.trainer -   Epoch: 19, Loss: 0.03285, Val loss: 0.01216, Val R2: -0.2023, Best val R2: 0.0003, No improve: 5/20, Time: 20.7s
+10/07/2026 19:43:38 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:43:44 - INFO - utils.trainer -   Loss: 0.01173
+10/07/2026 19:43:44 - INFO - utils.trainer -   MAE: 9.18077
+10/07/2026 19:43:44 - INFO - utils.trainer -   R2: -0.12471
+10/07/2026 19:43:44 - INFO - utils.trainer -   Epoch: 20, Loss: 0.03510, Val loss: 0.01173, Val R2: -0.1247, Best val R2: 0.0003, No improve: 6/20, Time: 20.6s
+10/07/2026 19:44:05 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:44:11 - INFO - utils.trainer -   Loss: 0.01303
+10/07/2026 19:44:11 - INFO - utils.trainer -   MAE: 9.72477
+10/07/2026 19:44:11 - INFO - utils.trainer -   R2: -0.24630
+10/07/2026 19:44:11 - INFO - utils.trainer -   Epoch: 21, Loss: 0.03070, Val loss: 0.01303, Val R2: -0.2463, Best val R2: 0.0003, No improve: 7/20, Time: 20.8s
+10/07/2026 19:44:31 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:44:38 - INFO - utils.trainer -   Loss: 0.01498
+10/07/2026 19:44:38 - INFO - utils.trainer -   MAE: 10.45183
+10/07/2026 19:44:38 - INFO - utils.trainer -   R2: -0.42490
+10/07/2026 19:44:38 - INFO - utils.trainer -   Epoch: 22, Loss: 0.03282, Val loss: 0.01498, Val R2: -0.4249, Best val R2: 0.0003, No improve: 8/20, Time: 20.7s
+10/07/2026 19:44:58 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:45:05 - INFO - utils.trainer -   Loss: 0.01196
+10/07/2026 19:45:05 - INFO - utils.trainer -   MAE: 9.29129
+10/07/2026 19:45:05 - INFO - utils.trainer -   R2: -0.14566
+10/07/2026 19:45:05 - INFO - utils.trainer -   Epoch: 23, Loss: 0.03119, Val loss: 0.01196, Val R2: -0.1457, Best val R2: 0.0003, No improve: 9/20, Time: 20.6s
+10/07/2026 19:45:25 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:45:31 - INFO - utils.trainer -   Loss: 0.01058
+10/07/2026 19:45:31 - INFO - utils.trainer -   MAE: 8.60309
+10/07/2026 19:45:31 - INFO - utils.trainer -   R2: -0.02233
+10/07/2026 19:45:31 - INFO - utils.trainer -   Epoch: 24, Loss: 0.03159, Val loss: 0.01058, Val R2: -0.0223, Best val R2: 0.0003, No improve: 10/20, Time: 20.6s
+10/07/2026 19:45:52 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:45:58 - INFO - utils.trainer -   Loss: 0.01035
+10/07/2026 19:45:58 - INFO - utils.trainer -   MAE: 8.48226
+10/07/2026 19:45:58 - INFO - utils.trainer -   R2: -0.00147
+10/07/2026 19:46:00 - INFO - utils.trainer -   Model saved to output_dir/TimeLLMKnowledge_AgeCAUEEG_train/checkpoint-epoch-25
+10/07/2026 19:46:00 - INFO - utils.trainer -   Checkpoint saved at epoch 25
+10/07/2026 19:46:00 - INFO - utils.trainer -   Epoch: 25, Loss: 0.03190, Val loss: 0.01035, Val R2: -0.0015, Best val R2: 0.0003, No improve: 11/20, Time: 20.5s
+10/07/2026 19:46:20 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:46:27 - INFO - utils.trainer -   Loss: 0.01300
+10/07/2026 19:46:27 - INFO - utils.trainer -   MAE: 9.71688
+10/07/2026 19:46:27 - INFO - utils.trainer -   R2: -0.24152
+10/07/2026 19:46:27 - INFO - utils.trainer -   Epoch: 26, Loss: 0.03342, Val loss: 0.01300, Val R2: -0.2415, Best val R2: 0.0003, No improve: 12/20, Time: 20.7s
+10/07/2026 19:46:47 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:46:53 - INFO - utils.trainer -   Loss: 0.01058
+10/07/2026 19:46:53 - INFO - utils.trainer -   MAE: 8.59483
+10/07/2026 19:46:53 - INFO - utils.trainer -   R2: -0.02562
+10/07/2026 19:46:53 - INFO - utils.trainer -   Epoch: 27, Loss: 0.03408, Val loss: 0.01058, Val R2: -0.0256, Best val R2: 0.0003, No improve: 13/20, Time: 20.6s
+10/07/2026 19:47:14 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:47:20 - INFO - utils.trainer -   Loss: 0.01030
+10/07/2026 19:47:20 - INFO - utils.trainer -   MAE: 8.37519
+10/07/2026 19:47:20 - INFO - utils.trainer -   R2: -0.00111
+10/07/2026 19:47:20 - INFO - utils.trainer -   Epoch: 28, Loss: 0.03158, Val loss: 0.01030, Val R2: -0.0011, Best val R2: 0.0003, No improve: 14/20, Time: 20.7s
+10/07/2026 19:47:41 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:47:47 - INFO - utils.trainer -   Loss: 0.01156
+10/07/2026 19:47:47 - INFO - utils.trainer -   MAE: 9.11054
+10/07/2026 19:47:47 - INFO - utils.trainer -   R2: -0.10996
+10/07/2026 19:47:47 - INFO - utils.trainer -   Epoch: 29, Loss: 0.03081, Val loss: 0.01156, Val R2: -0.1100, Best val R2: 0.0003, No improve: 15/20, Time: 20.6s
+10/07/2026 19:48:08 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:48:14 - INFO - utils.trainer -   Loss: 0.01330
+10/07/2026 19:48:14 - INFO - utils.trainer -   MAE: 9.82284
+10/07/2026 19:48:14 - INFO - utils.trainer -   R2: -0.26920
+10/07/2026 19:48:14 - INFO - utils.trainer -   Epoch: 30, Loss: 0.03102, Val loss: 0.01330, Val R2: -0.2692, Best val R2: 0.0003, No improve: 16/20, Time: 20.8s
+10/07/2026 19:48:35 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:48:41 - INFO - utils.trainer -   Loss: 0.01059
+10/07/2026 19:48:41 - INFO - utils.trainer -   MAE: 8.62782
+10/07/2026 19:48:41 - INFO - utils.trainer -   R2: -0.02349
+10/07/2026 19:48:41 - INFO - utils.trainer -   Epoch: 31, Loss: 0.03185, Val loss: 0.01059, Val R2: -0.0235, Best val R2: 0.0003, No improve: 17/20, Time: 20.7s
+10/07/2026 19:49:01 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:49:08 - INFO - utils.trainer -   Loss: 0.01672
+10/07/2026 19:49:08 - INFO - utils.trainer -   MAE: 11.08226
+10/07/2026 19:49:08 - INFO - utils.trainer -   R2: -0.58841
+10/07/2026 19:49:08 - INFO - utils.trainer -   Epoch: 32, Loss: 0.03225, Val loss: 0.01672, Val R2: -0.5884, Best val R2: 0.0003, No improve: 18/20, Time: 20.7s
+10/07/2026 19:49:28 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:49:34 - INFO - utils.trainer -   Loss: 0.01472
+10/07/2026 19:49:34 - INFO - utils.trainer -   MAE: 10.34608
+10/07/2026 19:49:34 - INFO - utils.trainer -   R2: -0.40065
+10/07/2026 19:49:34 - INFO - utils.trainer -   Epoch: 33, Loss: 0.03492, Val loss: 0.01472, Val R2: -0.4007, Best val R2: 0.0003, No improve: 19/20, Time: 20.7s
+10/07/2026 19:49:55 - INFO - utils.trainer -   ***** Running regression evaluation on val0 dataset *****
+10/07/2026 19:50:02 - INFO - utils.trainer -   Loss: 0.01124
+10/07/2026 19:50:02 - INFO - utils.trainer -   MAE: 8.54092
+10/07/2026 19:50:02 - INFO - utils.trainer -   R2: -0.10791
+10/07/2026 19:50:02 - INFO - utils.trainer -   Epoch: 34, Loss: 0.03192, Val loss: 0.01124, Val R2: -0.1079, Best val R2: 0.0003, No improve: 20/20, Time: 20.7s
+10/07/2026 19:50:02 - INFO - utils.trainer -   Early stopping triggered at epoch 34
+10/07/2026 19:50:02 - INFO - utils.trainer -   Early stopping triggered at epoch 34
+10/07/2026 19:50:02 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+10/07/2026 19:50:02 - INFO - utils.trainer -     582 keys not in checkpoint (kept from init)
+10/07/2026 19:50:02 - INFO - utils.trainer -   Model loaded from output_dir/TimeLLMKnowledge_AgeCAUEEG_train/TimeLLMKnowledge-0.bin (16/17 keys)
+10/07/2026 19:50:02 - INFO - utils.trainer -   ***** Running regression evaluation on test0 dataset *****
+10/07/2026 19:50:02 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+10/07/2026 19:50:02 - INFO - utils.trainer -     582 keys not in checkpoint (kept from init)
+10/07/2026 19:50:02 - INFO - utils.trainer -   Model loaded from output_dir/TimeLLMKnowledge_AgeCAUEEG_train/TimeLLMKnowledge-0.bin (16/17 keys)
+10/07/2026 19:50:08 - INFO - utils.trainer -   Loss: 0.00945
+10/07/2026 19:50:08 - INFO - utils.trainer -   MAE: 8.16058
+10/07/2026 19:50:08 - INFO - utils.trainer -   R2: -0.00846
+10/07/2026 19:50:08 - INFO - utils.trainer -   === Best epoch test result ===
+10/07/2026 19:50:08 - INFO - utils.trainer -     Loss: 0.00945
+10/07/2026 19:50:08 - INFO - utils.trainer -     MAE: 8.16058
+10/07/2026 19:50:08 - INFO - utils.trainer -     R2: -0.00846
+10/07/2026 19:50:09 - INFO - utils.trainer -   Model saved to output_dir/TimeLLMKnowledge_AgeCAUEEG_train/final-epoch-200
+10/07/2026 19:50:09 - INFO - utils.trainer -   Final model saved at epoch 200

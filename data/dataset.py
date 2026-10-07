@@ -346,7 +346,9 @@ class BaseDataset(Dataset):
                 ps = np.abs(np.fft.rfft(w[ch] * win)) ** 2
                 for bn, (lo, hi) in bands.items():
                     pw[bn].append(ps[(freqs >= lo) & (freqs < hi)].sum())
-            total = sum(np.mean(v) for v in pw.values())
+            # +1e-12：全平段（如坏导/零填充，约 0.3% 样本）PSD 全零，
+            # 否则 rel = 0/0 = nan 会沿 stats 传播进模型
+            total = sum(np.mean(v) for v in pw.values()) + 1e-12
             rel = {bn: np.mean(v) / total for bn, v in pw.items()}
             fa = sum(pw['a'][ch] for ch in frontal)
             pa = sum(pw['a'][ch] for ch in posterior)
