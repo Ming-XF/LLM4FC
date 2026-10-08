@@ -64,6 +64,7 @@ def compute_graph_evidence(dfc, spectral=None, morph=None):
         levels: (B,) list，每个元素为证据词列表
             （FC 6 句 + 频谱 4 句 [+ 形态 2 句]）。
         stats:  (B, 9) / (B, 18) / (B, 32) 连续统计量（裁剪 ±5）。
+            32 维分组：FC 9 | 频谱 13（9 带功率 + PSD 谱形 4）| 形态时域 10。
     """
     B, W, C, _ = dfc.shape
     device = dfc.device
@@ -197,7 +198,7 @@ def compute_graph_evidence(dfc, spectral=None, morph=None):
         return levels, stats
 
     # ── 形态学证据（CAER-v3）：2 句证据文本 + 14 维连续统计量 ──
-    # 顺序: ll_mean ll_max sharp_mean sharp_max sharp_focal kurt_mean
+    # 原 14 维顺序: ll_mean ll_max sharp_mean sharp_max sharp_focal kurt_mean
     #       kurt_max zcr_mean gamma_pow spike_mean spike_max apf apf_std slope
     m = morph.float().to(device)
     with torch.no_grad():
@@ -219,7 +220,12 @@ def compute_graph_evidence(dfc, spectral=None, morph=None):
         [0.3, 0.5, 0.4, 15.0, 4.0, 4.0, 10.0, 0.12, 0.03,
          0.01, 0.03, 9.5, 0.5, 1.5], device=device)
     morph_stats = (m / _MORPH_SCALES).clamp(-5.0, 5.0)
-    stats = torch.cat([stats, morph_stats], dim=-1)             # (B, 32)
+    # ── 分组重组（v4）：PSD 依赖 4 维并入频谱块，形态块只留时域 10 维 ──
+    # 最终顺序 = FC 9 | 频谱 13（9 带功率 + gamma/apf/apf_std/slope）| 形态时域 10
+    morph_psd = morph_stats[:, [8, 11, 12, 13]]                 # gamma apf apf_std slope
+    morph_time = morph_stats[:, [0, 1, 2, 3, 4, 5, 6, 7, 9, 10]]
+    stats = torch.cat(
+        [fc_stats, spec_stats, morph_psd, morph_time], dim=-1)  # (B, 32)
     return levels, stats
 
 

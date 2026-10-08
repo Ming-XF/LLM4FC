@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # 32 个短语，顺序与 compute_graph_evidence 输出的 stats 顺序一一对应：
-# FC 9 + 频谱 9 + 形态 14
+# FC 9 + 频谱 13（9 带功率 + PSD 谱形 4）+ 形态时域 10
 _PHRASES = [
     # FC 9
     "overall connectivity strength",
@@ -26,7 +26,7 @@ _PHRASES = [
     "parietal connectivity",
     "occipital connectivity",
     "midline connectivity",
-    # 频谱 9
+    # 频谱 13（带功率 9 + PSD 谱形 4）
     "delta relative power",
     "theta relative power",
     "alpha relative power",
@@ -36,7 +36,11 @@ _PHRASES = [
     "diffuse slowing index",
     "frontal posterior alpha power ratio",
     "temporal theta power fraction",
-    # 形态 14
+    "gamma power fraction",
+    "alpha peak frequency",
+    "alpha peak frequency variability",
+    "aperiodic spectral slope",
+    # 形态时域 10
     "line length mean",
     "line length maximum",
     "sharpness mean",
@@ -45,12 +49,8 @@ _PHRASES = [
     "amplitude kurtosis mean",
     "amplitude kurtosis maximum",
     "zero crossing rate",
-    "gamma power fraction",
     "spike rate mean",
     "spike rate maximum",
-    "alpha peak frequency",
-    "alpha peak frequency variability",
-    "aperiodic spectral slope",
 ]
 
 _EPS = 1e-8
@@ -66,22 +66,22 @@ def _softplus_inv(v):
 
 
 class KnowledgeCompiler(nn.Module):
-    """数值轴 + raw 投影 + 分支 gate。
+    """数值轴 + raw 分支 + 分支 gate。
 
     forward(stats, raw_feat):
         stats:    (B, num_stats) display 值（clip ±5，经 nan_to_num）
-        raw_feat: (B, d_feat) PatchStem 输出（fp32）
+        raw_feat: (B, num_stats, d_model) 组 raw token（外部组装：
+                  FC 图/PSD patch 嵌入 + 形态 PatchStem 投影）
         → q: (B, num_stats, d_model)
     """
 
     def __init__(self, d_llm, d_model, num_stats, tokenizer,
-                 word_embeddings, llm_type='llama', d_feat=256,
+                 word_embeddings, llm_type='llama',
                  numeric_init_std=0.02):
         super().__init__()
         self.d_llm = d_llm
         self.d_model = d_model
         self.num_stats = num_stats
-        self.d_feat = d_feat
         assert num_stats == len(_PHRASES), \
             f"num_stats={num_stats} 与短语表 {len(_PHRASES)} 不一致"
 
@@ -106,11 +106,6 @@ class KnowledgeCompiler(nn.Module):
             torch.empty(num_stats, d_model))
         nn.init.normal_(self.value_weights, std=numeric_init_std)
 
-        # ── raw 分支：d_feat → 每统计量独立投影（bias=False）──
-        self.raw_projection = nn.Linear(d_feat, num_stats * d_model,
-                                        bias=False)
-        nn.init.normal_(self.raw_projection.weight, std=0.02)
-
         # ── 分支 gate：softplus 非负，初始 1.0（约 50/50）──
         self.num_gate = nn.Parameter(torch.tensor(_softplus_inv(1.0)))
         self.raw_gate = nn.Parameter(torch.tensor(_softplus_inv(1.0)))
@@ -119,17 +114,16 @@ class KnowledgeCompiler(nn.Module):
         self.use_numeric_branch = True
         self.use_raw_branch = True
 
-    def forward(self, stats, raw_feat):
-        """stats: (B, num_stats)；raw_feat: (B, d_feat) → (B, num_stats, d_model)。"""
+    def forward(self, stats, raw_feat=None):
+        """stats: (B, num_stats)；raw_feat: (B, num_stats, d_model) 组 raw token
+        （外部组装：FC 图/PSD patch 嵌入 + 形态 PatchStem 投影）→ (B, S, d)。"""
         B = stats.shape[0]
         q = None
         if self.use_numeric_branch:
             v = stats.unsqueeze(-1) * self.value_weights    # (B, S, d_model)
             q = F.softplus(self.num_gate) * rms_norm(v)
         if self.use_raw_branch:
-            u = self.raw_projection(raw_feat).view(
-                B, self.num_stats, self.d_model)
-            q_raw = F.softplus(self.raw_gate) * rms_norm(u)
+            q_raw = F.softplus(self.raw_gate) * rms_norm(raw_feat)
             q = q_raw if q is None else q + q_raw
         assert q is not None, "数值分支与 raw 分支至少开启一个"
         return q

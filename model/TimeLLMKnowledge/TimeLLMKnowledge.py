@@ -6,9 +6,16 @@
   任务 prompt（不变）
 
 编码（全局块与局部块共享编译器参数）：
-  q_i = g_num·RMSNorm(W_i·s_i) + g_raw·RMSNorm(R_i·Stem(EEG块))     (128)
-  q → reprogram（跨注意力到词表原型）→ soft prompt (4096)
+  q_i = g_num·RMSNorm(W_i·s_i) + g_raw·RMSNorm(patch_i)             (128)
+  patch_i：FC 组=FC 图 2D CNN、频谱组=相对 PSD 2D CNN、
+           形态组=PatchStem 投影（--no-use_patch_embeds 回退旧共享路径）
+  q → reprogram（跨注意力到语义原型 bank，v3）→ soft prompt (4096)
   k_i = ref_rms·RMSNorm(soft_prompt_i + β·phrase_i)   ← phrase 只作身份锚点
+
+语义原型（v3，替代全词表学习混合 mapping_layer）：
+  每短语在冻结词表里取余弦 top-K 近邻候选，共享 Linear 压缩到 P 个原型，
+  第 i 个知识 token 只在其短语的 P 个原型上做注意力（确定性、域无关预选；
+  见 semantic_prototypes.py）。--no-use_semantic_prototypes 回退旧路径。
 
 序列：[start][task][end][全局 32][局部 6×32][READOUT(固定 token)] → 冻结 LLM
 → 末 K 层 READOUT 位置聚合 → 线性头（bias 固定源域先验）+ 知识 bypass 头。
@@ -32,7 +39,9 @@ from ..base import BaseConfig, ModelOutputs
 from ..TimeLLM.graph_evidence import compute_graph_evidence
 from .knowledge_compiler import KnowledgeCompiler, rms_norm
 from .local_stats import segment_spectral_stats, segment_morph_stats
+from .patch_embeds import FCEmbed, SpecEmbed, relative_psd_matrix
 from .prompts import get_prompt_config
+from .semantic_prototypes import SemanticPrototypeBank
 
 _EPS = 1e-8
 
@@ -81,19 +90,25 @@ class ReprogrammingLayer(nn.Module):
         self.dropout = nn.Dropout(attention_dropout)
 
     def forward(self, target_embedding, source_embedding, value_embedding):
-        # target (B, L, d_model)；source/value (S, d_llm)
+        # target (B, L, d_model)
+        # source/value：共享 bank 时 (S, d_llm)；语义原型时逐 token bank (L, S, d_llm)
         B, L, _ = target_embedding.shape
-        S, _ = source_embedding.shape
         H = self.n_heads
         E = target_embedding.shape[-1] // H
 
         q = self.query_projection(target_embedding).view(B, L, H, E)
-        k = self.key_projection(source_embedding).view(S, H, E)
-        scores = torch.einsum("blhe,she->bhls", q, k) * (1.0 / sqrt(E))
-        attn = self.dropout(torch.softmax(scores, dim=-1))       # (B,H,L,S)
-        # value 保持 4096：各头注意力作用于同一完整 prototype 向量后取均值
-        out = torch.einsum("bhls,sd->blhd", attn, value_embedding)
-        return out.mean(dim=2)                                   # (B,L,d_llm)
+        k = self.key_projection(source_embedding)
+        if k.dim() == 2:                                   # (S, H*E) 共享 bank
+            k = k.view(-1, H, E)
+            scores = torch.einsum("blhe,she->bhls", q, k) * (1.0 / sqrt(E))
+            attn = self.dropout(torch.softmax(scores, dim=-1))  # (B,H,L,S)
+            out = torch.einsum("bhls,sd->blhd", attn, value_embedding)
+        else:                                              # (L, S, H*E) 逐 token bank
+            k = k.view(L, -1, H, E)
+            scores = torch.einsum("blhe,lshe->bhls", q, k) * (1.0 / sqrt(E))
+            attn = self.dropout(torch.softmax(scores, dim=-1))  # (B,H,L,S)
+            out = torch.einsum("bhls,lsd->blhd", attn, value_embedding)
+        return out.mean(dim=2)                             # (B,L,d_llm)
 
 
 class PatchStem(nn.Module):
@@ -137,6 +152,12 @@ class TimeLLMKnowledgeConfig(BaseConfig):
                  learn_layer_weights=False,
                  phrase_beta_init=0.25,
                  bypass_gate_init=0.1,
+                 use_semantic_prototypes=True,
+                 proto_preselect=1000,
+                 proto_per_phrase=100,
+                 use_proto_mixed_bank=False,
+                 proto_mixed_gate=0.1,
+                 use_patch_embeds=True,
                  task_type='classification',
                  output_dim=2,
                  dataset_name='CAUEEG',
@@ -165,6 +186,12 @@ class TimeLLMKnowledgeConfig(BaseConfig):
         self.learn_layer_weights = learn_layer_weights
         self.phrase_beta_init = phrase_beta_init
         self.bypass_gate_init = bypass_gate_init
+        self.use_semantic_prototypes = use_semantic_prototypes
+        self.proto_preselect = proto_preselect
+        self.proto_per_phrase = proto_per_phrase
+        self.use_proto_mixed_bank = use_proto_mixed_bank
+        self.proto_mixed_gate = proto_mixed_gate
+        self.use_patch_embeds = use_patch_embeds
         self.task_type = task_type
         self.output_dim = output_dim
         self.dataset_name = dataset_name
@@ -256,19 +283,71 @@ class Model(nn.Module):
             tokenizer=self.tokenizer,
             word_embeddings=self._word_embeddings,
             llm_type=self.llm_type,
-            d_feat=config.d_feat,
         )
         self.knowledge_compiler.use_numeric_branch = \
             config.use_numeric_branch
         self.knowledge_compiler.use_raw_branch = config.use_raw_branch
 
-        self.mapping_layer = nn.Linear(self.vocab_size, self.num_prototypes)
+        # ── raw 分支：分组 patch 嵌入（FC 图 / 相对 PSD / 形态 PatchStem）──
+        # schema 分组：FC 9 | 频谱 13 | 形态时域 10（与 graph_evidence 输出一致）
+        self.num_fc_stats = 9
+        self.num_spec_stats = 13
+        self.num_morph_stats = 10
+        assert (self.num_fc_stats + self.num_spec_stats
+                + self.num_morph_stats) == config.num_stats
+        self.use_patch_embeds = config.use_patch_embeds
+        if self.use_patch_embeds:
+            self.fc_embed = FCEmbed(
+                out_tokens=self.num_fc_stats, d_model=config.d_model)
+            self.spec_embed = SpecEmbed(
+                out_tokens=self.num_spec_stats, d_model=config.d_model)
+            self.morph_head = nn.Linear(
+                config.d_feat, self.num_morph_stats * config.d_model)
+            self.raw_projection = None
+        else:
+            # 旧路径（消融对照）：共享 PatchStem → 全 32 统计量投影
+            self.fc_embed = None
+            self.spec_embed = None
+            self.morph_head = None
+            self.raw_projection = nn.Linear(
+                config.d_feat, config.num_stats * config.d_model)
+
+        # ── 语义原型 bank（替代 mapping_layer）或旧全词表学习混合（消融开关）──
+        self.use_semantic_prototypes = config.use_semantic_prototypes
+        if self.use_semantic_prototypes:
+            self.semantic_bank = SemanticPrototypeBank(
+                phrase_bank=self.knowledge_compiler.phrase_bank,
+                word_embeddings=self.word_embeddings,
+                tokenizer=self.tokenizer,
+                preselect=config.proto_preselect,
+                per_phrase=config.proto_per_phrase,
+            )
+            self.mapping_layer = None
+        else:
+            self.semantic_bank = None
+            self.mapping_layer = nn.Linear(self.vocab_size, self.num_prototypes)
+
         self.reprogramming_layer = ReprogrammingLayer(
             d_model=config.d_model,
             n_heads=config.n_heads,
             d_llm=self.d_llm,
             attention_dropout=config.dropout,
         )
+
+        # ── 混合学习 bank（可选对照）：小共享学习原型 + 门控融合 ──
+        if config.use_proto_mixed_bank:
+            self.mixed_bank = nn.Parameter(
+                torch.empty(config.proto_per_phrase, self.d_llm))
+            with torch.no_grad():
+                # 从词表均匀子集初始化（真实词向量出发）
+                sel = self.word_embeddings.detach().float()[
+                    torch.linspace(0, self.vocab_size - 1,
+                                   config.proto_per_phrase).round().long()]
+                self.mixed_bank.copy_(sel)
+        else:
+            self.mixed_bank = None
+        self.proto_mixed_gate = nn.Parameter(
+            torch.tensor(config.proto_mixed_gate))
 
         # phrase 融合系数（初始 0.25，phrase 只作身份锚点，不参与 q）
         self.phrase_beta = nn.Parameter(
@@ -359,6 +438,20 @@ class Model(nn.Module):
         stats_l = torch.nan_to_num(stats_l, nan=0.0)
         return stats_l, nseg, xl                     # (B*nseg, 32)
 
+    def _group_raw_tokens(self, x_z, static_fc):
+        """组装 (B, 32, d_model) 分组 raw token：
+        FC 图 2D CNN → 9；相对 PSD 2D CNN → 13；形态 PatchStem 投影 → 10。"""
+        if self.use_patch_embeds:
+            fc_t = self.fc_embed(static_fc.unsqueeze(1))        # (B, 9, d)
+            psd = relative_psd_matrix(x_z, self.config.hz)      # (B, 19, F)
+            spec_t = self.spec_embed(psd.unsqueeze(1))          # (B, 13, d)
+            morph_t = self.morph_head(self.patch_stem(x_z)).view(
+                x_z.shape[0], self.num_morph_stats, self.d_model)
+            return torch.cat([fc_t, spec_t, morph_t], dim=1)
+        # 旧路径（消融对照）：共享 PatchStem → 全 32 统计量投影
+        return self.raw_projection(self.patch_stem(x_z)).view(
+            x_z.shape[0], self.config.num_stats, self.d_model)
+
     def forward(self, x, labels, spectral=None, morph=None):
         B, N, T = x.shape
         device = x.device
@@ -385,31 +478,69 @@ class Model(nn.Module):
             stats_l, nseg, xl = self._local_stats(x_z)          # (B*nseg, 32)
 
         # ── 知识编译：q = gated(数值分支 + raw 分支) ──
-        raw_g = self.patch_stem(x_z)                            # (B, d_feat)
-        q_g = self.knowledge_compiler(stats_g, raw_g)           # (B, 32, d)
+        # raw 分支 = 分组 patch token（FC 图 / 相对 PSD / 形态 PatchStem），
+        # 旧共享 PatchStem 路径由 --no-use_patch_embeds 回退
+        if self.config.use_raw_branch:
+            group_raw_g = self._group_raw_tokens(x_z, static_fc)
+            q_g = self.knowledge_compiler(stats_g, group_raw_g)  # (B, 32, d)
+        else:
+            q_g = self.knowledge_compiler(stats_g)
         if nseg > 0:
-            raw_l = self.patch_stem(xl)                         # (B*nseg, d_feat)
-            q_l = self.knowledge_compiler(stats_l, raw_l)       # (B*nseg, 32, d)
+            if self.config.use_raw_branch:
+                seg_len = 10 * self.config.hz
+                fc_l = torch.bmm(xl, xl.transpose(1, 2)) / (seg_len - 1)
+                group_raw_l = self._group_raw_tokens(xl, fc_l)
+                q_l = self.knowledge_compiler(stats_l, group_raw_l)
+            else:
+                q_l = self.knowledge_compiler(stats_l)
 
         # ── reprogram → soft prompt (4096) ──
-        word_embeddings = self.word_embeddings.permute(1, 0).to(
-            dtype=self.mapping_layer.weight.dtype)
-        source_embeddings = self.mapping_layer(
-            word_embeddings).permute(1, 0)                      # (M, 4096)
         reprogram_dtype = \
             self.reprogramming_layer.query_projection.weight.dtype
-        soft_g = self.reprogramming_layer(
-            q_g.to(dtype=reprogram_dtype),
-            source_embeddings.to(dtype=reprogram_dtype),
-            source_embeddings.to(dtype=reprogram_dtype))        # (B, 32, 4096)
+        if self.use_semantic_prototypes:
+            # 语义原型：每知识 token 只在其短语的 P 个原型上做注意力
+            phrase_ids_g = torch.arange(self.config.num_stats, device=device)
+            banks_g = self.semantic_bank(phrase_ids_g)          # (32, P, 4096)
+            soft_g = self.reprogramming_layer(
+                q_g.to(dtype=reprogram_dtype),
+                banks_g.to(dtype=reprogram_dtype),
+                banks_g.to(dtype=reprogram_dtype))              # (B, 32, 4096)
+        else:
+            # 旧路径（消融基线）：全词表学习混合 mapping_layer
+            word_embeddings = self.word_embeddings.permute(1, 0).to(
+                dtype=self.mapping_layer.weight.dtype)
+            source_embeddings = self.mapping_layer(
+                word_embeddings).permute(1, 0)                  # (M, 4096)
+            soft_g = self.reprogramming_layer(
+                q_g.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype))    # (B, 32, 4096)
+        if self.mixed_bank is not None:
+            # 混合学习 bank：小共享学习原型输出经门控加在语义输出上
+            mb = self.mixed_bank.to(dtype=reprogram_dtype)
+            soft_g = soft_g + self.proto_mixed_gate * self.reprogramming_layer(
+                q_g.to(dtype=reprogram_dtype), mb, mb)
         knowledge = soft_g
         q_all = q_g
         if nseg > 0:
-            soft_l = self.reprogramming_layer(
-                q_l.to(dtype=reprogram_dtype),
-                source_embeddings.to(dtype=reprogram_dtype),
-                source_embeddings.to(dtype=reprogram_dtype)
-            ).view(B, nseg * self.config.num_stats, self.d_llm)
+            if self.use_semantic_prototypes:
+                # 每个 10s 段内统计量 schema 与全局相同 → 复用同一份 bank
+                banks_l = banks_g
+                soft_l = self.reprogramming_layer(
+                    q_l.to(dtype=reprogram_dtype),
+                    banks_l.to(dtype=reprogram_dtype),
+                    banks_l.to(dtype=reprogram_dtype)
+                ).view(B, nseg * self.config.num_stats, self.d_llm)
+            else:
+                soft_l = self.reprogramming_layer(
+                    q_l.to(dtype=reprogram_dtype),
+                    source_embeddings.to(dtype=reprogram_dtype),
+                    source_embeddings.to(dtype=reprogram_dtype)
+                ).view(B, nseg * self.config.num_stats, self.d_llm)
+            if self.mixed_bank is not None:
+                mb = self.mixed_bank.to(dtype=reprogram_dtype)
+                soft_l = soft_l + self.proto_mixed_gate * self.reprogramming_layer(
+                    q_l.to(dtype=reprogram_dtype), mb, mb)
             knowledge = torch.cat([soft_g, soft_l], dim=1)      # (B, S_k, 4096)
             q_all = torch.cat(
                 [q_g, q_l.view(B, nseg * self.config.num_stats, self.d_model)],
@@ -543,5 +674,6 @@ class Model(nn.Module):
                 'num_gate': self.knowledge_compiler.num_gate,
                 'raw_gate': self.knowledge_compiler.raw_gate,
                 'phrase_beta': self.phrase_beta,
+                'proto_mixed_gate': self.proto_mixed_gate,
             },
         )
