@@ -163,16 +163,15 @@ class TimeLLMPatchTrainer(Trainer):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TimeLLMKnowledgeTrainer — 领域知识 Token 编译器（纯知识版，无 patch 路径）
+# TimeLLMKnowledgeTrainer — raw EEG 知识 Token 编译器
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TimeLLMKnowledgeTrainer(Trainer):
-    """Domain-knowledge compiler trainer (no patch path).
+    """Offline FC/PSD plus raw-waveform knowledge compiler trainer.
 
-    Architecture: raw EEG (B, 19, T) → whole-minute static FC + dataset-level
-    spectral/morph stats → 32 display stats → per-stat phrase+value embedding
-    (128-dim sum) → knowledge soft prompt → frozen LLM → last-K-layer READOUT
-    aggregation → linear head.
+    Architecture: offline FC/PSD plus raw EEG waveform tokens →
+    semantic reprogramming → frozen LLM → last-K-layer READOUT aggregation
+    → linear head.
     """
 
     def __init__(self, args, local_rank=0, task_id=0, episode_seed=None):
@@ -182,7 +181,8 @@ class TimeLLMKnowledgeTrainer(Trainer):
     def prepare_inputs_kwargs(self, inputs):
         """Extract fields for TimeLLMKnowledge forward pass.
 
-        Uses the raw EEG time series plus dataset-level spectral/morph stats.
+        FC and relative PSD are read from the offline feature sidecar.  The raw
+        EEG time series is retained only for the PatchStem waveform branch.
 
         按任务类型自适应：
         - 分类：标签 → integer index
@@ -197,8 +197,11 @@ class TimeLLMKnowledgeTrainer(Trainer):
             labels = labels.float()
         kwargs = {
             "x": inputs['time_series'].float().to(self.device),
+            "global_fc": inputs['global_fc'].float().to(self.device),
+            "global_psd": inputs['global_psd'].float().to(self.device),
+            "local_fc": inputs['local_fc'].float().to(self.device),
+            "local_psd": inputs['local_psd'].float().to(self.device),
+            "local_mask": inputs['local_mask'].bool().to(self.device),
             "labels": labels.to(self.device),
-            "spectral": inputs['spectral'].float().to(self.device),
-            "morph": inputs['morph'].float().to(self.device),
         }
         return kwargs

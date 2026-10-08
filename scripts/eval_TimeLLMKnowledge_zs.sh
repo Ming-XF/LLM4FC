@@ -23,4 +23,14 @@ python main.py \
     --use_task_prompt \
     --num_prototypes 1000 \
     --readout_layers 4 \
+    --use_local_knowledge \
+    --use_knowledge_bypass \
+    --freeze_head_bias \
+    --no-learn_layer_weights \
+    --use_semantic_prototypes \
+    --proto_preselect 1000 \
+    --proto_per_phrase 100 \
+    --no-use_proto_mixed_bank \
+    --proto_mixed_gate 0.1 \
+    --use_patch_embeds \
     --do_test

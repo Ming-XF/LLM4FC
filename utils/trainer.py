@@ -697,9 +697,10 @@ class Trainer(object):
 
     # ── 回归评估（年龄预测等）────────────────────────────────
     def regression_evaluate(self, dataloader_key='test'):
-        """单值回归评估：MAE, R²。
+        """单值回归评估：MAE, R², Pearson r。
 
         适用于年龄预测等连续标量标签任务。
+        Pearson r 为跨域信号迁移诊断指标（仿射不变，不受系统偏差影响）。
         """
         import torch.distributed as dist
         is_dist = dist.is_initialized()
@@ -815,20 +816,28 @@ class Trainer(object):
             if len(preds_v) > 1:
                 mae = np.mean(np.abs(preds_v - labels_v))
                 r2 = r2_score(labels_v, preds_v)
+                # Pearson r：跨域信号迁移诊断（仿射不变，不受系统偏差影响）；
+                # std≈0（常数预测）时置 0，本身即为诊断信号
+                sp, sl = preds_v.std(), labels_v.std()
+                pr = float(np.corrcoef(preds_v, labels_v)[0, 1]) \
+                    if sp > 1e-8 and sl > 1e-8 else 0.0
                 result['MAE'] = float(mae * span)
                 result['R2'] = float(r2)
+                result['PearsonR'] = pr
             else:
                 result['MAE'] = 0.0
                 result['R2'] = 0.0
+                result['PearsonR'] = 0.0
 
             print()
             print(f'{dataloader_key}{self.task_id} : Loss:{result["Loss"]:.5f}, '
-                  f'MAE:{result["MAE"]:.5f}, R²:{result["R2"]:.5f}')
+                  f'MAE:{result["MAE"]:.5f}, R²:{result["R2"]:.5f}, '
+                  f'r:{result["PearsonR"]:.5f}')
             for k, v in result.items():
                 if v is not None and isinstance(v, (int, float, np.floating, np.integer)):
                     logger.info(f"{k}: {v:.5f}")
         else:
-            result = {'MAE': 0.0, 'R2': 0.0}
+            result = {'MAE': 0.0, 'R2': 0.0, 'PearsonR': 0.0}
 
         return result
 

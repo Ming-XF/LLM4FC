@@ -14,6 +14,7 @@ deepspeed --num_gpus=2 main.py \
     --num_repeat 1 \
     --save_steps 25 \
     --schedule 'cos' \
+    --warmup_steps 400 \
     --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
@@ -26,6 +27,16 @@ deepspeed --num_gpus=2 main.py \
     --use_task_prompt \
     --num_prototypes 1000 \
     --readout_layers 4 \
+    --use_local_knowledge \
+    --use_knowledge_bypass \
+    --freeze_head_bias \
+    --no-learn_layer_weights \
+    --use_semantic_prototypes \
+    --proto_preselect 1000 \
+    --proto_per_phrase 100 \
+    --no-use_proto_mixed_bank \
+    --proto_mixed_gate 0.1 \
+    --use_patch_embeds \
     --deepspeed \
     --deepspeed_config deepspeed/train_patch.json \
     --do_train \

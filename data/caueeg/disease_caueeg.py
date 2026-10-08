@@ -33,12 +33,14 @@ class DiseaseCAUEEGDataset(BaseDataset):
                                                     episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
-        raw = np.load("../data/CAUEEG/caueeg_disease.npz", allow_pickle=True)
+        raw_path = "../data/CAUEEG/caueeg_disease.npz"
+        raw = np.load(raw_path, allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()  # 兼容 .npz / .npy
         time_series = data["timeseries"]
         labels = data["labels"]
         subject_id = data["subject_id"]
-        self.hz = data["hz"]
+        self.hz = int(np.asarray(data["hz"]).item())
+        self.data_config.hz = self.hz
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
@@ -49,6 +51,7 @@ class DiseaseCAUEEGDataset(BaseDataset):
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
+        self._load_timellmknowledge_features(raw_path, data)
 
         if 'split_train_index' in data:
             self.train_index = data['split_train_index']
@@ -62,8 +65,13 @@ class DiseaseCAUEEGDataset(BaseDataset):
 
     def __getitem__(self, item):
         idx = self._active_index
-        time_series = torch.from_numpy(self.all_data['time_series'][idx[item]]).float()
-        labels = torch.from_numpy(self.all_data['labels'][idx[item]]).to(torch.int64)
+        sample_idx = idx[item]
+        time_series = torch.from_numpy(self.all_data['time_series'][sample_idx]).float()
+        labels = torch.from_numpy(self.all_data['labels'][sample_idx]).to(torch.int64)
+        knowledge_item = self._timellmknowledge_item(
+            sample_idx, time_series, labels)
+        if knowledge_item is not None:
+            return knowledge_item
 
         SFC = self.connectivity(time_series)
         SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)

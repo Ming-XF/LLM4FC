@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from pathlib import Path
 
 import torch
 from nilearn import connectome
@@ -7,6 +8,7 @@ from torch.utils.data import Dataset
 import numpy as np
 
 from .data_config import DataConfig
+from .knowledge_preprocess import FEATURE_VERSION, knowledge_feature_path
 
 
 class BaseDataset(Dataset):
@@ -65,6 +67,114 @@ class BaseDataset(Dataset):
             return self.val_index if self.val_index is not None and len(self.val_index) > 0 else self.test_index
         else:
             return self.test_index
+
+    @property
+    def uses_timellmknowledge_features(self):
+        """Whether this dataset must load the offline knowledge sidecar."""
+        return self.data_config.model == 'TimeLLMKnowledge'
+
+    def _load_timellmknowledge_features(self, raw_npz_path, raw_data):
+        """Load and validate the sidecar that is aligned to the raw NPZ."""
+        if not self.uses_timellmknowledge_features:
+            return
+
+        feature_path = knowledge_feature_path(raw_npz_path)
+        if not feature_path.exists():
+            raise FileNotFoundError(
+                f"TimeLLMKnowledge feature file is missing: {feature_path}. "
+                f"Generate it with: python -m data.knowledge_preprocess "
+                f"--input {raw_npz_path}")
+
+        features = np.load(feature_path, allow_pickle=False)
+        try:
+            required = {
+                'feature_version', 'source_size', 'source_mtime_ns',
+                'source_shape', 'hz', 'num_local_segments', 'sample_index',
+                'subject_id', 'global_fc', 'local_fc', 'global_psd',
+                'local_psd', 'local_mask',
+            }
+            missing = required.difference(features.files)
+            if missing:
+                raise ValueError(
+                    f"Feature file {feature_path} is missing fields: {sorted(missing)}")
+
+            version = str(np.asarray(features['feature_version']).item())
+            if version != FEATURE_VERSION:
+                raise ValueError(
+                    f"Unsupported feature version {version!r}; expected {FEATURE_VERSION!r}")
+
+            raw_path = Path(raw_npz_path).expanduser().resolve()
+            stat = raw_path.stat()
+            if int(np.asarray(features['source_size']).item()) != stat.st_size:
+                raise ValueError(
+                    f"Feature file {feature_path} does not match raw file size")
+            if int(np.asarray(features['source_mtime_ns']).item()) != stat.st_mtime_ns:
+                raise ValueError(
+                    f"Feature file {feature_path} is stale: raw file modification time changed")
+
+            time_series = np.asarray(raw_data['timeseries'])
+            source_shape = tuple(np.asarray(features['source_shape']).tolist())
+            if source_shape != time_series.shape:
+                raise ValueError(
+                    f"Feature source shape {source_shape} does not match raw shape "
+                    f"{time_series.shape}")
+            hz = int(np.asarray(features['hz']).item())
+            if hz != int(np.asarray(raw_data['hz']).item()):
+                raise ValueError("Feature sampling rate does not match raw NPZ")
+
+            num_samples, num_channels, _ = time_series.shape
+            sample_index = np.asarray(features['sample_index'])
+            if not np.array_equal(sample_index, np.arange(num_samples)):
+                raise ValueError("Feature sample_index is not aligned to raw sample order")
+            raw_subjects = np.asarray(raw_data['subject_id']).astype(str)
+            if not np.array_equal(
+                    np.asarray(features['subject_id']).astype(str), raw_subjects):
+                raise ValueError("Feature subject_id order does not match raw NPZ")
+
+            num_segments = int(np.asarray(features['num_local_segments']).item())
+            expected = {
+                'global_fc': (num_samples, num_channels, num_channels),
+                'local_fc': (num_samples, num_segments, num_channels, num_channels),
+                'global_psd': (num_samples, num_channels, None),
+                'local_psd': (num_samples, num_segments, num_channels, None),
+                'local_mask': (num_samples, num_segments),
+            }
+            arrays = {}
+            for name, shape in expected.items():
+                array = np.asarray(features[name])
+                if array.ndim != len(shape) or any(
+                        expected_dim is not None and actual_dim != expected_dim
+                        for actual_dim, expected_dim in zip(array.shape, shape)):
+                    raise ValueError(
+                        f"Feature {name} has shape {array.shape}, expected {shape}")
+                arrays[name] = array
+            if arrays['global_psd'].shape[-1] != arrays['local_psd'].shape[-1]:
+                raise ValueError("Global and local PSD frequency dimensions differ")
+
+            self.all_data.update(arrays)
+            self.data_config.hz = hz
+            self.data_config.num_local_segments = num_segments
+        finally:
+            features.close()
+
+    def _timellmknowledge_item(self, sample_idx, time_series, labels):
+        """Build one model input without recomputing FC or PSD online."""
+        if not self.uses_timellmknowledge_features:
+            return None
+        return {
+            'time_series': time_series,
+            'global_fc': torch.from_numpy(
+                self.all_data['global_fc'][sample_idx]).float(),
+            'global_psd': torch.from_numpy(
+                self.all_data['global_psd'][sample_idx]).float(),
+            'local_fc': torch.from_numpy(
+                self.all_data['local_fc'][sample_idx]).float(),
+            'local_psd': torch.from_numpy(
+                self.all_data['local_psd'][sample_idx]).float(),
+            'local_mask': torch.from_numpy(
+                self.all_data['local_mask'][sample_idx]).bool(),
+            'labels': labels,
+        }
 
     # ── 数据划分 — 自动选择 K-Fold 或 train/val/test 模式 ──────────────
     # ── 辅助：被试标签聚合 ────────────────────────────────────────────

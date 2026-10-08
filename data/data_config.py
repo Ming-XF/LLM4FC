@@ -4,6 +4,7 @@ class DataConfig:
     TASK_REGRESSION = "regression"
     def __init__(self, args, time_series_size=0, node_size=0, node_feature_size=0, output_dim=2,
                  task_type=None):
+        self.model = getattr(args, "model", "")
         self.dataset = args.dataset
         self.train_set = args.train_set
         self.few_shot = args.few_shot
@@ -25,6 +26,8 @@ class DataConfig:
         self.abla_vae = args.abla_vae
         self.fc_threshold = args.fc_threshold
         self.fc_keep_ratio = args.fc_keep_ratio
+        self.hz = None
+        self.num_local_segments = 6
 
         # 任务类型：由各数据集 load_data 显式设置；
         # 未设置时根据 output_dim 推断（向后兼容旧数据集）
@@ -54,5 +57,4 @@ class DataConfig:
     @property
     def is_regression(self):
         return self.task_type == self.TASK_REGRESSION
-
 

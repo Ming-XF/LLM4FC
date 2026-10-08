@@ -1,8 +1,8 @@
 """分段（局部）EEG 统计量的 torch 实现（与 data/dataset.py 的 numpy 版同公式）。
 
-供 TimeLLMKnowledge 局部知识块在 forward 内对 raw EEG 计算：整分钟切成
-6 个 10s 段，每段独立算 9 维频谱 + 14 维形态统计量，量纲与 numpy 版一致
-（/scales 缩放与 ±5 裁剪交给 compute_graph_evidence 统一处理）。
+保留为旧统计分支的兼容/研究工具。当前 TimeLLMKnowledge 主路径不再在
+forward 内调用本模块；FC 与相对 PSD 由 data/knowledge_preprocess.py 离线
+生成，数据集从 sidecar NPZ 读取。
 
 频谱窗：4s、50% overlap（10s 段内 4 窗）；按 codex 评审建议先聚合
 band power 再算比值，避免短段内每窗比值不稳定。

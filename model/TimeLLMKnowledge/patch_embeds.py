@@ -5,7 +5,9 @@ SpecEmbed：相对功率 PSD (B,1,19,F) → 2D CNN → (B, 13, 128)
 两个网络相互独立（不共用类、不共用权重）——FC 相关矩阵与频谱矩阵
 结构不同，各自定义。
 
-相对 PSD：复用 local_stats._welch_windows（4s hanning 窗、50% overlap），
+relative_psd_matrix 保留为在线参考实现；当前 TimeLLMKnowledge 主路径读取
+data/knowledge_preprocess.py 生成的离线相对 PSD。两者均使用 4s Hann 窗、
+50% overlap，
 每窗每通道除以自身总功率（相对化、幅度不变）→ 跨窗平均 → 取 0.5-45Hz。
 全局整分钟与 10s 局部段共用同一 helper。
 """

@@ -76,11 +76,14 @@ def _apply_deepspeed_config(args, ds_config_path):
 
 
 def log_explicit_args(args):
-    """Write the explicitly specified CLI args into the log file.
+    """Write the explicitly specified CLI args AND the full resolved args
+    into the log file.
 
     Values are read at call time (after any DeepSpeed JSON overrides), and
     args whose current value differs from the CLI snapshot are marked as
     overridden (e.g. batch_size / learning_rate from the DeepSpeed config).
+    The full section records every arg so the log is a self-contained
+    experiment record.
     """
     explicit = getattr(args, 'explicit_args', {})
     lines = ["=" * 20 + " Explicit args " + "=" * 20]
@@ -94,6 +97,15 @@ def log_explicit_args(args):
     lines.append(f"  [effective] batch_size: {args.batch_size}, "
                  f"learning_rate: {args.learning_rate}")
     logger.info("\n".join(lines))
+
+    # ── 全量参数段：日志自带完整实验口径（config.json 仍为权威存档）──
+    full = vars(args)
+    lines_full = ["=" * 20 + " Full args (resolved) " + "=" * 20]
+    for k in sorted(full):
+        if k == 'explicit_args':
+            continue
+        lines_full.append(f"  {k}: {full[k]}")
+    logger.info("\n".join(lines_full))
 
 
 def main(args):

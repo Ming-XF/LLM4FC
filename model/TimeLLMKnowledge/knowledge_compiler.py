@@ -1,20 +1,15 @@
-"""Knowledge compiler v2: 统计数值分支 + raw EEG patch 分支 → 知识 query。
+"""Raw EEG feature compiler for TimeLLMKnowledge.
 
-每统计量独立编译（无 token 间混合）：
-  q_i = g_num·RMSNorm(W_i·s_i) + g_raw·RMSNorm(R_i·Stem(EEG块))   (d_model 维)
-g_num/g_raw 为 softplus 非负 gate（初始均 1.0，两分支约 50/50）；
-phrase 不再进入 q——phrase 在 reprogram 之后于 4096 维与 soft prompt
-gated 求和（见 TimeLLMKnowledge.py），只作统计量身份/语言锚点（冻结）。
+Each knowledge slot is compiled independently from a raw feature token. The
+phrase bank is kept as a frozen language identity anchor and is fused after
+reprogramming; no hand-crafted numeric statistics are used here.
 """
-
-import math
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-# 32 个短语，顺序与 compute_graph_evidence 输出的 stats 顺序一一对应：
-# FC 9 + 频谱 13（9 带功率 + PSD 谱形 4）+ 形态时域 10
+# 32 个知识槽位的短语锚点：FC 9 + 频谱/PSD 13 + 波形形态 10。
+# 这些短语定义 raw token 的固定语义位置，不对应显式计算的统计值。
 _PHRASES = [
     # FC 9
     "overall connectivity strength",
@@ -61,23 +56,16 @@ def rms_norm(x, eps=1e-6):
     return x / (x.pow(2).mean(-1, keepdim=True).add(eps).sqrt())
 
 
-def _softplus_inv(v):
-    return math.log(math.exp(v) - 1.0)
-
-
 class KnowledgeCompiler(nn.Module):
-    """数值轴 + raw 分支 + 分支 gate。
+    """Compile raw feature tokens into independent knowledge queries.
 
-    forward(stats, raw_feat):
-        stats:    (B, num_stats) display 值（clip ±5，经 nan_to_num）
-        raw_feat: (B, num_stats, d_model) 组 raw token（外部组装：
-                  FC 图/PSD patch 嵌入 + 形态 PatchStem 投影）
-        → q: (B, num_stats, d_model)
+    ``raw_feat`` has shape ``(B, num_stats, d_model)`` and is assembled by
+    the model from FC, relative-PSD, and waveform encoders. There is no
+    token-to-token mixing at this stage.
     """
 
     def __init__(self, d_llm, d_model, num_stats, tokenizer,
-                 word_embeddings, llm_type='llama',
-                 numeric_init_std=0.02):
+                 word_embeddings, llm_type='llama'):
         super().__init__()
         self.d_llm = d_llm
         self.d_model = d_model
@@ -101,29 +89,18 @@ class KnowledgeCompiler(nn.Module):
         self.register_buffer("phrase_bank",
                              torch.stack(phrase_bank))       # (32, d_llm)
 
-        # ── 数值分支：每统计量独立数值轴（bias=False：s_i=0 时严格为零）──
-        self.value_weights = nn.Parameter(
-            torch.empty(num_stats, d_model))
-        nn.init.normal_(self.value_weights, std=numeric_init_std)
+        # Raw branch scale: kept learnable so the compiler can adapt the
+        # magnitude of its queries without reintroducing a numeric shortcut.
+        self.raw_gate = nn.Parameter(torch.tensor(0.541324854612918))
 
-        # ── 分支 gate：softplus 非负，初始 1.0（约 50/50）──
-        self.num_gate = nn.Parameter(torch.tensor(_softplus_inv(1.0)))
-        self.raw_gate = nn.Parameter(torch.tensor(_softplus_inv(1.0)))
-
-        # 分支开关（由模型 config 注入）
-        self.use_numeric_branch = True
-        self.use_raw_branch = True
-
-    def forward(self, stats, raw_feat=None):
-        """stats: (B, num_stats)；raw_feat: (B, num_stats, d_model) 组 raw token
-        （外部组装：FC 图/PSD patch 嵌入 + 形态 PatchStem 投影）→ (B, S, d)。"""
-        B = stats.shape[0]
-        q = None
-        if self.use_numeric_branch:
-            v = stats.unsqueeze(-1) * self.value_weights    # (B, S, d_model)
-            q = F.softplus(self.num_gate) * rms_norm(v)
-        if self.use_raw_branch:
-            q_raw = F.softplus(self.raw_gate) * rms_norm(raw_feat)
-            q = q_raw if q is None else q + q_raw
-        assert q is not None, "数值分支与 raw 分支至少开启一个"
-        return q
+    def forward(self, raw_feat):
+        """Return normalized raw knowledge queries: ``(B, S, d_model)``."""
+        if raw_feat is None:
+            raise ValueError("KnowledgeCompiler requires raw feature tokens")
+        expected = (self.num_stats, self.d_model)
+        if raw_feat.dim() != 3 or tuple(raw_feat.shape[1:]) != expected:
+            raise ValueError(
+                "raw_feat must have shape "
+                f"(B, {self.num_stats}, {self.d_model}), got "
+                f"{tuple(raw_feat.shape)}")
+        return torch.nn.functional.softplus(self.raw_gate) * rms_norm(raw_feat)

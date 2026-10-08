@@ -99,12 +99,14 @@ class AgeTUABDataset(BaseDataset):
                                              episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
-        raw = np.load("../data/TUAB/tuab_age.npz", allow_pickle=True)
+        raw_path = "../data/TUAB/tuab_age.npz"
+        raw = np.load(raw_path, allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
         labels = data["labels"].astype(np.float32)
         subject_id = data["subject_id"]
-        self.hz = data["hz"]
+        self.hz = int(np.asarray(data["hz"]).item())
+        self.data_config.hz = self.hz
         self.label_min = float(data['label_min']) if 'label_min' in data else None
         self.label_max = float(data['label_max']) if 'label_max' in data else None
 
@@ -116,6 +118,7 @@ class AgeTUABDataset(BaseDataset):
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
         self.all_data['subject_id'] = subject_id
+        self._load_timellmknowledge_features(raw_path, data)
 
         # ── 使用预处理阶段预计算的划分（随机，无分层）──
         if 'split_train_index' in data:
@@ -130,10 +133,15 @@ class AgeTUABDataset(BaseDataset):
 
     def __getitem__(self, item):
         idx = self._active_index
+        sample_idx = idx[item]
         time_series = torch.from_numpy(
-            self.all_data['time_series'][idx[item]]).float()
+            self.all_data['time_series'][sample_idx]).float()
         labels = torch.tensor(
-            self.all_data['labels'][idx[item]], dtype=torch.float32)
+            self.all_data['labels'][sample_idx], dtype=torch.float32)
+        knowledge_item = self._timellmknowledge_item(
+            sample_idx, time_series, labels)
+        if knowledge_item is not None:
+            return knowledge_item
 
         SFC = self.connectivity(time_series)
         SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)

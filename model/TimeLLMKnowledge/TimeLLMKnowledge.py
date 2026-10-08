@@ -1,12 +1,12 @@
-"""TimeLLMKnowledge v2: 全局+局部知识 Token 编译器（patch 编码 + 捷径解除）。
+"""TimeLLMKnowledge v2: 全局+局部 raw 知识 Token 编译器。
 
 输入三段：
-  整分钟 EEG → 静态 FC + 数据集层频谱/形态统计 → 32 个全局 display stats
-  6 个 10s 片段 → torch 内计算每片段 32 个局部 display stats（同 schema）
+  离线整分钟静态 FC / 相对 PSD + 在线波形编码 → 32 个全局 raw tokens
+  离线 6 个 10s FC / 相对 PSD + 在线波形编码 → 每片段 32 个局部 raw tokens
   任务 prompt（不变）
 
 编码（全局块与局部块共享编译器参数）：
-  q_i = g_num·RMSNorm(W_i·s_i) + g_raw·RMSNorm(patch_i)             (128)
+  q_i = g_raw·RMSNorm(patch_i)                                     (128)
   patch_i：FC 组=FC 图 2D CNN、频谱组=相对 PSD 2D CNN、
            形态组=PatchStem 投影（--no-use_patch_embeds 回退旧共享路径）
   q → reprogram（跨注意力到语义原型 bank，v3）→ soft prompt (4096)
@@ -36,10 +36,8 @@ import torch.nn.functional as F
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 
 from ..base import BaseConfig, ModelOutputs
-from ..TimeLLM.graph_evidence import compute_graph_evidence
 from .knowledge_compiler import KnowledgeCompiler, rms_norm
-from .local_stats import segment_spectral_stats, segment_morph_stats
-from .patch_embeds import FCEmbed, SpecEmbed, relative_psd_matrix
+from .patch_embeds import FCEmbed, SpecEmbed
 from .prompts import get_prompt_config
 from .semantic_prototypes import SemanticPrototypeBank
 
@@ -145,8 +143,6 @@ class TimeLLMKnowledgeConfig(BaseConfig):
                  hz=200,
                  num_local_segments=6,
                  use_local_knowledge=True,
-                 use_raw_branch=True,
-                 use_numeric_branch=True,
                  use_knowledge_bypass=True,
                  freeze_head_bias=True,
                  learn_layer_weights=False,
@@ -179,8 +175,6 @@ class TimeLLMKnowledgeConfig(BaseConfig):
         self.hz = hz
         self.num_local_segments = num_local_segments
         self.use_local_knowledge = use_local_knowledge
-        self.use_raw_branch = use_raw_branch
-        self.use_numeric_branch = use_numeric_branch
         self.use_knowledge_bypass = use_knowledge_bypass
         self.freeze_head_bias = freeze_head_bias
         self.learn_layer_weights = learn_layer_weights
@@ -284,9 +278,6 @@ class Model(nn.Module):
             word_embeddings=self._word_embeddings,
             llm_type=self.llm_type,
         )
-        self.knowledge_compiler.use_numeric_branch = \
-            config.use_numeric_branch
-        self.knowledge_compiler.use_raw_branch = config.use_raw_branch
 
         # ── raw 分支：分组 patch 嵌入（FC 图 / 相对 PSD / 形态 PatchStem）──
         # schema 分组：FC 9 | 频谱 13 | 形态时域 10（与 graph_evidence 输出一致）
@@ -418,33 +409,12 @@ class Model(nn.Module):
         anchor[-1] = 1.0
         return _LAYER_BETA * anchor + (1 - _LAYER_BETA) * w
 
-    def _local_stats(self, x_z):
-        """整分钟 z-scored EEG → (B*nseg, 32) 局部 display stats。
-
-        6 个 10s 段：每段静态 FC + torch 版频谱/形态统计量，
-        经 compute_graph_evidence 统一缩放裁剪（与全局同 schema）。
-        """
-        cfg = self.config
-        seg_len = 10 * cfg.hz
-        nseg = min(cfg.num_local_segments, x_z.shape[-1] // seg_len)
-        xl = x_z[:, :, :nseg * seg_len]
-        xl = xl.view(xl.shape[0], xl.shape[1], nseg, seg_len)
-        xl = xl.permute(0, 2, 1, 3).contiguous().view(-1, xl.shape[1], seg_len)
-        fc_l = torch.bmm(xl, xl.transpose(1, 2)) / (seg_len - 1)
-        spec_l = segment_spectral_stats(xl, cfg.hz)
-        morph_l = segment_morph_stats(xl, cfg.hz)
-        _, stats_l = compute_graph_evidence(
-            fc_l.unsqueeze(1), spec_l, morph_l)
-        stats_l = torch.nan_to_num(stats_l, nan=0.0)
-        return stats_l, nseg, xl                     # (B*nseg, 32)
-
-    def _group_raw_tokens(self, x_z, static_fc):
+    def _group_raw_tokens(self, x_z, static_fc, relative_psd):
         """组装 (B, 32, d_model) 分组 raw token：
         FC 图 2D CNN → 9；相对 PSD 2D CNN → 13；形态 PatchStem 投影 → 10。"""
         if self.use_patch_embeds:
             fc_t = self.fc_embed(static_fc.unsqueeze(1))        # (B, 9, d)
-            psd = relative_psd_matrix(x_z, self.config.hz)      # (B, 19, F)
-            spec_t = self.spec_embed(psd.unsqueeze(1))          # (B, 13, d)
+            spec_t = self.spec_embed(relative_psd.unsqueeze(1)) # (B, 13, d)
             morph_t = self.morph_head(self.patch_stem(x_z)).view(
                 x_z.shape[0], self.num_morph_stats, self.d_model)
             return torch.cat([fc_t, spec_t, morph_t], dim=1)
@@ -452,9 +422,17 @@ class Model(nn.Module):
         return self.raw_projection(self.patch_stem(x_z)).view(
             x_z.shape[0], self.config.num_stats, self.d_model)
 
-    def forward(self, x, labels, spectral=None, morph=None):
+    def forward(self, x, global_fc, global_psd,
+                local_fc, local_psd, local_mask, labels):
         B, N, T = x.shape
         device = x.device
+
+        if global_fc.shape != (B, N, N):
+            raise ValueError(
+                f"global_fc must have shape {(B, N, N)}, got {tuple(global_fc.shape)}")
+        if global_psd.ndim != 3 or global_psd.shape[:2] != (B, N):
+            raise ValueError(
+                f"global_psd must have shape (B, N, F), got {tuple(global_psd.shape)}")
 
         # ── 逐通道 z-score（幅度不变性：跨域零样本迁移的关键）──
         mean = x.mean(dim=-1, keepdim=True)
@@ -462,37 +440,51 @@ class Model(nn.Module):
         x_z = (x - mean) / (std + 1e-5)
         x_z = x_z.to(torch.float32)
 
-        # ── 全局知识：整分钟静态 FC + 数据集层频谱/形态 → (B, 32) ──
-        if spectral is None or morph is None:
-            raise ValueError(
-                "TimeLLMKnowledge requires spectral and morph stats; "
-                "make sure the dataset returns them")
-        static_fc = torch.bmm(x_z, x_z.transpose(1, 2)) / (T - 1)
-        _, stats_g = compute_graph_evidence(
-            static_fc.unsqueeze(1), spectral, morph)            # (B, 32)
-        stats_g = torch.nan_to_num(stats_g, nan=0.0)
-
-        # ── 局部知识：6 个 10s 段 → (B, nseg*32) ──
+        # ── 局部波形：与离线 sidecar 一致，固定切成 6 个 10s 段 ──
         nseg = 0
         if self.config.use_local_knowledge:
-            stats_l, nseg, xl = self._local_stats(x_z)          # (B*nseg, 32)
+            seg_len = 10 * self.config.hz
+            nseg = self.config.num_local_segments
+            expected_local_fc = (B, nseg, N, N)
+            if local_fc.shape != expected_local_fc:
+                raise ValueError(
+                    f"local_fc must have shape {expected_local_fc}, "
+                    f"got {tuple(local_fc.shape)}")
+            if (local_psd.ndim != 4 or
+                    local_psd.shape[:3] != (B, nseg, N)):
+                raise ValueError(
+                    f"local_psd must have shape (B, {nseg}, N, F), "
+                    f"got {tuple(local_psd.shape)}")
+            if local_psd.shape[-1] != global_psd.shape[-1]:
+                raise ValueError("Global and local PSD frequency dimensions differ")
+            if local_mask.shape != (B, nseg):
+                raise ValueError(
+                    f"local_mask must have shape {(B, nseg)}, "
+                    f"got {tuple(local_mask.shape)}")
+            if not bool(local_mask.all()):
+                raise ValueError(
+                    "Current one-minute TimeLLMKnowledge input requires all "
+                    "six local segments to be valid")
+            required_length = nseg * seg_len
+            if T < required_length:
+                raise ValueError(
+                    f"Raw waveform has {T} samples, but {required_length} are "
+                    "required to align with offline local features")
+            xl = x_z[:, :, :required_length]
+            xl = xl.view(B, N, nseg, seg_len)
+            xl = xl.permute(0, 2, 1, 3).contiguous().view(
+                B * nseg, N, seg_len)
 
-        # ── 知识编译：q = gated(数值分支 + raw 分支) ──
-        # raw 分支 = 分组 patch token（FC 图 / 相对 PSD / 形态 PatchStem），
-        # 旧共享 PatchStem 路径由 --no-use_patch_embeds 回退
-        if self.config.use_raw_branch:
-            group_raw_g = self._group_raw_tokens(x_z, static_fc)
-            q_g = self.knowledge_compiler(stats_g, group_raw_g)  # (B, 32, d)
-        else:
-            q_g = self.knowledge_compiler(stats_g)
+        # ── raw patch 编译为知识 query ──
+        group_raw_g = self._group_raw_tokens(
+            x_z, global_fc.to(torch.float32), global_psd.to(torch.float32))
+        q_g = self.knowledge_compiler(group_raw_g)               # (B, 32, d)
         if nseg > 0:
-            if self.config.use_raw_branch:
-                seg_len = 10 * self.config.hz
-                fc_l = torch.bmm(xl, xl.transpose(1, 2)) / (seg_len - 1)
-                group_raw_l = self._group_raw_tokens(xl, fc_l)
-                q_l = self.knowledge_compiler(stats_l, group_raw_l)
-            else:
-                q_l = self.knowledge_compiler(stats_l)
+            fc_l = local_fc.reshape(B * nseg, N, N).to(torch.float32)
+            psd_l = local_psd.reshape(
+                B * nseg, N, local_psd.shape[-1]).to(torch.float32)
+            group_raw_l = self._group_raw_tokens(xl, fc_l, psd_l)
+            q_l = self.knowledge_compiler(group_raw_l)
 
         # ── reprogram → soft prompt (4096) ──
         reprogram_dtype = \
@@ -671,7 +663,6 @@ class Model(nn.Module):
                 'readout_agg': agg,
                 'layer_weights': alpha,
                 'bypass_gate': self.bypass_gate,
-                'num_gate': self.knowledge_compiler.num_gate,
                 'raw_gate': self.knowledge_compiler.raw_gate,
                 'phrase_beta': self.phrase_beta,
                 'proto_mixed_gate': self.proto_mixed_gate,
