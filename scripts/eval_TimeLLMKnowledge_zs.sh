@@ -5,15 +5,14 @@
 # Run: sh scripts/eval_TimeLLMKnowledge_zs.sh
 #
 
-TARGET_DATASET="DiseaseTUEP"
-PRETRAIN_PATH="./output_dir/prompt_v2/TimeLLMKnowledge_DiseaseCAUEEG_train"
+TARGET_DATASET="DiseaseTUAB"
+PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
     --dataset "$TARGET_DATASET" \
     --pretrain_path "$PRETRAIN_PATH" \
     --few_shot 0 \
-    --append "_prompt_v2" \
     --batch_size 16 \
     --d_model 128 \
     --num_heads 8 \

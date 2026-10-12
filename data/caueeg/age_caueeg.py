@@ -7,7 +7,6 @@ import torch
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
-
 def _init_worker():
     """Set BLAS threads to 1 so each worker is single-threaded."""
     import os
@@ -15,7 +14,6 @@ def _init_worker():
     os.environ['OPENBLAS_NUM_THREADS'] = '1'
     os.environ['MKL_NUM_THREADS'] = '1'
     os.environ['NUMEXPR_NUM_THREADS'] = '1'
-
 
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
@@ -27,7 +25,6 @@ import warnings
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore")
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Dataset
@@ -95,189 +92,8 @@ class AgeCAUEEGDataset(BaseDataset):
         if knowledge_item is not None:
             return knowledge_item
 
-        SFC = self.connectivity(time_series)
-        SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
-        window_size = 12 * self.hz
-        step_size = (60 * self.hz - window_size) // 9
-        DFC = self.dynamic_connectivity(time_series, window_size, step_size)
-        DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
-
+        # ── EEGNet fallback：仅时域信号（在线 FC/PSD 死代码已删）──
         return {
-                'DFC': DFC,
-                'correlation': SFC,
                 'time_series': time_series,
                 'labels': labels,
-                'spectral': self.spectral_stats(time_series, self.hz),
-                'morph': self.morph_stats(time_series, self.hz),
         }
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Preprocessing — worker (module-level for multiprocessing)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _process_one_sample_age(args):
-    """Process a single EDF sample for age regression (multiprocessing worker).
-
-    Parameters
-    ----------
-    args : tuple
-        (sample, signal_folder, hz)
-
-    Returns
-    -------
-    data : ndarray (n_windows, 19, hz*60)
-    label : ndarray (n_windows,) — float age
-    subj_ids : ndarray (n_windows,)
-    """
-    sample, signal_folder, hz = args
-    serial = sample['serial']
-    age = float(sample['age'])
-    subject_id = int(re.findall(r'\d+', serial)[0])
-    edf_path = os.path.join(signal_folder, f"{serial}.edf")
-
-    raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
-    data = prepare_common_19_channel_raw(raw, hz)
-
-    window_samples = hz * 60
-    n_windows = data.shape[1] // window_samples
-    if n_windows == 0:
-        raise ValueError(f"Recording is shorter than one minute: {edf_path}")
-    data = data[:, :n_windows * window_samples]
-    data = data.reshape(data.shape[0], n_windows, window_samples)
-    data = np.transpose(data, (1, 0, 2))
-
-    label = np.full(data.shape[0], age, dtype=np.float32)
-    subj_ids = np.full(data.shape[0], subject_id)
-
-    return data.astype(np.float32), label, subj_ids
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Preprocessing — main entry point
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
-                         max_windows_per_subject=4,
-                         train_split=0.7, val_split=0.15):
-    """Preprocess the CAUEEG dataset for age regression.
-
-    Uses all subjects from annotation.json regardless of disease label.
-    Extracts age from the ``age`` field, segments into non‑overlapping
-    1‑minute windows, applies normalization, and saves.
-
-    Parameters
-    ----------
-    path : str
-        Path to the CAUEEG dataset root.
-    hz : int
-        Resampling rate in Hz.  Default 200.
-    """
-    annotation_file = os.path.join(path, "caueeg-dataset/annotation.json")
-    signal_folder = os.path.join(path, 'caueeg-dataset/signal', "edf")
-    output_path = os.path.join(path, "caueeg_age.npz")
-
-    with open(annotation_file, 'r') as f:
-        annotation = json.load(f)
-
-    # ── Use ALL subjects for age regression ──
-    target_samples = annotation['data']
-
-    ages = [s['age'] for s in target_samples]
-    print(f"Total subjects: {len(target_samples)}")
-    print(f"Age range: {min(ages)}–{max(ages)} (mean={np.mean(ages):.1f})")
-
-    n_workers = min(cpu_count(), len(target_samples), 48)
-    print(f"Processing {len(target_samples)} samples with {n_workers} workers...")
-
-    task_args = [(sample, signal_folder, hz) for sample in target_samples]
-
-    ts_list, lbl_list, subj_list = [], [], []
-    with Pool(processes=n_workers, initializer=_init_worker) as pool:
-        for data, label, subj_ids in tqdm(
-                pool.imap(_process_one_sample_age, task_args),
-                total=len(task_args), desc="Loading EDF"):
-            ts_list.append(data)
-            lbl_list.append(label)
-            subj_list.append(subj_ids)
-
-    print("Concatenating arrays...")
-    time_series = np.concatenate(ts_list, axis=0)
-    labels = np.concatenate(lbl_list, axis=0)
-    subject_ids = np.concatenate(subj_list, axis=0)
-    print(f"Concatenated: time_series={time_series.shape}, labels={labels.shape}")
-
-    # ── Per-subject window cap (uniform across all subjects, evenly spaced) ──
-    if max_windows_per_subject is not None:
-        unique_subjs = np.unique(subject_ids)
-        keep_mask = np.ones(len(subject_ids), dtype=bool)
-        n_capped = 0
-        for subj in unique_subjs:
-            idx = np.where(subject_ids == subj)[0]
-            if len(idx) > max_windows_per_subject:
-                sample_idx = np.linspace(0, len(idx) - 1, max_windows_per_subject, dtype=int)
-                keep_mask[idx] = False
-                keep_mask[idx[sample_idx]] = True
-                n_capped += 1
-        time_series = time_series[keep_mask]
-        labels = labels[keep_mask]
-        subject_ids = subject_ids[keep_mask]
-        print(f"Capped {n_capped} subjects (evenly spaced, max {max_windows_per_subject}/subj)")
-
-    # ── Per-subject random split (no stratification, reproducible) ──
-    unique_subjs = np.unique(subject_ids)
-    rng = np.random.RandomState(42)
-    rng.shuffle(unique_subjs)
-
-    n_total = len(unique_subjs)
-    n_train = int(n_total * train_split)
-    n_val = int(n_total * val_split)
-
-    train_subjs = unique_subjs[:n_train]
-    val_subjs = unique_subjs[n_train:n_train + n_val]
-    test_subjs = unique_subjs[n_train + n_val:]
-
-    split_train_index = np.where(np.isin(subject_ids, train_subjs))[0]
-    split_val_index = np.where(np.isin(subject_ids, val_subjs))[0]
-    split_test_index = np.where(np.isin(subject_ids, test_subjs))[0]
-
-    print(f"\nSplit: train={n_train} subj ({len(split_train_index)} samples), "
-          f"val={n_val} subj ({len(split_val_index)} samples), "
-          f"test={n_total - n_train - n_val} subj ({len(split_test_index)} samples)")
-
-    # ── 年龄归一化（固定先验边界，无泄漏）──
-    labels_raw = labels.astype(np.float32)
-    label_min = float(AGE_LABEL_MIN)
-    label_max = float(AGE_LABEL_MAX)
-    span = label_max - label_min
-    labels = ((labels_raw - label_min) / span).astype(np.float32)
-
-    print(f"\nTotal samples: {len(labels)}")
-    print(f"  Subjects: {len(np.unique(subject_ids))}")
-    print(f"  Age range: {labels_raw.min():.0f}–{labels_raw.max():.0f} "
-          f"(mean={labels_raw.mean():.1f}, median={np.median(labels_raw):.0f})")
-    print(f"  Normalized with fixed bounds [{AGE_LABEL_MIN:.0f},{AGE_LABEL_MAX:.0f}]")
-    print(f"  Shape: {time_series.shape}")
-
-    save_npz_atomic(
-        output_path,
-        timeseries=time_series,
-        labels=labels, labels_raw=labels_raw,
-        label_min=label_min, label_max=label_max,
-        subject_id=subject_ids, hz=hz,
-        split_train_index=split_train_index,
-        split_val_index=split_val_index,
-        split_test_index=split_test_index,
-        preprocessing_version=np.asarray(AGE_EEG_PREPROCESSING_VERSION),
-        channel_names=np.asarray(EEG_19_CHANNEL_ORDER),
-        reference=np.asarray('average_19_channels'),
-        unit=np.asarray('V'),
-    )
-    print(f"Saved to {output_path}")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-
-if __name__ == '__main__':
-    age_caueeg_preprocess("../data/CAUEEG/", hz=200)

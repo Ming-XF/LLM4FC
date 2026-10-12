@@ -117,13 +117,6 @@ def init_config():
     data_group.add_argument("--p1", default=4, type=int, help="")
     data_group.add_argument("--p2", default=8, type=int, help="")
 
-    preprocess_group = parser.add_argument_group(title="preprocess", description="")
-
-    preprocess_group.add_argument("--fc_threshold", default=0.0, type=float,
-                                  help="FC sparsification: edges with |value| < threshold are set to 0")
-    preprocess_group.add_argument("--fc_keep_ratio", default=1.0, type=float,
-                                  help="FC sparsification: top-K ratio of edges to keep by absolute value (1.0 = keep all)")
-
     model_group = parser.add_argument_group(title="model", description="")
     model_group.add_argument("--d_model", default=4, type=int, help="")
     model_group.add_argument("--k", default=5, type=int, help="")

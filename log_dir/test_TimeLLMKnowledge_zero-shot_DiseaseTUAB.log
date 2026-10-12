@@ -1,4 +1,5 @@
-10/09/2026 12:22:29 - INFO - __main__ -   ==================== Explicit args ====================
+10/12/2026 22:45:19 - INFO - __main__ -   ==================== Explicit args ====================
+  append: _prompt_v2
   batch_size: 16
   d_model: 128
   dataset: DiseaseTUAB
@@ -13,7 +14,7 @@
   model: TimeLLMKnowledge
   num_heads: 8
   num_prototypes: 1000
-  pretrain_path: ./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train
+  pretrain_path: ./output_dir/prompt_v2/TimeLLMKnowledge_DiseaseCAUEEG_train
   proto_mixed_gate: 0.1
   proto_per_phrase: 100
   proto_preselect: 1000
@@ -25,15 +26,14 @@
   use_semantic_prototypes: True
   use_task_prompt: True
   [effective] batch_size: 16, learning_rate: 0.0001
-10/09/2026 12:22:29 - INFO - __main__ -   ==================== Full args (resolved) ====================
+10/12/2026 22:45:19 - INFO - __main__ -   ==================== Full args (resolved) ====================
   D: 2
   F1: 8
   abla_channel: -1
   abla_vae: n
   activation: gelu
   alpha: 1.0
-  append: 
-  attention_depth: 2
+  append: _prompt_v2
   batch_size: 16
   beta: 1.0
   beta1: 0.9
@@ -52,22 +52,16 @@
   do_train: False
   drop_last: False
   dropout: 0.1
-  dynamic_stride: 1
   early_stop_metric: Loss
   early_stop_patience: 20
   eps: 1e-08
   epsilon: 1e-09
-  epsilon_ls: 0
   except_rule: None
-  fc_keep_ratio: 1.0
-  fc_threshold: 0.0
   few_shot: 0
   few_shot_seed: 42
   freeze_head_bias: True
   frequency: 500
-  hidden_dim: 1024
   initializer: None
-  integration: None
   k: 5
   learn_layer_weights: False
   learning_rate: 0.0001
@@ -83,10 +77,8 @@
   model_dir: output_dir
   no_weight_decay: False
   num_epochs: 200
-  num_gcn_layers: 1
   num_heads: 8
   num_kernels: 5
-  num_layers: 2
   num_prototypes: 1000
   num_repeat: 1
   num_windows: 10
@@ -94,9 +86,7 @@
   optimizer: Adam
   p1: 4
   p2: 8
-  patch_len: 512
-  patch_stride: 5
-  pretrain_path: ./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train
+  pretrain_path: ./output_dir/prompt_v2/TimeLLMKnowledge_DiseaseCAUEEG_train
   project: 
   proto_mixed_gate: 0.1
   proto_per_phrase: 100
@@ -113,146 +103,19 @@
   use_patch_embeds: True
   use_proto_mixed_bank: False
   use_semantic_prototypes: True
-  use_stats_prompt: False
   use_task_prompt: True
   val_set: 0.2
   visualize: False
   wandb_entity: cwg
   warmup_steps: 400
   weight_decay: 0.0001
-10/09/2026 12:22:29 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
-10/09/2026 12:22:29 - INFO - utils.trainer -     583 keys not in checkpoint (kept from init)
-10/09/2026 12:22:29 - INFO - utils.trainer -   Model loaded from ./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train/TimeLLMKnowledge-0.bin (35/36 keys)
-10/09/2026 12:22:29 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
-10/09/2026 12:25:52 - INFO - __main__ -   ==================== Explicit args ====================
-  batch_size: 16
-  d_model: 128
-  dataset: DiseaseTUAB
-  do_test: True
-  dropout: 0.1
-  few_shot: 0
-  freeze_head_bias: True
-  learn_layer_weights: False
-  llm_init: pretrained
-  llm_path: ./model/deepseek-r1-distill-llama-8B
-  llm_type: llama
-  model: TimeLLMKnowledge
-  num_heads: 8
-  num_prototypes: 1000
-  pretrain_path: ./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train
-  proto_mixed_gate: 0.1
-  proto_per_phrase: 100
-  proto_preselect: 1000
-  readout_layers: 4
-  use_knowledge_bypass: True
-  use_local_knowledge: True
-  use_patch_embeds: True
-  use_proto_mixed_bank: False
-  use_semantic_prototypes: True
-  use_task_prompt: True
-  [effective] batch_size: 16, learning_rate: 0.0001
-10/09/2026 12:25:52 - INFO - __main__ -   ==================== Full args (resolved) ====================
-  D: 2
-  F1: 8
-  abla_channel: -1
-  abla_vae: n
-  activation: gelu
-  alpha: 1.0
-  append: 
-  attention_depth: 2
-  batch_size: 16
-  beta: 1.0
-  beta1: 0.9
-  beta2: 0.98
-  d_ff: 128
-  d_model: 128
-  data_processors: 0
-  dataset: DiseaseTUAB
-  deepspeed: False
-  deepspeed_config: ds_config_zero3.json
-  device: cuda
-  distill: False
-  do_evaluate: False
-  do_parallel: False
-  do_test: True
-  do_train: False
-  drop_last: False
-  dropout: 0.1
-  dynamic_stride: 1
-  early_stop_metric: Loss
-  early_stop_patience: 20
-  eps: 1e-08
-  epsilon: 1e-09
-  epsilon_ls: 0
-  except_rule: None
-  fc_keep_ratio: 1.0
-  fc_threshold: 0.0
-  few_shot: 0
-  few_shot_seed: 42
-  freeze_head_bias: True
-  frequency: 500
-  hidden_dim: 1024
-  initializer: None
-  integration: None
-  k: 5
-  learn_layer_weights: False
-  learning_rate: 0.0001
-  llm_init: pretrained
-  llm_path: ./model/deepseek-r1-distill-llama-8B
-  llm_type: llama
-  local_rank: 0
-  log_dir: ./log_dir
-  match_rule: None
-  max_learning_rate: 0.001
-  max_steps: -1
-  model: TimeLLMKnowledge
-  model_dir: output_dir
-  no_weight_decay: False
-  num_epochs: 200
-  num_gcn_layers: 1
-  num_heads: 8
-  num_kernels: 5
-  num_layers: 2
-  num_prototypes: 1000
-  num_repeat: 1
-  num_windows: 10
-  num_workers: 5
-  optimizer: Adam
-  p1: 4
-  p2: 8
-  patch_len: 512
-  patch_stride: 5
-  pretrain_path: ./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train
-  project: 
-  proto_mixed_gate: 0.1
-  proto_per_phrase: 100
-  proto_preselect: 1000
-  readout_layers: 4
-  save_steps: 200
-  schedule: cos
-  sparsity: 0.7
-  standard_split: False
-  target_learning_rate: 1e-05
-  train_set: 0.6
-  use_knowledge_bypass: True
-  use_local_knowledge: True
-  use_patch_embeds: True
-  use_proto_mixed_bank: False
-  use_semantic_prototypes: True
-  use_stats_prompt: False
-  use_task_prompt: True
-  val_set: 0.2
-  visualize: False
-  wandb_entity: cwg
-  warmup_steps: 400
-  weight_decay: 0.0001
-10/09/2026 12:25:52 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
-10/09/2026 12:25:52 - INFO - utils.trainer -     583 keys not in checkpoint (kept from init)
-10/09/2026 12:25:52 - INFO - utils.trainer -   Model loaded from ./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train/TimeLLMKnowledge-0.bin (35/36 keys)
-10/09/2026 12:25:52 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
-10/09/2026 12:26:12 - INFO - utils.trainer -   Loss: 1.77147
-10/09/2026 12:26:12 - INFO - utils.trainer -   AUC: 0.67780
-10/09/2026 12:26:12 - INFO - utils.trainer -   Accuracy: 0.63958
-10/09/2026 12:26:12 - INFO - utils.trainer -   Precision: 0.65817
-10/09/2026 12:26:12 - INFO - utils.trainer -   Specificity: 0.59137
-10/09/2026 12:26:12 - INFO - utils.trainer -   Sensitivity: 0.68132
+10/12/2026 22:45:19 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+10/12/2026 22:45:19 - INFO - utils.trainer -     583 keys not in checkpoint (kept from init)
+10/12/2026 22:45:19 - INFO - utils.trainer -   Model loaded from ./output_dir/prompt_v2/TimeLLMKnowledge_DiseaseCAUEEG_train/TimeLLMKnowledge-0.bin (33/34 keys)
+10/12/2026 22:45:19 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
+10/12/2026 22:45:38 - INFO - utils.trainer -   Loss: 0.81147
+10/12/2026 22:45:38 - INFO - utils.trainer -   AUC: 0.76050
+10/12/2026 22:45:38 - INFO - utils.trainer -   Accuracy: 0.61249
+10/12/2026 22:45:38 - INFO - utils.trainer -   Precision: 0.58799
+10/12/2026 22:45:38 - INFO - utils.trainer -   Specificity: 0.25127
+10/12/2026 22:45:38 - INFO - utils.trainer -   Sensitivity: 0.92527

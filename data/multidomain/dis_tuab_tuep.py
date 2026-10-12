@@ -6,7 +6,6 @@ from random import shuffle
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
 
-
 class DisTUABTUEPDataset(BaseDataset):
     """TUAB + TUEP 二分类融合（0=正常/对照, 1=患病）。
 
@@ -58,16 +57,9 @@ class DisTUABTUEPDataset(BaseDataset):
         time_series = torch.from_numpy(self.all_data['time_series'][idx[item]]).float()
         labels = torch.from_numpy(self.all_data['labels'][idx[item]]).to(torch.int64)
 
-        SFC = self.connectivity(time_series)
-        SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
-        window_size = 12 * self.hz
-        step_size = (60 * self.hz - window_size) // 9
-        DFC = self.dynamic_connectivity(time_series, window_size, step_size)
-        DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
-
+        # ── EEGNet fallback：仅时域信号（在线 FC/PSD 死代码已删）──
         return {
-                'DFC': DFC,
-                'correlation': SFC,
+                'time_series': time_series,
                 'labels': labels,
                 'domain_label': torch.tensor(
                     self.all_data['domain_label'][idx[item]], dtype=torch.long),

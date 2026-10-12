@@ -24,8 +24,6 @@ class DataConfig:
         self.num_heads = args.num_heads
         self.abla_channel = args.abla_channel
         self.abla_vae = args.abla_vae
-        self.fc_threshold = args.fc_threshold
-        self.fc_keep_ratio = args.fc_keep_ratio
         self.hz = None
         self.num_local_segments = 6
 

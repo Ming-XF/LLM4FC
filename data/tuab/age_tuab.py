@@ -8,7 +8,6 @@ import torch
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
-
 def _init_worker():
     """Set BLAS threads to 1 so each worker is single-threaded."""
     import os
@@ -16,7 +15,6 @@ def _init_worker():
     os.environ['OPENBLAS_NUM_THREADS'] = '1'
     os.environ['MKL_NUM_THREADS'] = '1'
     os.environ['NUMEXPR_NUM_THREADS'] = '1'
-
 
 from ..data_config import DataConfig
 from ..dataset import BaseDataset
@@ -46,7 +44,6 @@ def _parse_age_from_edf_header(edf_path):
         return None
     except Exception:
         return None
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Dataset
@@ -114,240 +111,8 @@ class AgeTUABDataset(BaseDataset):
         if knowledge_item is not None:
             return knowledge_item
 
-        SFC = self.connectivity(time_series)
-        SFC = self.sparsify_fc(SFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
-        window_size = 12 * self.hz
-        step_size = (60 * self.hz - window_size) // 9
-        DFC = self.dynamic_connectivity(time_series, window_size, step_size)
-        DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
-
+        # ── EEGNet fallback：仅时域信号（在线 FC/PSD 死代码已删）──
         return {
-                'DFC': DFC,
-                'correlation': SFC,
                 'time_series': time_series,
                 'labels': labels,
-                'spectral': self.spectral_stats(time_series, self.hz),
-                'morph': self.morph_stats(time_series, self.hz),
         }
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Preprocessing — worker (module-level for multiprocessing)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _process_tuab_file_age(args):
-    """Process a single TUAB EDF file for age regression.
-
-    Age is extracted from the EDF header bytes (Patient ID ``Age:NN`` field).
-    Files with unparseable age are skipped.
-
-    Parameters
-    ----------
-    args : tuple
-        (edf_path, hz, subject_id)
-
-    Returns
-    -------
-    data : ndarray (n_windows, 19, hz*60) or None
-    labels : ndarray (n_windows,) or None — float age
-    subj_ids : ndarray (n_windows,) or None
-    """
-    edf_path, hz, subject_id = args
-
-    # ── Extract age from EDF header BEFORE loading full file ──
-    age = _parse_age_from_edf_header(edf_path)
-    if age is None:
-        return None, None, None
-    # Exclude placeholder age=999 (unknown)
-    if age >= 999:
-        return None, None, None
-
-    try:
-        raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
-    except Exception:
-        return None, None, None
-
-    try:
-        data = prepare_common_19_channel_raw(raw, hz)
-    except ValueError:
-        return None, None, None
-
-    # ── Truncate to whole minutes, reshape to 1‑minute windows ──
-    n_total = data.shape[1]
-    window_samples = hz * 60
-    n_windows = n_total // window_samples
-    if n_windows == 0:
-        return None, None, None
-
-    data = data[:, :n_windows * window_samples]
-    data = data.reshape(data.shape[0], n_windows, window_samples)
-    data = np.transpose(data, (1, 0, 2))
-
-    labels_arr = np.full(data.shape[0], age, dtype=np.float32)
-    subj_arr = np.full(data.shape[0], subject_id, dtype=np.int32)
-
-    return data.astype(np.float32), labels_arr, subj_arr
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Preprocessing — main entry point
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-def age_tuab_preprocess(path="../data/TUAB", hz=200,
-                       max_windows_per_subject=3,
-                       train_split=0.7, val_split=0.15):
-    """Preprocess the TUH Abnormal EEG Corpus for age regression.
-
-    Reads all EDF files under ``edf/train/`` and ``edf/eval/``, extracts the
-    standard 19‑channel 10-20 EEG, resamples to ``hz`` Hz, and segments into
-    non‑overlapping 1‑minute windows.
-
-    Age labels are extracted from the EDF file header (``Age:NN`` field).
-    Files with age=999 (unknown placeholder) are excluded.
-
-    Parameters
-    ----------
-    path : str
-        Path to the TUAB dataset root.
-    hz : int
-        Resampling rate in Hz.  Default 200.
-    """
-    edf_root = os.path.join(path, "edf")
-    output_path = os.path.join(path, "tuab_age.npz")
-
-    # ── Collect all EDF files ──
-    file_list = []
-    subject_map = {}
-
-    for split in ['train', 'eval']:
-        for cls_name in ['normal', 'abnormal']:
-            cls_dir = os.path.join(edf_root, split, cls_name, '01_tcp_ar')
-            if not os.path.isdir(cls_dir):
-                print(f"  [SKIP] directory not found: {cls_dir}")
-                continue
-            for fname in sorted(os.listdir(cls_dir)):
-                if not fname.endswith('.edf'):
-                    continue
-                edf_path = os.path.join(cls_dir, fname)
-                subj_str = fname.split('_s')[0]
-                file_list.append((edf_path, subj_str))
-
-    print(f"Found {len(file_list)} EDF files in {edf_root}")
-
-    # ── Assign sequential integer subject IDs ──
-    for _, subj_str in file_list:
-        if subj_str not in subject_map:
-            subject_map[subj_str] = len(subject_map) + 1
-
-    print(f"Unique subjects: {len(subject_map)}")
-
-    # ── Build multiprocessing task args ──
-    task_args = [
-        (edf_path, hz, subject_map[subj_str])
-        for edf_path, subj_str in file_list
-    ]
-
-    n_workers = min(cpu_count(), len(task_args), 48)
-    print(f"Processing {len(task_args)} files with {n_workers} workers...")
-
-    ts_list, lbl_list, subj_list = [], [], []
-    skipped = 0
-    with Pool(processes=n_workers, initializer=_init_worker) as pool:
-        for data, labels_arr, subj_arr in tqdm(
-                pool.imap(_process_tuab_file_age, task_args),
-                total=len(task_args),
-                desc="Processing TUAB age"):
-            if data is None:
-                skipped += 1
-                continue
-            ts_list.append(data)
-            lbl_list.append(labels_arr)
-            subj_list.append(subj_arr)
-
-    print(f"Skipped {skipped} files (missing channels, too short, "
-          f"or unparseable/missing age)")
-
-    if not ts_list:
-        raise RuntimeError("No valid EDF files processed — check dataset path.")
-
-    # ── Concatenate ──
-    print("Concatenating arrays...")
-    time_series = np.concatenate(ts_list, axis=0)
-    labels = np.concatenate(lbl_list, axis=0)
-    subject_ids = np.concatenate(subj_list, axis=0)
-    print(f"Concatenated: time_series={time_series.shape}, labels={labels.shape}")
-
-    # ── Per-subject window cap (uniform across all subjects, evenly spaced) ──
-    if max_windows_per_subject is not None:
-        unique_subjs = np.unique(subject_ids)
-        keep_mask = np.ones(len(subject_ids), dtype=bool)
-        n_capped = 0
-        for subj in unique_subjs:
-            idx = np.where(subject_ids == subj)[0]
-            if len(idx) > max_windows_per_subject:
-                sample_idx = np.linspace(0, len(idx) - 1, max_windows_per_subject, dtype=int)
-                keep_mask[idx] = False
-                keep_mask[idx[sample_idx]] = True
-                n_capped += 1
-        time_series = time_series[keep_mask]
-        labels = labels[keep_mask]
-        subject_ids = subject_ids[keep_mask]
-        print(f"Capped {n_capped} subjects (evenly spaced, max {max_windows_per_subject}/subj)")
-
-    # ── Per-subject random split (no stratification, reproducible) ──
-    unique_subjs = np.unique(subject_ids)
-    rng = np.random.RandomState(42)
-    rng.shuffle(unique_subjs)
-
-    n_total = len(unique_subjs)
-    n_train = int(n_total * train_split)
-    n_val = int(n_total * val_split)
-
-    train_subjs = unique_subjs[:n_train]
-    val_subjs = unique_subjs[n_train:n_train + n_val]
-    test_subjs = unique_subjs[n_train + n_val:]
-
-    split_train_index = np.where(np.isin(subject_ids, train_subjs))[0]
-    split_val_index = np.where(np.isin(subject_ids, val_subjs))[0]
-    split_test_index = np.where(np.isin(subject_ids, test_subjs))[0]
-
-    print(f"\nSplit: train={n_train} subj ({len(split_train_index)} samples), "
-          f"val={n_val} subj ({len(split_val_index)} samples), "
-          f"test={n_total - n_train - n_val} subj ({len(split_test_index)} samples)")
-
-    # ── 年龄归一化（固定先验边界，无泄漏）──
-    labels_raw = labels.astype(np.float32)
-    label_min = float(AGE_LABEL_MIN)
-    label_max = float(AGE_LABEL_MAX)
-    span = label_max - label_min
-    labels = ((labels_raw - label_min) / span).astype(np.float32)
-
-    print(f"\nTotal samples: {len(labels)}")
-    print(f"  Subjects: {len(np.unique(subject_ids))}")
-    print(f"  Age range: {labels_raw.min():.1f}–{labels_raw.max():.1f} "
-          f"(mean={labels_raw.mean():.1f}, median={np.median(labels_raw):.0f})")
-    print(f"  Normalized with fixed bounds [{AGE_LABEL_MIN:.0f},{AGE_LABEL_MAX:.0f}]")
-    print(f"  Shape: {time_series.shape}")
-
-    save_npz_atomic(
-        output_path,
-        timeseries=time_series,
-        labels=labels, labels_raw=labels_raw,
-        label_min=label_min, label_max=label_max,
-        subject_id=subject_ids, hz=hz,
-        split_train_index=split_train_index,
-        split_val_index=split_val_index,
-        split_test_index=split_test_index,
-        preprocessing_version=np.asarray(AGE_EEG_PREPROCESSING_VERSION),
-        channel_names=np.asarray(EEG_19_CHANNEL_ORDER),
-        reference=np.asarray('average_19_channels'),
-        unit=np.asarray('V'),
-    )
-    print(f"Saved to {output_path}")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-
-if __name__ == '__main__':
-    age_tuab_preprocess("../data/TUAB", hz=200)
