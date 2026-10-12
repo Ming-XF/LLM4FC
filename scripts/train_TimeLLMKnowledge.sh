@@ -5,8 +5,8 @@
 # Run: sh scripts/train_TimeLLMKnowledge.sh
 #
 
-DATASET="AgeCAUEEG"
-EARLY_STOP_METRIC="R2"
+DATASET="DiseaseCAUEEG"
+EARLY_STOP_METRIC="AUC"
 
 deepspeed --num_gpus=2 main.py \
     --model "TimeLLMKnowledge" \

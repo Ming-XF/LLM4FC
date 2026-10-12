@@ -101,12 +101,11 @@ class AgeTUEPDataset(BaseDataset):
         raw = np.load(raw_path, allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
-        labels = data["labels"].astype(np.float32)
+        labels, labels_raw, self.label_min, self.label_max = prepare_age_labels(
+            data, source=raw_path)
         subject_id = data["subject_id"]
         self.hz = int(np.asarray(data["hz"]).item())
         self.data_config.hz = self.hz
-        self.label_min = float(data['label_min']) if 'label_min' in data else None
-        self.label_max = float(data['label_max']) if 'label_max' in data else None
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
@@ -115,6 +114,7 @@ class AgeTUEPDataset(BaseDataset):
 
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
+        self.all_data['labels_raw'] = labels_raw
         self.all_data['subject_id'] = subject_id
         self._load_timellmknowledge_features(raw_path, data)
 

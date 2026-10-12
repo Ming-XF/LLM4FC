@@ -51,14 +51,14 @@ class AgeDSDataset(BaseDataset):
                                            episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
-        raw = np.load("../data/DS/ds_age.npz", allow_pickle=True)
+        raw_path = "../data/DS/ds_age.npz"
+        raw = np.load(raw_path, allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
-        labels = data["labels"].astype(np.float32)
+        labels, labels_raw, self.label_min, self.label_max = prepare_age_labels(
+            data, source=raw_path)
         subject_id = data["subject_id"]
         self.hz = data["hz"]
-        self.label_min = float(data['label_min']) if 'label_min' in data else None
-        self.label_max = float(data['label_max']) if 'label_max' in data else None
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
@@ -67,6 +67,7 @@ class AgeDSDataset(BaseDataset):
 
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
+        self.all_data['labels_raw'] = labels_raw
         self.all_data['subject_id'] = subject_id
 
         # ── 使用预处理阶段预计算的划分（随机，无分层）──

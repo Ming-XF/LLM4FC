@@ -131,6 +131,23 @@ class BaseDataset(Dataset):
                     np.asarray(features['subject_id']).astype(str), raw_subjects):
                 raise ValueError("Feature subject_id order does not match raw NPZ")
 
+            for field in (
+                    'preprocessing_version', 'channel_names', 'reference',
+                    'unit', 'label_min', 'label_max'):
+                if field not in raw_data:
+                    continue
+                feature_field = f'source_{field}'
+                if feature_field not in features.files:
+                    raise ValueError(
+                        f"Feature file {feature_path} is missing source metadata "
+                        f"{feature_field!r}")
+                if not np.array_equal(
+                        np.asarray(features[feature_field]),
+                        np.asarray(raw_data[field])):
+                    raise ValueError(
+                        f"Feature source metadata {feature_field!r} does not "
+                        f"match raw NPZ")
+
             num_segments = int(np.asarray(features['num_local_segments']).item())
             expected = {
                 'global_fc': (num_samples, num_channels, num_channels),

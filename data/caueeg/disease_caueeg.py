@@ -97,13 +97,18 @@ def _process_one_sample(args):
     subject_id = int(re.findall(r'\d+', serial)[0])
     edf_path = os.path.join(signal_folder, f"{serial}.edf")
 
-    raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
-    data, times = raw[:, :]
-    data = data[:19, :]
+    try:
+        raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
+        data = prepare_common_19_channel_raw(raw, hz)
+    except (OSError, RuntimeError, ValueError):
+        return None, None, None
 
-    if data.shape[1] % (hz * 60) != 0:
-        data = data[:, :-(data.shape[1] % (hz * 60))]
-    data = data.reshape(data.shape[0], data.shape[1] // (hz * 60), -1)
+    window_samples = hz * 60
+    n_windows = data.shape[1] // window_samples
+    if n_windows == 0:
+        return None, None, None
+    data = data[:, :n_windows * window_samples]
+    data = data.reshape(data.shape[0], n_windows, window_samples)
     data = np.transpose(data, (1, 0, 2))
 
     # 二分类: AD=1, Normal=0
@@ -151,12 +156,20 @@ def disease_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
 
     # 多进程并行处理
     ts_list, lbl_list, subj_list = [], [], []
+    skipped = 0
     with Pool(processes=n_workers, initializer=_init_worker) as pool:
-        for data, label, subj_ids in tqdm(pool.imap_unordered(_process_one_sample, task_args),
-                                          total=len(task_args), desc="加载EDF"):
+        for data, label, subj_ids in tqdm(
+                pool.imap(_process_one_sample, task_args),
+                total=len(task_args), desc="加载EDF"):
+            if data is None:
+                skipped += 1
+                continue
             ts_list.append(data)
             lbl_list.append(label)
             subj_list.append(subj_ids)
+
+    if skipped:
+        print(f"Skipped {skipped} files (missing channels, too short, or unreadable)")
 
     print("Concatenating arrays...")
     time_series = np.concatenate(ts_list, axis=0)
@@ -253,10 +266,20 @@ def disease_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
     print(f"  Normal (label=0): {int(len(labels) - labels.sum())}")
     print(f"  Shape: {time_series.shape}")
 
-    np.savez(output_path, timeseries=time_series, labels=labels, subject_id=subject_ids, hz=hz,
-             split_train_index=split_train_index,
-             split_val_index=split_val_index,
-             split_test_index=split_test_index)
+    save_npz_atomic(
+        output_path,
+        timeseries=time_series,
+        labels=labels,
+        subject_id=subject_ids,
+        hz=hz,
+        split_train_index=split_train_index,
+        split_val_index=split_val_index,
+        split_test_index=split_test_index,
+        preprocessing_version=np.asarray(EEG_PREPROCESSING_VERSION),
+        channel_names=np.asarray(EEG_19_CHANNEL_ORDER),
+        reference=np.asarray('average_19_channels'),
+        unit=np.asarray('V'),
+    )
 
 
 if __name__ == '__main__':

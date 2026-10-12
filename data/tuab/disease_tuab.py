@@ -29,41 +29,6 @@ import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Standard 19-channel 10-20 EEG order (CAUEEG-compatible)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_TUAB_CHANNEL_ORDER = [
-    'Fp1', 'F3', 'C3', 'P3', 'O1',          # left hemisphere
-    'Fp2', 'F4', 'C4', 'P4', 'O2',          # right hemisphere
-    'F7', 'T3', 'T5',                         # left temporal
-    'F8', 'T4', 'T6',                         # right temporal
-    'Fz', 'Cz', 'Pz',                         # midline
-]
-
-# Mapping from EDF channel-name variants to standard 10-20 short names.
-# EDF channels appear as "EEG FP1-REF", "EEG FZ-LE", etc.
-_CHANNEL_NORM_MAP = {
-    'FP1': 'Fp1', 'FP2': 'Fp2',
-    'FZ': 'Fz', 'CZ': 'Cz', 'PZ': 'Pz',
-}
-
-
-def _normalize_channel(name):
-    """Normalize an EDF channel name to the 10-20 short form.
-
-    ``EEG FP1-REF`` → ``Fp1``, ``EEG C3-LE`` → ``C3``.
-    """
-    # Strip known prefix / suffix
-    for prefix in ['EEG ']:
-        if name.startswith(prefix):
-            name = name[len(prefix):]
-    for suffix in ['-REF', '-LE']:
-        if name.endswith(suffix):
-            name = name[:-len(suffix)]
-    return _CHANNEL_NORM_MAP.get(name, name)
-
-
 def _resolve_param(val, pos):
     """Resolve a per-class parameter that may be an int (both classes) or
     tuple ``(pos_val, neg_val)``.
@@ -189,26 +154,10 @@ def _process_tuab_file(args):
     except Exception:
         return None, None, None
 
-    # ── Build a mapping from normalised channel name → EDF index ──
-    edf_ch_names = raw.info['ch_names']
-    ch_index = {}
-    for i, ch in enumerate(edf_ch_names):
-        norm = _normalize_channel(ch)
-        ch_index[norm] = i
-
-    # ── Check all 19 standard channels exist ──
-    missing = [ch for ch in _TUAB_CHANNEL_ORDER if ch not in ch_index]
-    if missing:
+    try:
+        data = prepare_common_19_channel_raw(raw, hz)
+    except ValueError:
         return None, None, None
-
-    # ── Pick and reorder the 19 EEG channels ──
-    pick_idx = [ch_index[ch] for ch in _TUAB_CHANNEL_ORDER]
-    raw.pick([edf_ch_names[i] for i in pick_idx], verbose=False)
-
-    # ── Average reference, resample ──
-    raw.set_eeg_reference('average', verbose=False)
-    raw = raw.copy().resample(sfreq=hz, verbose=False)
-    data = raw.get_data()  # (19, n_samples)
 
     # ── Truncate to whole minutes, reshape to 1‑minute windows ──
     n_total = data.shape[1]
@@ -300,7 +249,7 @@ def disease_tuab_preprocess(path="../data/TUAB", hz=200, max_windows_per_subject
     skipped = 0
     with Pool(processes=n_workers, initializer=_init_worker) as pool:
         for data, labels_arr, subj_arr in tqdm(
-                pool.imap_unordered(_process_tuab_file, task_args),
+                pool.imap(_process_tuab_file, task_args),
                 total=len(task_args),
                 desc="Processing TUAB"):
             if data is None:
@@ -422,11 +371,20 @@ def disease_tuab_preprocess(path="../data/TUAB", hz=200, max_windows_per_subject
     print(f"  Normal   (label=0): {n_normal}")
     print(f"  Shape: {time_series.shape}")
 
-    np.savez(output_path, timeseries=time_series,
-             labels=labels, subject_id=subject_ids, hz=hz,
-             split_train_index=split_train_index,
-             split_val_index=split_val_index,
-             split_test_index=split_test_index)
+    save_npz_atomic(
+        output_path,
+        timeseries=time_series,
+        labels=labels,
+        subject_id=subject_ids,
+        hz=hz,
+        split_train_index=split_train_index,
+        split_val_index=split_val_index,
+        split_test_index=split_test_index,
+        preprocessing_version=np.asarray(EEG_PREPROCESSING_VERSION),
+        channel_names=np.asarray(EEG_19_CHANNEL_ORDER),
+        reference=np.asarray('average_19_channels'),
+        unit=np.asarray('V'),
+    )
     print(f"Saved to {output_path}")
 
 

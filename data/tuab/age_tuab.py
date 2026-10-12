@@ -27,35 +27,6 @@ import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Standard 19-channel 10-20 EEG order (CAUEEG-compatible)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_TUAB_CHANNEL_ORDER = [
-    'Fp1', 'F3', 'C3', 'P3', 'O1',
-    'Fp2', 'F4', 'C4', 'P4', 'O2',
-    'F7', 'T3', 'T5',
-    'F8', 'T4', 'T6',
-    'Fz', 'Cz', 'Pz',
-]
-
-_CHANNEL_NORM_MAP = {
-    'FP1': 'Fp1', 'FP2': 'Fp2',
-    'FZ': 'Fz', 'CZ': 'Cz', 'PZ': 'Pz',
-}
-
-
-def _normalize_channel(name):
-    """Normalize an EDF channel name to the 10-20 short form."""
-    for prefix in ['EEG ']:
-        if name.startswith(prefix):
-            name = name[len(prefix):]
-    for suffix in ['-REF', '-LE']:
-        if name.endswith(suffix):
-            name = name[:-len(suffix)]
-    return _CHANNEL_NORM_MAP.get(name, name)
-
-
 def _parse_age_from_edf_header(edf_path):
     """Extract age from EDF file header (Patient ID field).
 
@@ -103,12 +74,11 @@ class AgeTUABDataset(BaseDataset):
         raw = np.load(raw_path, allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
-        labels = data["labels"].astype(np.float32)
+        labels, labels_raw, self.label_min, self.label_max = prepare_age_labels(
+            data, source=raw_path)
         subject_id = data["subject_id"]
         self.hz = int(np.asarray(data["hz"]).item())
         self.data_config.hz = self.hz
-        self.label_min = float(data['label_min']) if 'label_min' in data else None
-        self.label_max = float(data['label_max']) if 'label_max' in data else None
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
@@ -117,6 +87,7 @@ class AgeTUABDataset(BaseDataset):
 
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
+        self.all_data['labels_raw'] = labels_raw
         self.all_data['subject_id'] = subject_id
         self._load_timellmknowledge_features(raw_path, data)
 
@@ -196,26 +167,10 @@ def _process_tuab_file_age(args):
     except Exception:
         return None, None, None
 
-    # ── Build mapping from normalised channel name → EDF index ──
-    edf_ch_names = raw.info['ch_names']
-    ch_index = {}
-    for i, ch in enumerate(edf_ch_names):
-        norm = _normalize_channel(ch)
-        ch_index[norm] = i
-
-    # ── Check all 19 standard channels exist ──
-    missing = [ch for ch in _TUAB_CHANNEL_ORDER if ch not in ch_index]
-    if missing:
+    try:
+        data = prepare_common_19_channel_raw(raw, hz)
+    except ValueError:
         return None, None, None
-
-    # ── Pick and reorder the 19 EEG channels ──
-    pick_idx = [ch_index[ch] for ch in _TUAB_CHANNEL_ORDER]
-    raw.pick([edf_ch_names[i] for i in pick_idx], verbose=False)
-
-    # ── Average reference, resample ──
-    raw.set_eeg_reference('average', verbose=False)
-    raw = raw.copy().resample(sfreq=hz, verbose=False)
-    data = raw.get_data()
 
     # ── Truncate to whole minutes, reshape to 1‑minute windows ──
     n_total = data.shape[1]
@@ -300,7 +255,7 @@ def age_tuab_preprocess(path="../data/TUAB", hz=200,
     skipped = 0
     with Pool(processes=n_workers, initializer=_init_worker) as pool:
         for data, labels_arr, subj_arr in tqdm(
-                pool.imap_unordered(_process_tuab_file_age, task_args),
+                pool.imap(_process_tuab_file_age, task_args),
                 total=len(task_args),
                 desc="Processing TUAB age"):
             if data is None:
@@ -375,14 +330,20 @@ def age_tuab_preprocess(path="../data/TUAB", hz=200,
     print(f"  Normalized with fixed bounds [{AGE_LABEL_MIN:.0f},{AGE_LABEL_MAX:.0f}]")
     print(f"  Shape: {time_series.shape}")
 
-    np.savez(output_path,
-             timeseries=time_series,
-             labels=labels, labels_raw=labels_raw,
-             label_min=label_min, label_max=label_max,
-             subject_id=subject_ids, hz=hz,
-             split_train_index=split_train_index,
-             split_val_index=split_val_index,
-             split_test_index=split_test_index)
+    save_npz_atomic(
+        output_path,
+        timeseries=time_series,
+        labels=labels, labels_raw=labels_raw,
+        label_min=label_min, label_max=label_max,
+        subject_id=subject_ids, hz=hz,
+        split_train_index=split_train_index,
+        split_val_index=split_val_index,
+        split_test_index=split_test_index,
+        preprocessing_version=np.asarray(AGE_EEG_PREPROCESSING_VERSION),
+        channel_names=np.asarray(EEG_19_CHANNEL_ORDER),
+        reference=np.asarray('average_19_channels'),
+        unit=np.asarray('V'),
+    )
     print(f"Saved to {output_path}")
 
 

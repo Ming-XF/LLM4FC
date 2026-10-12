@@ -196,6 +196,12 @@ def preprocess_timellmknowledge_features(
             temporary_output = output_path.with_name(
                 output_path.name + f".tmp-{os.getpid()}.npz")
             try:
+                source_metadata = {}
+                for field in (
+                        'preprocessing_version', 'channel_names',
+                        'reference', 'unit', 'label_min', 'label_max'):
+                    if field in raw.files:
+                        source_metadata[f'source_{field}'] = np.asarray(raw[field])
                 np.savez_compressed(
                     temporary_output,
                     feature_version=np.asarray(FEATURE_VERSION),
@@ -221,6 +227,7 @@ def preprocess_timellmknowledge_features(
                     local_psd=local_psd,
                     local_mask=np.ones(
                         (num_samples, num_local_segments), dtype=np.bool_),
+                    **source_metadata,
                 )
                 os.replace(temporary_output, output_path)
             finally:

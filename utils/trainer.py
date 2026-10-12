@@ -521,7 +521,7 @@ class Trainer(object):
                     w_sum += n
                 result['Loss'] = w_loss / w_sum if w_sum > 0 else 0.0
         else:
-            preds = preds_local.numpy() if preds_local is not None else np.zeros(0)
+            preds = preds_local.cpu().numpy() if preds_local is not None else np.zeros(0)
             labels = labels_local
             result['Loss'] = losses / len(loss_list) if len(loss_list) > 0 else 0.0
 

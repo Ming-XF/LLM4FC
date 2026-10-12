@@ -55,12 +55,11 @@ class AgeCAUEEGDataset(BaseDataset):
         raw = np.load(raw_path, allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()
         time_series = data["timeseries"]
-        labels = data["labels"].astype(np.float32)
+        labels, labels_raw, self.label_min, self.label_max = prepare_age_labels(
+            data, source=raw_path)
         subject_id = data["subject_id"]
         self.hz = int(np.asarray(data["hz"]).item())
         self.data_config.hz = self.hz
-        self.label_min = float(data['label_min']) if 'label_min' in data else None
-        self.label_max = float(data['label_max']) if 'label_max' in data else None
 
         self.data_config.node_size = self.data_config.node_feature_size = time_series[0].shape[0]
         self.data_config.time_series_size = time_series[0].shape[1]
@@ -69,6 +68,7 @@ class AgeCAUEEGDataset(BaseDataset):
 
         self.all_data['time_series'] = time_series
         self.all_data['labels'] = labels
+        self.all_data['labels_raw'] = labels_raw
         self.all_data['subject_id'] = subject_id
         self._load_timellmknowledge_features(raw_path, data)
 
@@ -137,12 +137,14 @@ def _process_one_sample_age(args):
     edf_path = os.path.join(signal_folder, f"{serial}.edf")
 
     raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
-    data, times = raw[:, :]
-    data = data[:19, :]
+    data = prepare_common_19_channel_raw(raw, hz)
 
-    if data.shape[1] % (hz * 60) != 0:
-        data = data[:, :-(data.shape[1] % (hz * 60))]
-    data = data.reshape(data.shape[0], data.shape[1] // (hz * 60), -1)
+    window_samples = hz * 60
+    n_windows = data.shape[1] // window_samples
+    if n_windows == 0:
+        raise ValueError(f"Recording is shorter than one minute: {edf_path}")
+    data = data[:, :n_windows * window_samples]
+    data = data.reshape(data.shape[0], n_windows, window_samples)
     data = np.transpose(data, (1, 0, 2))
 
     label = np.full(data.shape[0], age, dtype=np.float32)
@@ -194,7 +196,7 @@ def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
     ts_list, lbl_list, subj_list = [], [], []
     with Pool(processes=n_workers, initializer=_init_worker) as pool:
         for data, label, subj_ids in tqdm(
-                pool.imap_unordered(_process_one_sample_age, task_args),
+                pool.imap(_process_one_sample_age, task_args),
                 total=len(task_args), desc="Loading EDF"):
             ts_list.append(data)
             lbl_list.append(label)
@@ -258,14 +260,20 @@ def age_caueeg_preprocess(path="../data/CAUEEG/", hz=200,
     print(f"  Normalized with fixed bounds [{AGE_LABEL_MIN:.0f},{AGE_LABEL_MAX:.0f}]")
     print(f"  Shape: {time_series.shape}")
 
-    np.savez(output_path,
-             timeseries=time_series,
-             labels=labels, labels_raw=labels_raw,
-             label_min=label_min, label_max=label_max,
-             subject_id=subject_ids, hz=hz,
-             split_train_index=split_train_index,
-             split_val_index=split_val_index,
-             split_test_index=split_test_index)
+    save_npz_atomic(
+        output_path,
+        timeseries=time_series,
+        labels=labels, labels_raw=labels_raw,
+        label_min=label_min, label_max=label_max,
+        subject_id=subject_ids, hz=hz,
+        split_train_index=split_train_index,
+        split_val_index=split_val_index,
+        split_test_index=split_test_index,
+        preprocessing_version=np.asarray(AGE_EEG_PREPROCESSING_VERSION),
+        channel_names=np.asarray(EEG_19_CHANNEL_ORDER),
+        reference=np.asarray('average_19_channels'),
+        unit=np.asarray('V'),
+    )
     print(f"Saved to {output_path}")
 
 
