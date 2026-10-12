@@ -1,460 +1,0 @@
-
-libgomp: Invalid value for environment variable OMP_NUM_THREADS
-
-libgomp: Invalid value for environment variable OMP_NUM_THREADS
-[2026-10-07 19:26:50,871] [WARNING] [runner.py:232:fetch_hostfile] Unable to find hostfile, will proceed with training with local resources only.
-[2026-10-07 19:26:50,871] [INFO] [runner.py:630:main] cmd = /root/miniconda3/bin/python -u -m deepspeed.launcher.launch --world_info=eyJsb2NhbGhvc3QiOiBbMCwgMV19 --master_addr=127.0.0.1 --master_port=29500 --enable_each_rank_log=None --log_level=info main.py --model TimeLLMKnowledge --num_epochs 200 --num_repeat 1 --save_steps 25 --schedule cos --early_stop_patience 20 --early_stop_metric R2 --dataset AgeCAUEEG --d_model 128 --num_heads 8 --dropout 0.1 --llm_type llama --llm_path ./model/deepseek-r1-distill-llama-8B --llm_init pretrained --use_task_prompt --num_prototypes 1000 --readout_layers 4 --deepspeed --deepspeed_config deepspeed/train_patch.json --do_train --do_evaluate --do_test
-
-libgomp: Invalid value for environment variable OMP_NUM_THREADS
-
-libgomp: Invalid value for environment variable OMP_NUM_THREADS
-[2026-10-07 19:26:55,293] [INFO] [launch.py:155:main] 0 NV_LIBNCCL_PACKAGE_VERSION=2.25.1-1
-[2026-10-07 19:26:55,293] [INFO] [launch.py:155:main] 0 NV_LIBNCCL_DEV_PACKAGE_VERSION=2.25.1-1
-[2026-10-07 19:26:55,293] [INFO] [launch.py:155:main] 0 NV_LIBNCCL_PACKAGE_NAME=libnccl2
-[2026-10-07 19:26:55,293] [INFO] [launch.py:155:main] 0 NV_LIBNCCL_DEV_PACKAGE_NAME=libnccl-dev
-[2026-10-07 19:26:55,293] [INFO] [launch.py:155:main] 0 NV_LIBNCCL_PACKAGE=libnccl2=2.25.1-1+cuda12.8
-[2026-10-07 19:26:55,293] [INFO] [launch.py:155:main] 0 NV_LIBNCCL_DEV_PACKAGE=libnccl-dev=2.25.1-1+cuda12.8
-[2026-10-07 19:26:55,293] [INFO] [launch.py:155:main] 0 NCCL_VERSION=2.25.1-1
-[2026-10-07 19:26:55,293] [INFO] [launch.py:162:main] WORLD INFO DICT: {'localhost': [0, 1]}
-[2026-10-07 19:26:55,293] [INFO] [launch.py:168:main] nnodes=1, num_local_procs=2, node_rank=0
-[2026-10-07 19:26:55,293] [INFO] [launch.py:179:main] global_rank_mapping=defaultdict(<class 'list'>, {'localhost': [0, 1]})
-[2026-10-07 19:26:55,293] [INFO] [launch.py:180:main] dist_world_size=2
-[2026-10-07 19:26:55,293] [INFO] [launch.py:184:main] Setting CUDA_VISIBLE_DEVICES=0,1
-[2026-10-07 19:26:55,294] [INFO] [launch.py:272:main] process 9424 spawned with command: ['/root/miniconda3/bin/python', '-u', 'main.py', '--local_rank=0', '--model', 'TimeLLMKnowledge', '--num_epochs', '200', '--num_repeat', '1', '--save_steps', '25', '--schedule', 'cos', '--early_stop_patience', '20', '--early_stop_metric', 'R2', '--dataset', 'AgeCAUEEG', '--d_model', '128', '--num_heads', '8', '--dropout', '0.1', '--llm_type', 'llama', '--llm_path', './model/deepseek-r1-distill-llama-8B', '--llm_init', 'pretrained', '--use_task_prompt', '--num_prototypes', '1000', '--readout_layers', '4', '--deepspeed', '--deepspeed_config', 'deepspeed/train_patch.json', '--do_train', '--do_evaluate', '--do_test']
-[2026-10-07 19:26:55,295] [INFO] [launch.py:272:main] process 9425 spawned with command: ['/root/miniconda3/bin/python', '-u', 'main.py', '--local_rank=1', '--model', 'TimeLLMKnowledge', '--num_epochs', '200', '--num_repeat', '1', '--save_steps', '25', '--schedule', 'cos', '--early_stop_patience', '20', '--early_stop_metric', 'R2', '--dataset', 'AgeCAUEEG', '--d_model', '128', '--num_heads', '8', '--dropout', '0.1', '--llm_type', 'llama', '--llm_path', './model/deepseek-r1-distill-llama-8B', '--llm_init', 'pretrained', '--use_task_prompt', '--num_prototypes', '1000', '--readout_layers', '4', '--deepspeed', '--deepspeed_config', 'deepspeed/train_patch.json', '--do_train', '--do_evaluate', '--do_test']
-
-libgomp: Invalid value for environment variable OMP_NUM_THREADS
-
-libgomp: Invalid value for environment variable OMP_NUM_THREADS
-
-libgomp: Invalid value for environment variable OMP_NUM_THREADS
-
-libgomp: Invalid value for environment variable OMP_NUM_THREADS
-[DS] batch_size=48, lr=0.0001 (from deepspeed/train_patch.json)
-[DS] batch_size=48, lr=0.0001 (from deepspeed/train_patch.json)
-`torch_dtype` is deprecated! Use `dtype` instead!
-`torch_dtype` is deprecated! Use `dtype` instead!
-Loading checkpoint shards:   0%|                                                                                                                                                                                                                                     | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:   0%|                                                                                                                                                                                                                                     | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 2/2 [00:00<00:00, 158.71it/s]
-Loading checkpoint shards: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 2/2 [00:00<00:00, 155.92it/s]
-epoch:   0% 0/200 [00:00<?, ?it/s]epoch:   0% 0/200 [00:00<?, ?it/s]
-Iteration:   0% 0/41 [00:00<?, ?it/s][A
-Iteration:   0% 0/41 [00:00<?, ?it/s][A
-
-Iteration:   2% 1/41 [00:03<02:25,  3.65s/it][AIteration:   2% 1/41 [00:03<02:25,  3.65s/it][A
-
-Iteration:   5% 2/41 [00:04<01:09,  1.78s/it][AIteration:   5% 2/41 [00:04<01:09,  1.78s/it][A
-
-Iteration:   7% 3/41 [00:04<00:44,  1.16s/it]Iteration:   7% 3/41 [00:04<00:44,  1.16s/it][A[A
-
-Iteration:  10% 4/41 [00:04<00:32,  1.15it/s][AIteration:  10% 4/41 [00:04<00:32,  1.15it/s][A
-
-Iteration:  12% 5/41 [00:05<00:25,  1.41it/s]Iteration:  12% 5/41 [00:05<00:25,  1.41it/s][A[A
-
-Iteration:  15% 6/41 [00:05<00:21,  1.61it/s][AIteration:  15% 6/41 [00:05<00:21,  1.61it/s][A
-
-Iteration:  17% 7/41 [00:06<00:19,  1.79it/s][AIteration:  17% 7/41 [00:06<00:19,  1.79it/s][A
-
-Iteration:  20% 8/41 [00:06<00:17,  1.94it/s]Iteration:  20% 8/41 [00:06<00:17,  1.94it/s][A[A
-
-Iteration:  22% 9/41 [00:07<00:15,  2.05it/s][AIteration:  22% 9/41 [00:07<00:15,  2.05it/s][A
-
-Iteration:  24% 10/41 [00:07<00:14,  2.13it/s]Iteration:  24% 10/41 [00:07<00:14,  2.13it/s][A[A
-
-Iteration:  27% 11/41 [00:07<00:13,  2.19it/s]Iteration:  27% 11/41 [00:07<00:13,  2.19it/s][A[A
-
-Iteration:  29% 12/41 [00:08<00:13,  2.23it/s][AIteration:  29% 12/41 [00:08<00:13,  2.23it/s][A
-
-Iteration:  32% 13/41 [00:08<00:12,  2.27it/s][AIteration:  32% 13/41 [00:08<00:12,  2.27it/s][A
-
-Iteration:  34% 14/41 [00:09<00:11,  2.29it/s][AIteration:  34% 14/41 [00:09<00:11,  2.29it/s][A
-Iteration:  37% 15/41 [00:09<00:11,  2.31it/s][A
-Iteration:  37% 15/41 [00:09<00:11,  2.30it/s][A
-
-Iteration:  39% 16/41 [00:10<00:10,  2.32it/s][AIteration:  39% 16/41 [00:10<00:10,  2.32it/s][A
-
-Iteration:  41% 17/41 [00:10<00:10,  2.32it/s][AIteration:  41% 17/41 [00:10<00:10,  2.32it/s][A
-
-Iteration:  44% 18/41 [00:10<00:09,  2.33it/s][AIteration:  44% 18/41 [00:10<00:09,  2.33it/s][A
-
-Iteration:  46% 19/41 [00:11<00:09,  2.34it/s][AIteration:  46% 19/41 [00:11<00:09,  2.34it/s][A
-
-Iteration:  49% 20/41 [00:11<00:08,  2.34it/s][AIteration:  49% 20/41 [00:11<00:08,  2.34it/s][A
-
-Iteration:  51% 21/41 [00:12<00:08,  2.34it/s]Iteration:  51% 21/41 [00:12<00:08,  2.34it/s][A[A
-
-Iteration:  54% 22/41 [00:12<00:08,  2.34it/s][AIteration:  54% 22/41 [00:12<00:08,  2.34it/s][A
-
-Iteration:  56% 23/41 [00:13<00:07,  2.34it/s][AIteration:  56% 23/41 [00:13<00:07,  2.34it/s][A
-
-Iteration:  59% 24/41 [00:13<00:07,  2.34it/s][AIteration:  59% 24/41 [00:13<00:07,  2.34it/s][A
-Iteration:  61% 25/41 [00:13<00:06,  2.35it/s][A
-Iteration:  61% 25/41 [00:13<00:06,  2.34it/s][A
-
-Iteration:  63% 26/41 [00:14<00:06,  2.35it/s][AIteration:  63% 26/41 [00:14<00:06,  2.35it/s][A
-
-Iteration:  66% 27/41 [00:14<00:05,  2.35it/s][AIteration:  66% 27/41 [00:14<00:05,  2.35it/s][A
-
-Iteration:  68% 28/41 [00:15<00:05,  2.34it/s][AIteration:  68% 28/41 [00:15<00:05,  2.34it/s][A
-
-Iteration:  71% 29/41 [00:15<00:05,  2.34it/s][AIteration:  71% 29/41 [00:15<00:05,  2.34it/s][A
-
-Iteration:  73% 30/41 [00:16<00:04,  2.34it/s]Iteration:  73% 30/41 [00:16<00:04,  2.34it/s][A[A
-
-Iteration:  76% 31/41 [00:16<00:04,  2.34it/s][AIteration:  76% 31/41 [00:16<00:04,  2.34it/s][A
-
-Iteration:  78% 32/41 [00:16<00:03,  2.35it/s]Iteration:  78% 32/41 [00:16<00:03,  2.35it/s][A[A
-
-Iteration:  80% 33/41 [00:17<00:03,  2.35it/s][AIteration:  80% 33/41 [00:17<00:03,  2.35it/s][A
-
-Iteration:  83% 34/41 [00:17<00:02,  2.35it/s][AIteration:  83% 34/41 [00:17<00:02,  2.35it/s][A
-
-Iteration:  85% 35/41 [00:18<00:02,  2.35it/s][AIteration:  85% 35/41 [00:18<00:02,  2.35it/s][A
-
-Iteration:  88% 36/41 [00:18<00:02,  2.35it/s][AIteration:  88% 36/41 [00:18<00:02,  2.35it/s][A
-
-Iteration:  90% 37/41 [00:19<00:01,  2.35it/s][AIteration:  90% 37/41 [00:19<00:01,  2.35it/s][A
-
-Iteration:  93% 38/41 [00:19<00:01,  2.35it/s][AIteration:  93% 38/41 [00:19<00:01,  2.35it/s][A
-
-Iteration:  95% 39/41 [00:19<00:00,  2.34it/s][AIteration:  95% 39/41 [00:19<00:00,  2.34it/s][A
-
-Iteration:  98% 40/41 [00:20<00:00,  2.35it/s][AIteration:  98% 40/41 [00:20<00:00,  2.35it/s][A
-
-Iteration: 100% 41/41 [00:20<00:00,  2.84it/s][AIteration: 100% 41/41 [00:20<00:00,  2.84it/s][AIteration: 100% 41/41 [00:20<00:00,  1.97it/s]
-
-val-eval-R1:   0% 0/9 [00:00<?, ?it/s][AIteration: 100% 41/41 [00:20<00:00,  1.97it/s]
-
-val-eval-R0:   0% 0/9 [00:00<?, ?it/s][A
-val-eval-R1:  11% 1/9 [00:02<00:21,  2.66s/it][A
-val-eval-R0:  11% 1/9 [00:02<00:21,  2.70s/it][A
-val-eval-R1:  22% 2/9 [00:02<00:08,  1.21s/it][A
-val-eval-R0:  22% 2/9 [00:02<00:08,  1.23s/it][A
-val-eval-R1:  33% 3/9 [00:03<00:04,  1.33it/s][A
-val-eval-R0:  33% 3/9 [00:03<00:04,  1.32it/s][A
-val-eval-R1:  44% 4/9 [00:03<00:02,  1.89it/s][A
-val-eval-R0:  44% 4/9 [00:03<00:02,  1.87it/s][A
-val-eval-R1:  56% 5/9 [00:03<00:01,  2.47it/s][A
-val-eval-R0:  56% 5/9 [00:03<00:01,  2.44it/s][A
-val-eval-R1:  67% 6/9 [00:04<00:01,  1.58it/s][A
-val-eval-R0:  67% 6/9 [00:04<00:01,  1.54it/s][A
-val-eval-R1:  78% 7/9 [00:04<00:00,  2.05it/s][A
-val-eval-R0:  78% 7/9 [00:04<00:00,  2.00it/s][A
-val-eval-R1:  89% 8/9 [00:04<00:00,  2.54it/s][A
-val-eval-R0:  89% 8/9 [00:04<00:00,  2.49it/s][A
-val-eval-R1: 100% 9/9 [00:05<00:00,  3.21it/s][A
-val-eval-R0: 100% 9/9 [00:05<00:00,  3.16it/s][Aval-eval-R1: 100% 9/9 [00:05<00:00,  1.71it/s]
-val-eval-R0: 100% 9/9 [00:05<00:00,  1.68it/s]
-
-val0 : Loss:0.01979, MAE:12.14374, R²:-0.87774
-                                  Epoch: 1, Loss: 0.08724, Val loss: 0.01979, Val R2: -0.8777, Best val R2: -0.8777, No improve: 0/20, Time: 20.8s
-epoch:   0% 0/200 [00:26<?, ?it/s]epoch:   0% 1/200 [00:26<1:29:22, 26.95s/it]epoch:   0% 1/200 [00:26<1:29:22, 26.95s/it]
-Iteration:   0% 0/41 [00:00<?, ?it/s][A
-Iteration:   0% 0/41 [00:00<?, ?it/s][A
-
-Iteration:   2% 1/41 [00:02<01:59,  2.98s/it]Iteration:   2% 1/41 [00:02<01:59,  2.98s/it][A[A
-
-Iteration:   5% 2/41 [00:03<00:57,  1.48s/it][AIteration:   5% 2/41 [00:03<00:57,  1.48s/it][A
-
-Iteration:   7% 3/41 [00:03<00:38,  1.00s/it][AIteration:   7% 3/41 [00:03<00:38,  1.00s/it][A
-
-Iteration:  10% 4/41 [00:04<00:28,  1.29it/s][AIteration:  10% 4/41 [00:04<00:28,  1.29it/s][A
-Iteration:  12% 5/41 [00:04<00:23,  1.54it/s][A
-Iteration:  12% 5/41 [00:04<00:23,  1.54it/s][A
-Iteration:  15% 6/41 [00:05<00:20,  1.72it/s][A
-Iteration:  15% 6/41 [00:05<00:20,  1.71it/s][A
-
-Iteration:  17% 7/41 [00:05<00:18,  1.88it/s]Iteration:  17% 7/41 [00:05<00:18,  1.88it/s][A[A
-
-Iteration:  20% 8/41 [00:06<00:16,  2.00it/s][AIteration:  20% 8/41 [00:06<00:16,  2.00it/s][A
-Iteration:  22% 9/41 [00:06<00:15,  2.09it/s][A
-Iteration:  22% 9/41 [00:06<00:15,  2.09it/s][A
-
-Iteration:  24% 10/41 [00:06<00:14,  2.15it/s][AIteration:  24% 10/41 [00:06<00:14,  2.15it/s][A
-
-Iteration:  27% 11/41 [00:07<00:13,  2.19it/s][AIteration:  27% 11/41 [00:07<00:13,  2.19it/s][A
-Iteration:  29% 12/41 [00:07<00:13,  2.23it/s][A
-Iteration:  29% 12/41 [00:07<00:13,  2.23it/s][A
-
-Iteration:  32% 13/41 [00:08<00:12,  2.25it/s][AIteration:  32% 13/41 [00:08<00:12,  2.25it/s][A
-
-Iteration:  34% 14/41 [00:08<00:11,  2.27it/s][AIteration:  34% 14/41 [00:08<00:11,  2.27it/s][A
-
-Iteration:  37% 15/41 [00:09<00:11,  2.29it/s][AIteration:  37% 15/41 [00:09<00:11,  2.29it/s][A
-
-Iteration:  39% 16/41 [00:09<00:11,  2.27it/s][AIteration:  39% 16/41 [00:09<00:11,  2.27it/s][A
-Iteration:  41% 17/41 [00:09<00:10,  2.29it/s][A
-Iteration:  41% 17/41 [00:09<00:10,  2.29it/s][A
-
-Iteration:  44% 18/41 [00:10<00:10,  2.29it/s][AIteration:  44% 18/41 [00:10<00:10,  2.29it/s][A
-
-Iteration:  46% 19/41 [00:10<00:09,  2.30it/s][AIteration:  46% 19/41 [00:10<00:09,  2.30it/s][A
-
-Iteration:  49% 20/41 [00:11<00:09,  2.31it/s][AIteration:  49% 20/41 [00:11<00:09,  2.31it/s][A
-Iteration:  51% 21/41 [00:11<00:08,  2.30it/s][A
-Iteration:  51% 21/41 [00:11<00:08,  2.30it/s][A
-
-Iteration:  54% 22/41 [00:12<00:08,  2.29it/s]Iteration:  54% 22/41 [00:12<00:08,  2.29it/s][A[A
-
-Iteration:  56% 23/41 [00:12<00:07,  2.29it/s][AIteration:  56% 23/41 [00:12<00:07,  2.29it/s][A
-
-Iteration:  59% 24/41 [00:12<00:07,  2.30it/s][AIteration:  59% 24/41 [00:12<00:07,  2.30it/s][A
-Iteration:  61% 25/41 [00:13<00:06,  2.31it/s][A
-Iteration:  61% 25/41 [00:13<00:06,  2.31it/s][A
-
-Iteration:  63% 26/41 [00:13<00:06,  2.30it/s][AIteration:  63% 26/41 [00:13<00:06,  2.30it/s][A
-
-Iteration:  66% 27/41 [00:14<00:06,  2.30it/s][AIteration:  66% 27/41 [00:14<00:06,  2.30it/s][A
-
-Iteration:  68% 28/41 [00:14<00:05,  2.30it/s][AIteration:  68% 28/41 [00:14<00:05,  2.30it/s][A
-
-Iteration:  71% 29/41 [00:15<00:05,  2.30it/s][AIteration:  71% 29/41 [00:15<00:05,  2.30it/s][A
-
-Iteration:  73% 30/41 [00:15<00:04,  2.31it/s][AIteration:  73% 30/41 [00:15<00:04,  2.31it/s][A
-
-Iteration:  76% 31/41 [00:15<00:04,  2.30it/s][AIteration:  76% 31/41 [00:15<00:04,  2.30it/s][A
-
-Iteration:  78% 32/41 [00:16<00:03,  2.30it/s][AIteration:  78% 32/41 [00:16<00:03,  2.30it/s][A
-
-Iteration:  80% 33/41 [00:16<00:03,  2.30it/s][AIteration:  80% 33/41 [00:16<00:03,  2.30it/s][A
-
-Iteration:  83% 34/41 [00:17<00:03,  2.31it/s][AIteration:  83% 34/41 [00:17<00:03,  2.31it/s][A
-
-Iteration:  85% 35/41 [00:17<00:02,  2.32it/s][AIteration:  85% 35/41 [00:17<00:02,  2.31it/s][A
-
-Iteration:  88% 36/41 [00:18<00:02,  2.31it/s][AIteration:  88% 36/41 [00:18<00:02,  2.31it/s][A
-
-Iteration:  90% 37/41 [00:18<00:01,  2.32it/s][AIteration:  90% 37/41 [00:18<00:01,  2.32it/s][A
-
-Iteration:  93% 38/41 [00:19<00:01,  2.32it/s][AIteration:  93% 38/41 [00:19<00:01,  2.32it/s][A
-
-Iteration:  95% 39/41 [00:19<00:00,  2.33it/s][AIteration:  95% 39/41 [00:19<00:00,  2.33it/s][A
-
-Iteration:  98% 40/41 [00:19<00:00,  2.33it/s][AIteration:  98% 40/41 [00:19<00:00,  2.33it/s][A
-Iteration: 100% 41/41 [00:20<00:00,  2.81it/s][A
-Iteration: 100% 41/41 [00:20<00:00,  2.81it/s][AIteration: 100% 41/41 [00:20<00:00,  2.02it/s]
-
-val-eval-R0:   0% 0/9 [00:00<?, ?it/s][AIteration: 100% 41/41 [00:20<00:00,  2.01it/s]
-
-val-eval-R1:   0% 0/9 [00:00<?, ?it/s][A
-val-eval-R0:  11% 1/9 [00:02<00:22,  2.78s/it][A
-val-eval-R0:  22% 2/9 [00:02<00:08,  1.26s/it][A
-val-eval-R0:  33% 3/9 [00:03<00:04,  1.30it/s][A
-val-eval-R0:  44% 4/9 [00:03<00:02,  1.86it/s][A
-val-eval-R1:  11% 1/9 [00:03<00:26,  3.29s/it][A
-val-eval-R0:  56% 5/9 [00:03<00:01,  2.42it/s][A
-val-eval-R1:  22% 2/9 [00:03<00:10,  1.47s/it][A
-val-eval-R1:  33% 3/9 [00:03<00:05,  1.13it/s][A
-val-eval-R1:  44% 4/9 [00:03<00:03,  1.64it/s][A
-val-eval-R1:  56% 5/9 [00:04<00:01,  2.19it/s][A
-val-eval-R0:  67% 6/9 [00:04<00:01,  1.53it/s][A
-val-eval-R0:  78% 7/9 [00:04<00:01,  2.00it/s][A
-val-eval-R0:  89% 8/9 [00:05<00:00,  2.49it/s][A
-val-eval-R0: 100% 9/9 [00:05<00:00,  3.16it/s][Aval-eval-R0: 100% 9/9 [00:05<00:00,  1.67it/s]
-
-val-eval-R1:  67% 6/9 [00:05<00:02,  1.33it/s][A
-val-eval-R1:  78% 7/9 [00:05<00:01,  1.76it/s][A
-val-eval-R1:  89% 8/9 [00:05<00:00,  2.24it/s][A
-val-eval-R1: 100% 9/9 [00:05<00:00,  2.88it/s][Aval-eval-R1: 100% 9/9 [00:06<00:00,  1.45it/s]
-
-val0 : Loss:0.01035, MAE:8.46487, R²:-0.00426
-                                            Epoch: 2, Loss: 0.03023, Val loss: 0.01035, Val R2: -0.0043, Best val R2: -0.0043, No improve: 0/20, Time: 20.3s
-epoch:   0% 1/200 [00:56<1:29:22, 26.95s/it]epoch:   1% 2/200 [00:56<1:34:26, 28.62s/it]epoch:   1% 2/200 [00:56<1:34:26, 28.62s/it]
-Iteration:   0% 0/41 [00:00<?, ?it/s][A
-Iteration:   0% 0/41 [00:00<?, ?it/s][A
-
-Iteration:   2% 1/41 [00:03<02:17,  3.44s/it][AIteration:   2% 1/41 [00:03<02:17,  3.44s/it][A
-
-Iteration:   5% 2/41 [00:03<01:05,  1.67s/it][AIteration:   5% 2/41 [00:03<01:05,  1.67s/it][A
-
-Iteration:   7% 3/41 [00:04<00:41,  1.10s/it][AIteration:   7% 3/41 [00:04<00:41,  1.10s/it][A
-
-Iteration:  10% 4/41 [00:04<00:30,  1.20it/s][AIteration:  10% 4/41 [00:04<00:30,  1.20it/s][A
-Iteration:  12% 5/41 [00:05<00:24,  1.45it/s][A
-Iteration:  12% 5/41 [00:05<00:24,  1.45it/s][A
-
-Iteration:  15% 6/41 [00:05<00:21,  1.66it/s][AIteration:  15% 6/41 [00:05<00:21,  1.66it/s][A
-
-Iteration:  17% 7/41 [00:06<00:18,  1.83it/s][AIteration:  17% 7/41 [00:06<00:18,  1.83it/s][A
-
-Iteration:  20% 8/41 [00:06<00:16,  1.97it/s][AIteration:  20% 8/41 [00:06<00:16,  1.97it/s][A
-
-Iteration:  22% 9/41 [00:06<00:15,  2.08it/s][AIteration:  22% 9/41 [00:06<00:15,  2.08it/s][A
-
-Iteration:  24% 10/41 [00:07<00:14,  2.15it/s][AIteration:  24% 10/41 [00:07<00:14,  2.15it/s][A
-
-Iteration:  27% 11/41 [00:07<00:13,  2.18it/s][AIteration:  27% 11/41 [00:07<00:13,  2.18it/s][A
-
-Iteration:  29% 12/41 [00:08<00:13,  2.22it/s][AIteration:  29% 12/41 [00:08<00:13,  2.22it/s][A
-
-Iteration:  32% 13/41 [00:08<00:12,  2.25it/s][AIteration:  32% 13/41 [00:08<00:12,  2.25it/s][A
-
-Iteration:  34% 14/41 [00:09<00:11,  2.28it/s][AIteration:  34% 14/41 [00:09<00:11,  2.28it/s][A
-
-Iteration:  37% 15/41 [00:09<00:11,  2.30it/s][AIteration:  37% 15/41 [00:09<00:11,  2.30it/s][A
-
-Iteration:  39% 16/41 [00:09<00:10,  2.30it/s][AIteration:  39% 16/41 [00:09<00:10,  2.30it/s][A
-
-Iteration:  41% 17/41 [00:10<00:10,  2.32it/s][AIteration:  41% 17/41 [00:10<00:10,  2.32it/s][A
-Iteration:  44% 18/41 [00:10<00:09,  2.32it/s][A
-Iteration:  44% 18/41 [00:10<00:09,  2.32it/s][A
-Iteration:  46% 19/41 [00:11<00:09,  2.33it/s][A
-Iteration:  46% 19/41 [00:11<00:09,  2.33it/s][A
-
-Iteration:  49% 20/41 [00:11<00:08,  2.33it/s][AIteration:  49% 20/41 [00:11<00:08,  2.33it/s][A
-
-Iteration:  51% 21/41 [00:12<00:08,  2.32it/s][AIteration:  51% 21/41 [00:12<00:08,  2.32it/s][A
-
-Iteration:  54% 22/41 [00:12<00:08,  2.33it/s][AIteration:  54% 22/41 [00:12<00:08,  2.33it/s][A
-
-Iteration:  56% 23/41 [00:12<00:07,  2.33it/s][AIteration:  56% 23/41 [00:12<00:07,  2.33it/s][A
-
-Iteration:  59% 24/41 [00:13<00:07,  2.33it/s][AIteration:  59% 24/41 [00:13<00:07,  2.33it/s][A
-
-Iteration:  61% 25/41 [00:13<00:06,  2.33it/s][AIteration:  61% 25/41 [00:13<00:06,  2.33it/s][A
-
-Iteration:  63% 26/41 [00:14<00:06,  2.33it/s][AIteration:  63% 26/41 [00:14<00:06,  2.33it/s][A
-
-Iteration:  66% 27/41 [00:14<00:06,  2.32it/s][AIteration:  66% 27/41 [00:14<00:06,  2.32it/s][A
-
-Iteration:  68% 28/41 [00:15<00:05,  2.32it/s][AIteration:  68% 28/41 [00:15<00:05,  2.32it/s][A
-
-Iteration:  71% 29/41 [00:15<00:05,  2.33it/s][AIteration:  71% 29/41 [00:15<00:05,  2.33it/s][A
-
-Iteration:  73% 30/41 [00:15<00:04,  2.31it/s][AIteration:  73% 30/41 [00:15<00:04,  2.31it/s][A
-
-Iteration:  76% 31/41 [00:16<00:04,  2.31it/s][AIteration:  76% 31/41 [00:16<00:04,  2.31it/s][A
-
-Iteration:  78% 32/41 [00:16<00:03,  2.32it/s][AIteration:  78% 32/41 [00:16<00:03,  2.32it/s][A
-
-Iteration:  80% 33/41 [00:17<00:03,  2.32it/s][AIteration:  80% 33/41 [00:17<00:03,  2.32it/s][A
-
-Iteration:  83% 34/41 [00:17<00:03,  2.32it/s][AIteration:  83% 34/41 [00:17<00:03,  2.32it/s][A
-
-Iteration:  85% 35/41 [00:18<00:02,  2.33it/s][AIteration:  85% 35/41 [00:18<00:02,  2.33it/s][A
-
-Iteration:  88% 36/41 [00:18<00:02,  2.33it/s][AIteration:  88% 36/41 [00:18<00:02,  2.33it/s][A
-
-Iteration:  90% 37/41 [00:18<00:01,  2.34it/s][AIteration:  90% 37/41 [00:18<00:01,  2.34it/s][A
-
-Iteration:  93% 38/41 [00:19<00:01,  2.33it/s][AIteration:  93% 38/41 [00:19<00:01,  2.33it/s][A
-
-Iteration:  95% 39/41 [00:19<00:00,  2.34it/s][AIteration:  95% 39/41 [00:19<00:00,  2.34it/s][A
-
-Iteration:  98% 40/41 [00:20<00:00,  2.34it/s][AIteration:  98% 40/41 [00:20<00:00,  2.34it/s][A
-
-Iteration: 100% 41/41 [00:20<00:00,  2.83it/s][AIteration: 100% 41/41 [00:20<00:00,  2.83it/s][AIteration: 100% 41/41 [00:20<00:00,  1.99it/s]
-
-val-eval-R0:   0% 0/9 [00:00<?, ?it/s][AIteration: 100% 41/41 [00:20<00:00,  1.97it/s]
-
-val-eval-R1:   0% 0/9 [00:00<?, ?it/s][A
-val-eval-R0:  11% 1/9 [00:02<00:22,  2.75s/it][A
-val-eval-R0:  22% 2/9 [00:02<00:08,  1.25s/it][A
-val-eval-R0:  33% 3/9 [00:03<00:04,  1.31it/s][A
-val-eval-R0:  44% 4/9 [00:03<00:02,  1.87it/s][A
-val-eval-R1:  11% 1/9 [00:03<00:25,  3.18s/it][A
-val-eval-R0:  56% 5/9 [00:03<00:01,  2.43it/s][A
-val-eval-R1:  22% 2/9 [00:03<00:09,  1.42s/it][A
-val-eval-R1:  33% 3/9 [00:03<00:05,  1.16it/s][A
-val-eval-R1:  44% 4/9 [00:03<00:02,  1.68it/s][A
-val-eval-R1:  56% 5/9 [00:03<00:01,  2.23it/s][A
-val-eval-R0:  67% 6/9 [00:04<00:01,  1.54it/s][A
-val-eval-R0:  78% 7/9 [00:04<00:00,  2.00it/s][A
-val-eval-R0:  89% 8/9 [00:04<00:00,  2.50it/s][A
-val-eval-R0: 100% 9/9 [00:05<00:00,  3.18it/s][Aval-eval-R0: 100% 9/9 [00:05<00:00,  1.68it/s]
-
-val-eval-R1:  67% 6/9 [00:05<00:02,  1.35it/s][A
-val-eval-R1:  78% 7/9 [00:05<00:01,  1.78it/s][A
-val-eval-R1:  89% 8/9 [00:05<00:00,  2.26it/s][A
-val-eval-R1: 100% 9/9 [00:05<00:00,  2.91it/s][Aval-eval-R1: 100% 9/9 [00:06<00:00,  1.48it/s]
-
-val0 : Loss:0.01087, MAE:8.72256, R²:-0.05213
-                                            Epoch: 3, Loss: 0.02781, Val loss: 0.01087, Val R2: -0.0521, Best val R2: -0.0043, No improve: 1/20, Time: 20.6s
-epoch:   1% 2/200 [01:23<1:34:26, 28.62s/it]epoch:   2% 3/200 [01:23<1:31:20, 27.82s/it]epoch:   2% 3/200 [01:23<1:31:20, 27.82s/it]
-Iteration:   0% 0/41 [00:00<?, ?it/s][A
-Iteration:   0% 0/41 [00:00<?, ?it/s][A
-
-Iteration:   2% 1/41 [00:03<02:21,  3.53s/it][AIteration:   2% 1/41 [00:03<02:21,  3.53s/it][A
-
-Iteration:   5% 2/41 [00:03<01:06,  1.71s/it][AIteration:   5% 2/41 [00:03<01:06,  1.71s/it][A
-
-Iteration:   7% 3/41 [00:04<00:46,  1.21s/it][AIteration:   7% 3/41 [00:04<00:46,  1.21s/it][A
-
-Iteration:  10% 4/41 [00:05<00:33,  1.10it/s][AIteration:  10% 4/41 [00:05<00:33,  1.10it/s][A
-Iteration:  12% 5/41 [00:05<00:26,  1.36it/s][A
-Iteration:  12% 5/41 [00:05<00:26,  1.36it/s][A
-
-Iteration:  15% 6/41 [00:05<00:22,  1.57it/s][AIteration:  15% 6/41 [00:05<00:22,  1.57it/s][A
-
-Iteration:  17% 7/41 [00:06<00:23,  1.44it/s][AIteration:  17% 7/41 [00:06<00:23,  1.44it/s][A
-
-Iteration:  20% 8/41 [00:07<00:20,  1.64it/s][AIteration:  20% 8/41 [00:07<00:20,  1.64it/s][A
-
-Iteration:  22% 9/41 [00:07<00:17,  1.81it/s][AIteration:  22% 9/41 [00:07<00:17,  1.81it/s][A
-
-Iteration:  24% 10/41 [00:07<00:15,  1.95it/s][AIteration:  24% 10/41 [00:07<00:15,  1.95it/s][A
-
-Iteration:  27% 11/41 [00:08<00:14,  2.04it/s][AIteration:  27% 11/41 [00:08<00:14,  2.04it/s][A
-
-Iteration:  29% 12/41 [00:08<00:13,  2.12it/s][AIteration:  29% 12/41 [00:08<00:13,  2.12it/s][A
-
-Iteration:  32% 13/41 [00:09<00:12,  2.18it/s][AIteration:  32% 13/41 [00:09<00:12,  2.18it/s][A
-
-Iteration:  34% 14/41 [00:09<00:12,  2.22it/s][AIteration:  34% 14/41 [00:09<00:12,  2.22it/s][A
-
-Iteration:  37% 15/41 [00:10<00:11,  2.26it/s][AIteration:  37% 15/41 [00:10<00:11,  2.26it/s][A
-
-Iteration:  39% 16/41 [00:10<00:11,  2.27it/s][AIteration:  39% 16/41 [00:10<00:11,  2.27it/s][A
-
-Iteration:  41% 17/41 [00:11<00:10,  2.29it/s][AIteration:  41% 17/41 [00:11<00:10,  2.29it/s][A
-
-Iteration:  44% 18/41 [00:11<00:09,  2.31it/s][AIteration:  44% 18/41 [00:11<00:09,  2.31it/s][A
-
-Iteration:  46% 19/41 [00:11<00:09,  2.32it/s][AIteration:  46% 19/41 [00:11<00:09,  2.32it/s][A
-
-Iteration:  49% 20/41 [00:12<00:09,  2.33it/s][AIteration:  49% 20/41 [00:12<00:09,  2.33it/s][A
-
-Iteration:  51% 21/41 [00:12<00:08,  2.31it/s][AIteration:  51% 21/41 [00:12<00:08,  2.31it/s][A
-
-Iteration:  54% 22/41 [00:13<00:08,  2.32it/s][AIteration:  54% 22/41 [00:13<00:08,  2.32it/s][A
-
-Iteration:  56% 23/41 [00:13<00:07,  2.32it/s][AIteration:  56% 23/41 [00:13<00:07,  2.32it/s][A
-
-Iteration:  59% 24/41 [00:14<00:07,  2.33it/s][AIteration:  59% 24/41 [00:14<00:07,  2.33it/s][A
-
-Iteration:  61% 25/41 [00:14<00:06,  2.33it/s][AIteration:  61% 25/41 [00:14<00:06,  2.33it/s][A
-
-Iteration:  63% 26/41 [00:14<00:06,  2.33it/s][AIteration:  63% 26/41 [00:14<00:06,  2.33it/s][A
-
-Iteration:  66% 27/41 [00:15<00:06,  2.32it/s][AIteration:  66% 27/41 [00:15<00:06,  2.32it/s][A
-
-Iteration:  68% 28/41 [00:15<00:05,  2.32it/s][AIteration:  68% 28/41 [00:15<00:05,  2.32it/s][A
-
-Iteration:  71% 29/41 [00:16<00:05,  2.33it/s][AIteration:  71% 29/41 [00:16<00:05,  2.33it/s][A
-
-Iteration:  73% 30/41 [00:16<00:04,  2.33it/s][AIteration:  73% 30/41 [00:16<00:04,  2.33it/s][A
-
-Iteration:  76% 31/41 [00:17<00:04,  2.32it/s][AIteration:  76% 31/41 [00:17<00:04,  2.32it/s][A
-
-Iteration:  78% 32/41 [00:17<00:03,  2.33it/s][AIteration:  78% 32/41 [00:17<00:03,  2.33it/s][A
-
-Iteration:  80% 33/41 [00:17<00:03,  2.33it/s][AIteration:  80% 33/41 [00:17<00:03,  2.33it/s][A
-
-Iteration:  83% 34/41 [00:18<00:03,  2.33it/s][AIteration:  83% 34/41 [00:18<00:03,  2.33it/s][A
-
-Iteration:  85% 35/41 [00:18<00:02,  2.34it/s][AIteration:  85% 35/41 [00:18<00:02,  2.34it/s][A
-Iteration:  88% 36/41 [00:19<00:02,  2.34it/s][A
-Iteration:  88% 36/41 [00:19<00:02,  2.34it/s][A
-
-Iteration:  90% 37/41 [00:19<00:01,  2.34it/s][AIteration:  90% 37/41 [00:19<00:01,  2.34it/s][A
-
-Iteration:  93% 38/41 [00:20<00:01,  2.34it/s][AIteration:  93% 38/41 [00:20<00:01,  2.34it/s][A
-
-Iteration:  95% 39/41 [00:20<00:00,  2.34it/s][AIteration:  95% 39/41 [00:20<00:00,  2.34it/s][A
-
-Iteration:  98% 40/41 [00:20<00:00,  2.34it/s][AIteration:  98% 40/41 [00:20<00:00,  2.34it/s][A
-
-Iteration: 100% 41/41 [00:21<00:00,  2.83it/s][AIteration: 100% 41/41 [00:21<00:00,  2.83it/s][AIteration: 100% 41/41 [00:21<00:00,  1.93it/s]
-
-val-eval-R0:   0% 0/9 [00:00<?, ?it/s][AIteration: 100% 41/41 [00:21<00:00,  1.91it/s]
-
-val-eval-R1:   0% 0/9 [00:00<?, ?it/s][A

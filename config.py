@@ -8,50 +8,7 @@ import pdb
 
 
 def init_model_config(args, data_config: DataConfig):
-    if args.model == "BNT":
-        model_config = BNTConfig(node_size=data_config.node_size,
-                                 sizes=(data_config.node_size, data_config.node_size // 2),
-                                 pooling=(False, True),
-                                 pos_encoding=None,  # identity, none
-                                 orthogonal=True,
-                                 # freeze_center=True,
-                                 freeze_center=False,
-                                 project_assignment=True,
-                                 num_heads=args.num_heads,
-                                 pos_embed_dim=data_config.node_size,
-                                 dim_feedforward=1024,
-                                 task_type=data_config.task_type,
-                                 output_dim=data_config.output_dim,
-                                 )
-        model = BNT(model_config)
-    elif args.model == 'BrainNetCNN':
-        model_config = BrainNetCNNConfig(node_size=data_config.node_size,
-                                         task_type=data_config.task_type,
-                                         output_dim=data_config.output_dim)
-        model = BrainNetCNN(model_config)
-    elif args.model == "ALTER":
-        model_config = ALTERConfig(node_size=data_config.node_size,
-                                 # sizes=(data_config.node_size, data_config.node_size // 2),
-                                 sizes=(360, 100),
-                                 pooling=(False, True),
-                                 pos_encoding="rrwp",  # identity, none
-                                 orthogonal=True,
-                                 freeze_center=False,
-                                 project_assignment=True,
-                                 num_heads=args.num_heads,
-                                 # pos_embed_dim=data_config.node_size,
-                                 pos_embed_dim=32,
-                                 dim_feedforward=1024,
-                                 task_type=data_config.task_type,
-                                 output_dim=data_config.output_dim,
-                                 )
-        model = ALTER(model_config)
-    elif args.model == 'GCDGCN':
-        model_config = GCDGCNConfig(node_size=data_config.node_size,
-                                         task_type=data_config.task_type,
-                                         output_dim=data_config.output_dim)
-        model = GCDGCN(model_config)
-    elif args.model == "EEGNet":
+    if args.model == "EEGNet":
         model_config = EEGNetConfig(node_size=data_config.node_size,
                                     time_series_size=data_config.time_series_size,
                                     output_dim=data_config.output_dim,
@@ -63,46 +20,6 @@ def init_model_config(args, data_config: DataConfig):
                                     p2=args.p2,
                                     dropout=args.dropout)
         model = EEGNet(model_config)
-    elif args.model == 'TimeLLM':
-        model_config = TimeLLMConfig(
-            node_size=data_config.node_size,
-            d_model=args.d_model,
-            n_heads=args.num_heads,
-            d_ff=args.d_ff,
-            num_prototypes=args.num_prototypes,
-            num_gcn_layers=args.num_gcn_layers,
-            dropout=args.dropout,
-            num_windows=args.num_windows,
-            task_type=data_config.task_type,
-            output_dim=data_config.output_dim,
-            dataset_name=args.dataset,
-            llm_type=args.llm_type,
-            llm_path=args.llm_path,
-            llm_init=args.llm_init,
-            use_task_prompt=args.use_task_prompt,
-            use_stats_prompt=args.use_stats_prompt,
-        )
-        model = Model(model_config)
-    elif args.model == 'TimeLLMPatch':
-        model_config = TimeLLMPatchConfig(
-            node_size=data_config.node_size,
-            time_series_size=data_config.time_series_size,
-            d_model=args.d_model,
-            n_heads=args.num_heads,
-            d_ff=args.d_ff,
-            num_prototypes=args.num_prototypes,
-            dropout=args.dropout,
-            patch_len=args.patch_len,
-            patch_stride=args.patch_stride,
-            task_type=data_config.task_type,
-            output_dim=data_config.output_dim,
-            dataset_name=args.dataset,
-            llm_type=args.llm_type,
-            llm_path=args.llm_path,
-            llm_init=args.llm_init,
-            use_task_prompt=args.use_task_prompt,
-        )
-        model = TimeLLMPatchModel(model_config)
     elif args.model == 'TimeLLMKnowledge':
         model_config = TimeLLMKnowledgeConfig(
             node_size=data_config.node_size,
@@ -175,7 +92,7 @@ def init_config():
     global_group.add_argument("--project", default="", type=str, help="")
     global_group.add_argument("--wandb_entity", default='cwg', type=str, help="")
     global_group.add_argument("--log_dir", default="./log_dir", type=str, help="")
-    global_group.add_argument("--model", default="TimeLLM", type=str, help="")
+    global_group.add_argument("--model", default="TimeLLMKnowledge", type=str, help="")
     global_group.add_argument("--num_repeat", default=1, type=int, help="")
     global_group.add_argument("--visualize", action="store_true", help="")
     global_group.add_argument("--append", default="", type=str, help="")
@@ -212,19 +129,14 @@ def init_config():
     model_group.add_argument("--k", default=5, type=int, help="")
     model_group.add_argument("--num_kernels", default=5, type=int, help="")
     model_group.add_argument("--sparsity", default=0.7, type=float, help="")
-    model_group.add_argument("--dynamic_stride", default=1, type=int, help="")
-    model_group.add_argument("--hidden_dim", default=1024, type=int, help="")
     model_group.add_argument("--num_heads", default=1, type=int, help="")
     model_group.add_argument("--abla_channel", default=-1, type=int, help="Channel Ablation EXP")
     model_group.add_argument("--abla_vae", default="n", type=str, help="Vae Ablation EXP")
-    model_group.add_argument("--num_layers", default=2, type=int, help="")
-    model_group.add_argument("--attention_depth", default=2, type=int, help="")
     model_group.add_argument("--activation", default="gelu", type=str, help="")
     model_group.add_argument("--model_dir", default="output_dir", type=str, help="")
     model_group.add_argument("--dropout", default=0.5, type=float, help="")
     model_group.add_argument("--distill", action="store_true", help="")
     model_group.add_argument("--initializer", default=None, type=str, help="")
-    model_group.add_argument("--integration", default=None, type=str, help="")
     model_group.add_argument("--llm_type", default="chatglm", type=str,
                              choices=["chatglm", "llama"],
                              help="LLM backbone: chatglm (default) or llama")
@@ -235,17 +147,11 @@ def init_config():
                              help="LLM weight init for ablation: 'pretrained' (default) "
                                   "or 'random' (same arch, randomly-initialized weights, "
                                   "to test whether pretrained knowledge contributes)")
-    model_group.add_argument("--patch_stride", default=5, type=int, help="Patch stride (TimeLLMPatch raw-EEG patching; legacy DFC subsampling for TimeLLM v1)")
     model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
-    model_group.add_argument("--num_gcn_layers", default=1, type=int, help="Number of GCN layers (TimeLLM)")
     model_group.add_argument("--use_task_prompt", action="store_true",
                              help="TimeLLM: include task description prompt")
-    model_group.add_argument("--use_stats_prompt", action="store_true",
-                             help="TimeLLM: include CAER-v3 statistics as a "
-                                  "text prompt before the DFC patches")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
-    model_group.add_argument("--patch_len", default=512, type=int, help="Patch length in raw samples (TimeLLMPatch)")
     model_group.add_argument("--readout_layers", default=4, type=int,
                              help="TimeLLMKnowledge: number of final LLM layers "
                                   "aggregated for READOUT position readout (K)")
@@ -297,7 +203,6 @@ def init_config():
     train_group.add_argument("--local_rank", default=0, type=int, help="Local rank (set by DeepSpeed launcher)")
     train_group.add_argument("--device", default="cuda", type=str, help="")
     train_group.add_argument("--save_steps", default=200, type=int, help="")
-    train_group.add_argument("--epsilon_ls", default=0, type=float, help=" label_smoothing")
     train_group.add_argument("--alpha", default=1., type=float, help="")
     train_group.add_argument("--beta", default=1., type=float, help="")
     train_group.add_argument("--early_stop_patience", default=20, type=int,

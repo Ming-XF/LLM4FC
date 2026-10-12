@@ -235,7 +235,6 @@ def main(args):
                 group_name = f"{args.model}" \
                              f"_{args.dataset}" \
                              f"_{args.batch_size}" \
-                             f"{f'sparsity-{args.sparsity}' if 'DFaST' in args.model else ''}" \
                              f'F{args.frequency}D{args.D}F{args.num_kernels}P{args.p1}={args.p2}_dp{args.dropout}' \
                              f"-cross"
 

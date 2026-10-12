@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-LLM4FC is a research codebase for EEG-based brain analysis using **Time-LLM-style reprogramming**: dynamic functional connectivity (DFC) is extracted from EEG, encoded by a GCN, then fed into a **frozen LLM** (ChatGLM-6B or DeepSeek-R1-Distill-Llama-8B) via cross-attention "reprogramming", followed by a linear classification/regression head. It also ships several baseline graph models (BNT, BrainNetCNN, ALTER, GCDGCN) under the same training harness.
+LLM4FC is a research codebase for EEG-based brain analysis using **Time-LLM-style reprogramming**: dynamic functional connectivity (DFC) is extracted from EEG, encoded by a GCN, then fed into a **frozen LLM** (ChatGLM-6B or DeepSeek-R1-Distill-Llama-8B) via cross-attention "reprogramming", followed by a linear classification/regression head. It also ships a classic raw-EEG CNN baseline (EEGNet) under the same training harness.
 
 Tasks are either **classification** (disease: AD/MCI/SCD, seizure, abnormal EEG; gender) or **regression** (age prediction). The active research focus is the streamlined TimeLLM path: GCN-based DFC encoding, cross-attention reprogramming, an optional task prompt, and a frozen LLM backbone.
 
@@ -27,7 +27,7 @@ python main.py --model BNT --dataset DiseaseBeirut --do_train --do_test
 ```
 
 Key runtime flags (defined in `config.py:init_config`):
-- `--model` selects both the model and the trainer via string eval: `eval(args.model + 'Trainer')` in `main.py` and `eval(f"{args.dataset}Dataset")` in `utils/trainer.py`. Valid models: `TimeLLM`, `BNT`, `BrainNetCNN`, `ALTER`, `GCDGCN`.
+- `--model` selects both the model and the trainer via string eval: `eval(args.model + 'Trainer')` in `main.py` and `eval(f"{args.dataset}Dataset")` in `utils/trainer.py`. Valid models: `TimeLLMKnowledge`, `EEGNet`.
 - `--deepspeed` uses `deepspeed/train.json` (training) or `deepspeed/finetune.json` (few-shot); the DeepSpeed JSON is the **single source of truth for batch size and LR** — `main.py:_apply_deepspeed_config` overwrites `args.batch_size`/`args.learning_rate` from it.
 - `--do_parallel` uses `torch.nn.parallel.DistributedDataParallel` instead (init via `torchrun`/env vars).
 - `--few_shot 0` = use all data; `>0` = N subjects per class; `-1` = full-data finetune. Combined with `--pretrain_path` this triggers transfer-learning mode (zero-shot / few-shot) in `main.py:main`.
