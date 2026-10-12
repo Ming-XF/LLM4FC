@@ -6,13 +6,14 @@
 #
 
 TARGET_DATASET="DiseaseTUAB"
-PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train"
+PRETRAIN_PATH="./output_dir/learn_layer_weights/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
     --dataset "$TARGET_DATASET" \
     --pretrain_path "$PRETRAIN_PATH" \
     --few_shot 0 \
+    --append "_learn_layer_weights" \
     --batch_size 16 \
     --d_model 128 \
     --num_heads 8 \
@@ -26,7 +27,7 @@ python main.py \
     --use_local_knowledge \
     --use_knowledge_bypass \
     --freeze_head_bias \
-    --no-learn_layer_weights \
+    --learn_layer_weights \
     --use_semantic_prototypes \
     --proto_preselect 1000 \
     --proto_per_phrase 100 \

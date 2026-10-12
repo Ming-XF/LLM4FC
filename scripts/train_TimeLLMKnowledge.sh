@@ -18,6 +18,8 @@ deepspeed --num_gpus=2 main.py \
     --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
+    --model_dir output_dir/learn_layer_weights \
+    --append "_learn_layer_weights" \
     --d_model 128 \
     --num_heads 8 \
     --dropout 0.1 \
@@ -30,7 +32,7 @@ deepspeed --num_gpus=2 main.py \
     --use_local_knowledge \
     --use_knowledge_bypass \
     --freeze_head_bias \
-    --no-learn_layer_weights \
+    --learn_layer_weights \
     --use_semantic_prototypes \
     --proto_preselect 1000 \
     --proto_per_phrase 100 \
