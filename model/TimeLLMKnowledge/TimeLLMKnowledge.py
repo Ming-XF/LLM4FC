@@ -17,11 +17,12 @@
   第 i 个知识 token 只在其短语的 P 个原型上做注意力（确定性、域无关预选；
   见 semantic_prototypes.py）。--no-use_semantic_prototypes 回退旧路径。
 
-序列：[start][task][end][全局 32][局部 6×32][READOUT(固定 token)] → 冻结 LLM
-→ 末 K 层 READOUT 位置聚合 → 线性头（bias 固定源域先验）+ 知识 bypass 头。
+序列：[全局 32][局部 6×32][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
+→ 末 K 层 prompt 末位位置聚合 → 线性头（bias 固定源域先验）+ 知识 bypass 头。
 
 捷径解除（codex 评审配套）：
-  - READOUT 为固定文本 token 词表向量（不可学习）；
+  - 读出位置为任务 prompt 末位 token（冻结词表向量，不可学习；
+    无 prompt 时退化为固定 ":" token 缓冲）；
   - 层聚合权重默认固定均匀（learn_layer_weights=False）；
   - 输出头 bias 冻结在归一化标签先验（回归 0.5 / 分类 0）；
   - bypass：z = mean_pool(q) → 小线性头 → y = y_llm + λ·y_bypass，
@@ -239,26 +240,13 @@ class Model(nn.Module):
         else:
             raise ValueError(f"Unsupported llm_type: {self.llm_type}")
 
-        # ── 文本 prompt 缓冲（与 TimeLLMPatch 相同的 tag/任务 prompt）──
+        # ── 任务 prompt 缓冲（冻结词表向量，末位 ":" 即读出位置）──
         prompt_config = get_prompt_config(config.dataset_name)
         task_ids = self.tokenizer.encode(prompt_config.prompt_task)
         with torch.no_grad():
             task_embeds = self._word_embeddings(torch.tensor(task_ids))
         self.register_buffer("task_prompt_embeddings", task_embeds)
         self.P_task = task_embeds.shape[0]
-
-        start_tag_ids = self.tokenizer.encode("<start_prompt>\n")
-        with torch.no_grad():
-            start_tag_embeds = self._word_embeddings(
-                torch.tensor(start_tag_ids))
-        self.register_buffer("start_tag_embeddings", start_tag_embeds)
-        self.P_start = start_tag_embeds.shape[0]
-
-        end_tag_ids = self.tokenizer.encode("\n<end_prompt>")
-        with torch.no_grad():
-            end_tag_embeds = self._word_embeddings(torch.tensor(end_tag_ids))
-        self.register_buffer("end_tag_embeddings", end_tag_embeds)
-        self.P_end = end_tag_embeds.shape[0]
 
         self.word_embeddings = self._word_embeddings.weight
         self.vocab_size = self.word_embeddings.shape[0]
@@ -344,19 +332,15 @@ class Model(nn.Module):
         self.phrase_beta = nn.Parameter(
             torch.tensor(config.phrase_beta_init))
 
-        # ── READOUT：固定文本 token 词表向量（不可学习，焊死捷径）──
-        readout_ids = self.tokenizer.encode(
-            " age", add_special_tokens=False)
-        if not readout_ids:
-            readout_ids = self.tokenizer.encode(
-                "age", add_special_tokens=False)
-        if not readout_ids:
-            readout_ids = [self.tokenizer.eos_token_id]
+        # ── 无 prompt 兜底读出 token："：" 词表向量（不可学习，焊死捷径）──
+        colon_ids = self.tokenizer.encode(":", add_special_tokens=False)
+        if not colon_ids:
+            colon_ids = [self.tokenizer.eos_token_id]
         with torch.no_grad():
             rv = self._word_embeddings(
-                torch.tensor(readout_ids)).mean(0).float()
+                torch.tensor(colon_ids)).mean(0).float()
         rms = rv.pow(2).mean().sqrt().clamp_min(_EPS)
-        self.register_buffer("readout_embedding", rv / rms * ref_rms)
+        self.register_buffer("readout_token", rv / rms * ref_rms)
 
         # ── 最后 K 层聚合权重：默认固定均匀；learn=True 时锚定 softmax ──
         self.layer_logits = (
@@ -401,7 +385,7 @@ class Model(nn.Module):
         K = self.config.readout_layers
         if self.layer_logits is None:
             return torch.full((K,), 1.0 / K,
-                              device=self.readout_embedding.device,
+                              device=self.task_prompt_embeddings.device,
                               dtype=torch.float32)
         a = self.layer_logits
         w = torch.softmax(a / _LAYER_TEMP, dim=0)
@@ -552,27 +536,21 @@ class Model(nn.Module):
             knowledge + self.phrase_beta * phrase)
         S_k = knowledge.shape[1]
 
-        # ── 组装序列：[start][task][end][knowledge][READOUT(固定)] ──
-        start_tag = self.start_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
-        end_tag = self.end_tag_embeddings.unsqueeze(0).expand(B, -1, -1)
-        task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(
-            B, -1, -1)
-        readout = self.readout_embedding.unsqueeze(0).unsqueeze(0).expand(
-            B, 1, -1).to(dtype=torch.bfloat16)
-
-        prompt_parts = [start_tag]
-        prompt_length = self.P_start
+        # ── 组装序列：[knowledge][task prompt(末位 ":" 为读出位置)] ──
+        # 无 prompt 时退化为 [knowledge][":" 兜底 token]，读出位置恒为 S-1
+        prompt_parts = [knowledge.to(dtype=torch.bfloat16)]
         if self.config.use_task_prompt:
+            task_prompt = self.task_prompt_embeddings.unsqueeze(0).expand(
+                B, -1, -1)
             prompt_parts.append(task_prompt)
-            prompt_length += self.P_task
-        prompt_parts.append(end_tag)
-        prompt_length += self.P_end
-        prompt_parts.append(knowledge.to(dtype=torch.bfloat16))
-        prompt_parts.append(readout)
+        else:
+            prompt_parts.append(
+                self.readout_token.unsqueeze(0).expand(
+                    B, -1, -1).to(dtype=torch.bfloat16))
 
         inputs_embeds = torch.cat(prompt_parts, dim=1)
         sequence_length = inputs_embeds.shape[1]
-        readout_idx = prompt_length + S_k                      # = S - 1
+        readout_idx = sequence_length - 1                      # 末位 token
 
         if self.llm_type == 'chatglm':
             causal_mask = torch.triu(
@@ -587,12 +565,9 @@ class Model(nn.Module):
                 sequence_length, dtype=torch.long, device=device
             ).unsqueeze(0).repeat(B, 1)
             if self.position_encoding_2d:
-                block_pos = torch.cat([
-                    torch.arange(
-                        prompt_length, dtype=torch.long, device=device),
-                    torch.arange(
-                        S_k + 1, dtype=torch.long, device=device),
-                ]).unsqueeze(0).repeat(B, 1)
+                block_pos = torch.arange(
+                    sequence_length, dtype=torch.long, device=device
+                ).unsqueeze(0).repeat(B, 1)
                 position_ids = torch.stack((global_pos, block_pos), dim=1)
             else:
                 position_ids = global_pos

@@ -18,6 +18,8 @@ deepspeed --num_gpus=2 main.py \
     --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
+    --model_dir output_dir/prompt_v2 \
+    --append "_prompt_v2" \
     --d_model 128 \
     --num_heads 8 \
     --dropout 0.1 \
