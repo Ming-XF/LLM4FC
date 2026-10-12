@@ -51,6 +51,18 @@ def init_model_config(args, data_config: DataConfig):
                                          task_type=data_config.task_type,
                                          output_dim=data_config.output_dim)
         model = GCDGCN(model_config)
+    elif args.model == "EEGNet":
+        model_config = EEGNetConfig(node_size=data_config.node_size,
+                                    time_series_size=data_config.time_series_size,
+                                    output_dim=data_config.output_dim,
+                                    task_type=data_config.task_type,
+                                    frequency=args.frequency,
+                                    D=args.D,
+                                    num_kernels=args.num_kernels,
+                                    p1=args.p1,
+                                    p2=args.p2,
+                                    dropout=args.dropout)
+        model = EEGNet(model_config)
     elif args.model == 'TimeLLM':
         model_config = TimeLLMConfig(
             node_size=data_config.node_size,

@@ -81,6 +81,7 @@ class DiseaseCAUEEGDataset(BaseDataset):
         DFC = self.sparsify_fc(DFC, self.data_config.fc_threshold, self.data_config.fc_keep_ratio)
 
         return {
+                'time_series': time_series,
                 'DFC': DFC,
                 'correlation': SFC,  # SFC, for backward compat
                 'labels': labels,
