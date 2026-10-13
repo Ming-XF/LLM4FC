@@ -1,5 +1,5 @@
-10/13/2026 00:18:27 - INFO - __main__ -   ==================== Explicit args ====================
-  append: _learn_layer_weights
+10/13/2026 14:20:49 - INFO - __main__ -   ==================== Explicit args ====================
+  append: _readout8
   batch_size: 16
   d_model: 128
   dataset: DiseaseTUAB
@@ -7,33 +7,30 @@
   dropout: 0.1
   few_shot: 0
   freeze_head_bias: True
-  learn_layer_weights: True
   llm_init: pretrained
   llm_path: ./model/deepseek-r1-distill-llama-8B
   llm_type: llama
   model: TimeLLMKnowledge
   num_heads: 8
   num_prototypes: 1000
-  pretrain_path: ./output_dir/learn_layer_weights/TimeLLMKnowledge_DiseaseCAUEEG_train
-  proto_mixed_gate: 0.1
+  pretrain_path: ./output_dir/readout8/TimeLLMKnowledge_DiseaseCAUEEG_train
   proto_per_phrase: 100
   proto_preselect: 1000
-  readout_layers: 4
+  readout_layers: 8
   use_knowledge_bypass: True
   use_local_knowledge: True
   use_patch_embeds: True
-  use_proto_mixed_bank: False
   use_semantic_prototypes: True
   use_task_prompt: True
   [effective] batch_size: 16, learning_rate: 0.0001
-10/13/2026 00:18:27 - INFO - __main__ -   ==================== Full args (resolved) ====================
+10/13/2026 14:20:49 - INFO - __main__ -   ==================== Full args (resolved) ====================
   D: 2
   F1: 8
   abla_channel: -1
   abla_vae: n
   activation: gelu
   alpha: 1.0
-  append: _learn_layer_weights
+  append: _readout8
   batch_size: 16
   beta: 1.0
   beta1: 0.9
@@ -63,7 +60,6 @@
   frequency: 500
   initializer: None
   k: 5
-  learn_layer_weights: True
   learning_rate: 0.0001
   llm_init: pretrained
   llm_path: ./model/deepseek-r1-distill-llama-8B
@@ -86,12 +82,11 @@
   optimizer: Adam
   p1: 4
   p2: 8
-  pretrain_path: ./output_dir/learn_layer_weights/TimeLLMKnowledge_DiseaseCAUEEG_train
+  pretrain_path: ./output_dir/readout8/TimeLLMKnowledge_DiseaseCAUEEG_train
   project: 
-  proto_mixed_gate: 0.1
   proto_per_phrase: 100
   proto_preselect: 1000
-  readout_layers: 4
+  readout_layers: 8
   save_steps: 200
   schedule: cos
   sparsity: 0.7
@@ -101,7 +96,6 @@
   use_knowledge_bypass: True
   use_local_knowledge: True
   use_patch_embeds: True
-  use_proto_mixed_bank: False
   use_semantic_prototypes: True
   use_task_prompt: True
   val_set: 0.2
@@ -109,13 +103,13 @@
   wandb_entity: cwg
   warmup_steps: 400
   weight_decay: 0.0001
-10/13/2026 00:18:27 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
-10/13/2026 00:18:27 - INFO - utils.trainer -     583 keys not in checkpoint (kept from init)
-10/13/2026 00:18:27 - INFO - utils.trainer -   Model loaded from ./output_dir/learn_layer_weights/TimeLLMKnowledge_DiseaseCAUEEG_train/TimeLLMKnowledge-0.bin (34/35 keys)
-10/13/2026 00:18:27 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
-10/13/2026 00:18:45 - INFO - utils.trainer -   Loss: 0.96702
-10/13/2026 00:18:45 - INFO - utils.trainer -   AUC: 0.70843
-10/13/2026 00:18:45 - INFO - utils.trainer -   Accuracy: 0.64311
-10/13/2026 00:18:45 - INFO - utils.trainer -   Precision: 0.62541
-10/13/2026 00:18:45 - INFO - utils.trainer -   Specificity: 0.42386
-10/13/2026 00:18:45 - INFO - utils.trainer -   Sensitivity: 0.83297
+10/13/2026 14:20:49 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+10/13/2026 14:20:49 - INFO - utils.trainer -     583 keys not in checkpoint (kept from init)
+10/13/2026 14:20:49 - INFO - utils.trainer -   Model loaded from ./output_dir/readout8/TimeLLMKnowledge_DiseaseCAUEEG_train/TimeLLMKnowledge-0.bin (32/33 keys)
+10/13/2026 14:20:49 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
+10/13/2026 14:21:07 - INFO - utils.trainer -   Loss: 1.47446
+10/13/2026 14:21:07 - INFO - utils.trainer -   AUC: 0.66798
+10/13/2026 14:21:07 - INFO - utils.trainer -   Accuracy: 0.61366
+10/13/2026 14:21:07 - INFO - utils.trainer -   Precision: 0.59607
+10/13/2026 14:21:07 - INFO - utils.trainer -   Specificity: 0.32234
+10/13/2026 14:21:07 - INFO - utils.trainer -   Sensitivity: 0.86593

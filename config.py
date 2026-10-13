@@ -41,12 +41,9 @@ def init_model_config(args, data_config: DataConfig):
             use_local_knowledge=args.use_local_knowledge,
             use_knowledge_bypass=args.use_knowledge_bypass,
             freeze_head_bias=args.freeze_head_bias,
-            learn_layer_weights=args.learn_layer_weights,
             use_semantic_prototypes=args.use_semantic_prototypes,
             proto_preselect=args.proto_preselect,
             proto_per_phrase=args.proto_per_phrase,
-            use_proto_mixed_bank=args.use_proto_mixed_bank,
-            proto_mixed_gate=args.proto_mixed_gate,
             use_patch_embeds=args.use_patch_embeds,
         )
         model = TimeLLMKnowledgeModel(model_config)
@@ -157,9 +154,6 @@ def init_config():
     model_group.add_argument("--freeze_head_bias",
                              action=argparse.BooleanOptionalAction, default=True,
                              help="TimeLLMKnowledge: freeze output-head bias at normalized label prior")
-    model_group.add_argument("--learn_layer_weights",
-                             action=argparse.BooleanOptionalAction, default=False,
-                             help="TimeLLMKnowledge: learn anchored layer-aggregation weights (default: fixed uniform)")
     model_group.add_argument("--use_semantic_prototypes",
                              action=argparse.BooleanOptionalAction, default=True,
                              help="TimeLLMKnowledge: per-phrase vocab-neighborhood "
@@ -171,13 +165,6 @@ def init_config():
     model_group.add_argument("--proto_per_phrase", default=100, type=int,
                              help="TimeLLMKnowledge: prototypes per phrase after "
                                   "shared Linear compression")
-    model_group.add_argument("--use_proto_mixed_bank",
-                             action=argparse.BooleanOptionalAction, default=False,
-                             help="TimeLLMKnowledge: add small shared learned "
-                                  "prototype bank gated onto semantic bank output")
-    model_group.add_argument("--proto_mixed_gate", default=0.1, type=float,
-                             help="TimeLLMKnowledge: init gate for mixed learned "
-                                  "prototype bank")
     model_group.add_argument("--use_patch_embeds",
                              action=argparse.BooleanOptionalAction, default=True,
                              help="TimeLLMKnowledge: per-group patch embeddings "

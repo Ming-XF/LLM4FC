@@ -23,7 +23,7 @@
 捷径解除（codex 评审配套）：
   - 读出位置为任务 prompt 末位 token（冻结词表向量，不可学习；
     无 prompt 时退化为固定 ":" token 缓冲）；
-  - 层聚合权重默认固定均匀（learn_layer_weights=False）；
+  - 层聚合权重固定均匀；
   - 输出头 bias 冻结在归一化标签先验（回归 0.5 / 分类 0）；
   - bypass：z = mean_pool(q) → 小线性头 → y = y_llm + λ·y_bypass，
     λ 初始 0.1，给知识路径一条不经过冻结 LLM 的直连监督。
@@ -43,10 +43,6 @@ from .prompts import get_prompt_config
 from .semantic_prototypes import SemanticPrototypeBank
 
 _EPS = 1e-8
-
-# 层权重聚合（learn_layer_weights=True 时）：α = β·e_last + (1-β)·softmax(a/T)
-_LAYER_BETA = 0.4
-_LAYER_TEMP = 1.5
 
 
 class RMSNorm(nn.Module):
@@ -146,14 +142,11 @@ class TimeLLMKnowledgeConfig(BaseConfig):
                  use_local_knowledge=True,
                  use_knowledge_bypass=True,
                  freeze_head_bias=True,
-                 learn_layer_weights=False,
                  phrase_beta_init=0.25,
                  bypass_gate_init=0.1,
                  use_semantic_prototypes=True,
                  proto_preselect=1000,
                  proto_per_phrase=100,
-                 use_proto_mixed_bank=False,
-                 proto_mixed_gate=0.1,
                  use_patch_embeds=True,
                  task_type='classification',
                  output_dim=2,
@@ -178,14 +171,11 @@ class TimeLLMKnowledgeConfig(BaseConfig):
         self.use_local_knowledge = use_local_knowledge
         self.use_knowledge_bypass = use_knowledge_bypass
         self.freeze_head_bias = freeze_head_bias
-        self.learn_layer_weights = learn_layer_weights
         self.phrase_beta_init = phrase_beta_init
         self.bypass_gate_init = bypass_gate_init
         self.use_semantic_prototypes = use_semantic_prototypes
         self.proto_preselect = proto_preselect
         self.proto_per_phrase = proto_per_phrase
-        self.use_proto_mixed_bank = use_proto_mixed_bank
-        self.proto_mixed_gate = proto_mixed_gate
         self.use_patch_embeds = use_patch_embeds
         self.task_type = task_type
         self.output_dim = output_dim
@@ -313,21 +303,6 @@ class Model(nn.Module):
             attention_dropout=config.dropout,
         )
 
-        # ── 混合学习 bank（可选对照）：小共享学习原型 + 门控融合 ──
-        if config.use_proto_mixed_bank:
-            self.mixed_bank = nn.Parameter(
-                torch.empty(config.proto_per_phrase, self.d_llm))
-            with torch.no_grad():
-                # 从词表均匀子集初始化（真实词向量出发）
-                sel = self.word_embeddings.detach().float()[
-                    torch.linspace(0, self.vocab_size - 1,
-                                   config.proto_per_phrase).round().long()]
-                self.mixed_bank.copy_(sel)
-        else:
-            self.mixed_bank = None
-        self.proto_mixed_gate = nn.Parameter(
-            torch.tensor(config.proto_mixed_gate))
-
         # phrase 融合系数（初始 0.25，phrase 只作身份锚点，不参与 q）
         self.phrase_beta = nn.Parameter(
             torch.tensor(config.phrase_beta_init))
@@ -341,11 +316,6 @@ class Model(nn.Module):
                 torch.tensor(colon_ids)).mean(0).float()
         rms = rv.pow(2).mean().sqrt().clamp_min(_EPS)
         self.register_buffer("readout_token", rv / rms * ref_rms)
-
-        # ── 最后 K 层聚合权重：默认固定均匀；learn=True 时锚定 softmax ──
-        self.layer_logits = (
-            nn.Parameter(torch.zeros(config.readout_layers))
-            if config.learn_layer_weights else None)
 
         # ── 输出头：bias 冻结在归一化标签先验（均值预测"送分项"提前给）──
         self.task_type = config.task_type
@@ -379,19 +349,6 @@ class Model(nn.Module):
         if hasattr(self, 'llm'):
             self.llm.eval()
         return self
-
-    def _layer_weights(self):
-        """α = 固定均匀(1/K) 或 β·e_last + (1-β)·softmax(a/T)（learn 时）。"""
-        K = self.config.readout_layers
-        if self.layer_logits is None:
-            return torch.full((K,), 1.0 / K,
-                              device=self.task_prompt_embeddings.device,
-                              dtype=torch.float32)
-        a = self.layer_logits
-        w = torch.softmax(a / _LAYER_TEMP, dim=0)
-        anchor = torch.zeros(K, device=a.device, dtype=a.dtype)
-        anchor[-1] = 1.0
-        return _LAYER_BETA * anchor + (1 - _LAYER_BETA) * w
 
     def _group_raw_tokens(self, x_z, static_fc, relative_psd):
         """组装 (B, 32, d_model) 分组 raw token：
@@ -491,11 +448,6 @@ class Model(nn.Module):
                 q_g.to(dtype=reprogram_dtype),
                 source_embeddings.to(dtype=reprogram_dtype),
                 source_embeddings.to(dtype=reprogram_dtype))    # (B, 32, 4096)
-        if self.mixed_bank is not None:
-            # 混合学习 bank：小共享学习原型输出经门控加在语义输出上
-            mb = self.mixed_bank.to(dtype=reprogram_dtype)
-            soft_g = soft_g + self.proto_mixed_gate * self.reprogramming_layer(
-                q_g.to(dtype=reprogram_dtype), mb, mb)
         knowledge = soft_g
         q_all = q_g
         if nseg > 0:
@@ -513,10 +465,6 @@ class Model(nn.Module):
                     source_embeddings.to(dtype=reprogram_dtype),
                     source_embeddings.to(dtype=reprogram_dtype)
                 ).view(B, nseg * self.config.num_stats, self.d_llm)
-            if self.mixed_bank is not None:
-                mb = self.mixed_bank.to(dtype=reprogram_dtype)
-                soft_l = soft_l + self.proto_mixed_gate * self.reprogramming_layer(
-                    q_l.to(dtype=reprogram_dtype), mb, mb)
             knowledge = torch.cat([soft_g, soft_l], dim=1)      # (B, S_k, 4096)
             q_all = torch.cat(
                 [q_g, q_l.view(B, nseg * self.config.num_stats, self.d_model)],
@@ -606,8 +554,7 @@ class Model(nn.Module):
             [h[:, readout_idx, :].float() for h in all_hidden[-K:]], dim=1)
         # 逐层固定 RMS 归一化（无参数，防各层范数差异主导聚合）
         hs = hs / (hs.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
-        alpha = self._layer_weights()                           # (K,)
-        agg = (hs * alpha.view(1, -1, 1)).sum(1)                # (B, 4096)
+        agg = hs.mean(dim=1)                                    # (B, 4096)
 
         logits = self.output_head(
             agg.to(dtype=self.output_head[1].weight.dtype))
@@ -636,10 +583,8 @@ class Model(nn.Module):
                 'q': q_all,
                 'knowledge': knowledge,
                 'readout_agg': agg,
-                'layer_weights': alpha,
                 'bypass_gate': self.bypass_gate,
                 'raw_gate': self.knowledge_compiler.raw_gate,
                 'phrase_beta': self.phrase_beta,
-                'proto_mixed_gate': self.proto_mixed_gate,
             },
         )
