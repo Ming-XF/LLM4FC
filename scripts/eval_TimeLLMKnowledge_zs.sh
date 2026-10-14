@@ -6,14 +6,13 @@
 #
 
 TARGET_DATASET="DiseaseTUAB"
-PRETRAIN_PATH="./output_dir/readout8/TimeLLMKnowledge_DiseaseCAUEEG_train"
+PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
     --dataset "$TARGET_DATASET" \
     --pretrain_path "$PRETRAIN_PATH" \
     --few_shot 0 \
-    --append "_readout8" \
     --batch_size 16 \
     --d_model 128 \
     --num_heads 8 \
@@ -23,7 +22,7 @@ python main.py \
     --llm_init pretrained \
     --use_task_prompt \
     --num_prototypes 1000 \
-    --readout_layers 8 \
+    --readout_layers 4 \
     --use_local_knowledge \
     --use_knowledge_bypass \
     --freeze_head_bias \
