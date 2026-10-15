@@ -26,7 +26,7 @@ python main.py \
     --num_prototypes 1000 \
     --readout_layers 4 \
     --use_local_knowledge \
-    --use_knowledge_bypass \
+    --use_knowledge_fusion \
     --freeze_head_bias \
     --use_semantic_prototypes \
     --proto_preselect 1000 \

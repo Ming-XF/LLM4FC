@@ -8,6 +8,9 @@
 DATASET="DiseaseCAUEEG"
 EARLY_STOP_METRIC="AUC"
 
+# H800 本机卡间 P2P 直连损坏（NCCL BROADCAST 无限挂起），必须禁用 P2P 走共享内存
+export NCCL_P2P_DISABLE=1
+
 deepspeed --num_gpus=2 main.py \
     --model "TimeLLMKnowledge" \
     --num_epochs 200 \
@@ -18,7 +21,8 @@ deepspeed --num_gpus=2 main.py \
     --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
-    --model_dir output_dir \
+    --model_dir output_dir/fusion_gate \
+    --append _fusion_gate \
     --d_model 128 \
     --num_heads 8 \
     --dropout 0.1 \
@@ -29,7 +33,7 @@ deepspeed --num_gpus=2 main.py \
     --num_prototypes 1000 \
     --readout_layers 4 \
     --use_local_knowledge \
-    --use_knowledge_bypass \
+    --use_knowledge_fusion \
     --freeze_head_bias \
     --use_semantic_prototypes \
     --proto_preselect 1000 \

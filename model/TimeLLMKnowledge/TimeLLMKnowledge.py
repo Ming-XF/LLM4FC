@@ -18,15 +18,15 @@
   见 semantic_prototypes.py）。--no-use_semantic_prototypes 回退旧路径。
 
 序列：[全局 32][局部 6×32][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
-→ 末 K 层 prompt 末位位置聚合 → 线性头（bias 固定源域先验）+ 知识 bypass 头。
+→ 末 K 层 prompt 末位位置聚合 → 4096→128 隐层（知识特征在此直接融合）→ GELU → Dropout → 输出投影（bias 固定源域先验）。
 
-捷径解除（codex 评审配套）：
+捷径解除：
   - 读出位置为任务 prompt 末位 token（冻结词表向量，不可学习；
     无 prompt 时退化为固定 ":" token 缓冲）；
   - 层聚合权重固定均匀；
   - 输出头 bias 冻结在归一化标签先验（回归 0.5 / 分类 0）；
-  - bypass：z = mean_pool(q) → 小线性头 → y = y_llm + λ·y_bypass，
-    λ 初始 0.1，给知识路径一条不经过冻结 LLM 的直连监督。
+  - fusion：z = 全局/局部平衡池化(q) → 128 维隐层直接相加（fused = h1 + z），
+    经 GELU 后走共享输出投影，给知识路径一条不经过冻结 LLM 的特征直连。
 """
 
 from math import sqrt
@@ -140,10 +140,11 @@ class TimeLLMKnowledgeConfig(BaseConfig):
                  hz=200,
                  num_local_segments=6,
                  use_local_knowledge=True,
-                 use_knowledge_bypass=True,
+                 use_knowledge_fusion=True,
                  freeze_head_bias=True,
                  phrase_beta_init=0.25,
-                 bypass_gate_init=0.1,
+                 fusion_alpha_max=0.5,
+                 fusion_gate_init=-1.39,
                  use_semantic_prototypes=True,
                  proto_preselect=1000,
                  proto_per_phrase=100,
@@ -169,10 +170,11 @@ class TimeLLMKnowledgeConfig(BaseConfig):
         self.hz = hz
         self.num_local_segments = num_local_segments
         self.use_local_knowledge = use_local_knowledge
-        self.use_knowledge_bypass = use_knowledge_bypass
+        self.use_knowledge_fusion = use_knowledge_fusion
         self.freeze_head_bias = freeze_head_bias
         self.phrase_beta_init = phrase_beta_init
-        self.bypass_gate_init = bypass_gate_init
+        self.fusion_alpha_max = fusion_alpha_max
+        self.fusion_gate_init = fusion_gate_init
         self.use_semantic_prototypes = use_semantic_prototypes
         self.proto_preselect = proto_preselect
         self.proto_per_phrase = proto_per_phrase
@@ -317,23 +319,22 @@ class Model(nn.Module):
         rms = rv.pow(2).mean().sqrt().clamp_min(_EPS)
         self.register_buffer("readout_token", rv / rms * ref_rms)
 
-        # ── 输出头：bias 冻结在归一化标签先验（均值预测"送分项"提前给）──
+        # ── 输出头：4096→128→output_dim，知识特征在 128 维隐层直接融合 ──
         self.task_type = config.task_type
         self.output_head = nn.Sequential(
             RMSNorm(self.d_llm, learnable=True),
-            nn.Linear(self.d_llm, config.output_dim),
-            nn.Dropout(config.dropout),
+            nn.Linear(self.d_llm, config.d_model),
         )
+        self.output_proj = nn.Linear(config.d_model, config.output_dim)
+        self.output_dropout = nn.Dropout(config.dropout)
+        # 有界标量门控：α = α_max·σ(g)，初始 α≈0.1（与旧 bypass_gate init 同义）
+        self.fusion_gate = nn.Parameter(torch.tensor(config.fusion_gate_init))
         if config.freeze_head_bias:
+            # bias 冻结在归一化标签先验（均值预测"送分项"提前给）
             prior = 0.5 if self.task_type == 'regression' else 0.0
             with torch.no_grad():
-                self.output_head[1].bias.fill_(prior)
-            self.output_head[1].bias.requires_grad_(False)
-
-        # ── 知识 bypass 头：mean_pool(q) → 线性头，直连监督知识路径 ──
-        self.bypass_head = nn.Linear(config.d_model, config.output_dim)
-        self.bypass_gate = nn.Parameter(
-            torch.tensor(config.bypass_gate_init))
+                self.output_proj.bias.fill_(prior)
+            self.output_proj.bias.requires_grad_(False)
 
         for param in self.llm.parameters():
             param.requires_grad = False
@@ -556,14 +557,23 @@ class Model(nn.Module):
         hs = hs / (hs.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
         agg = hs.mean(dim=1)                                    # (B, 4096)
 
-        logits = self.output_head(
-            agg.to(dtype=self.output_head[1].weight.dtype))
+        h1 = self.output_head(
+            agg.to(dtype=self.output_head[1].weight.dtype))     # (B, d_model)
 
-        # ── 知识 bypass：mean_pool(q) → 线性头，λ 加权 ──
-        if self.config.use_knowledge_bypass:
-            z = q_all.mean(dim=1)                               # (B, d_model)
-            y_bypass = self.bypass_head(z)
-            logits = logits + self.bypass_gate * y_bypass
+        # ── 知识特征融合：全局/局部平衡池化 → 128 维隐层直接相加 ──
+        if self.config.use_knowledge_fusion:
+            z_g = q_all[:, :self.config.num_stats].mean(dim=1)
+            z_l = (q_all[:, self.config.num_stats:].mean(dim=1)
+                   if q_all.shape[1] > self.config.num_stats else 0.0)
+            z = rms_norm(0.5 * (z_g + z_l))                     # (B, d_model)
+            alpha = self.config.fusion_alpha_max * torch.sigmoid(
+                self.fusion_gate)                               # 标量，∈[0, α_max]
+            fused = h1 + alpha * z
+        else:
+            alpha = None
+            fused = h1
+
+        logits = self.output_proj(self.output_dropout(F.gelu(fused)))
 
         if self.task_type == 'regression':
             prediction = logits.squeeze(-1)
@@ -583,7 +593,7 @@ class Model(nn.Module):
                 'q': q_all,
                 'knowledge': knowledge,
                 'readout_agg': agg,
-                'bypass_gate': self.bypass_gate,
+                'fusion_gate': alpha,
                 'raw_gate': self.knowledge_compiler.raw_gate,
                 'phrase_beta': self.phrase_beta,
             },

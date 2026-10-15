@@ -39,7 +39,8 @@ def init_model_config(args, data_config: DataConfig):
             use_task_prompt=args.use_task_prompt,
             readout_layers=args.readout_layers,
             use_local_knowledge=args.use_local_knowledge,
-            use_knowledge_bypass=args.use_knowledge_bypass,
+            use_knowledge_fusion=args.use_knowledge_fusion,
+            fusion_alpha_max=args.fusion_alpha_max,
             freeze_head_bias=args.freeze_head_bias,
             use_semantic_prototypes=args.use_semantic_prototypes,
             proto_preselect=args.proto_preselect,
@@ -148,9 +149,14 @@ def init_config():
     model_group.add_argument("--use_local_knowledge",
                              action=argparse.BooleanOptionalAction, default=True,
                              help="TimeLLMKnowledge: append 6x10s local knowledge blocks")
-    model_group.add_argument("--use_knowledge_bypass",
+    model_group.add_argument("--use_knowledge_fusion",
                              action=argparse.BooleanOptionalAction, default=True,
-                             help="TimeLLMKnowledge: mean-pool(q) residual head with gate lambda")
+                             help="TimeLLMKnowledge: fuse balanced-pooled "
+                                  "knowledge features into the 128-dim head "
+                                  "hidden state")
+    model_group.add_argument("--fusion_alpha_max", default=0.5, type=float,
+                             help="TimeLLMKnowledge: upper bound of the "
+                                  "sigmoid fusion gate (alpha)")
     model_group.add_argument("--freeze_head_bias",
                              action=argparse.BooleanOptionalAction, default=True,
                              help="TimeLLMKnowledge: freeze output-head bias at normalized label prior")
