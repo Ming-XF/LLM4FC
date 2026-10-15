@@ -6,7 +6,7 @@
 #
 
 TARGET_DATASET="DiseaseTUAB"
-PRETRAIN_PATH="./output_dir/nofusion/TimeLLMKnowledge_DiseaseCAUEEG_train"
+PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
@@ -24,11 +24,10 @@ python main.py \
     --num_prototypes 1000 \
     --readout_layers 4 \
     --use_local_knowledge \
-    --no-use_knowledge_fusion \
+    --use_knowledge_fusion \
     --freeze_head_bias \
     --use_semantic_prototypes \
     --proto_preselect 1000 \
     --proto_per_phrase 100 \
     --use_patch_embeds \
-    --append _nofusion \
     --do_test
