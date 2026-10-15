@@ -5,7 +5,7 @@
 # Run: sh scripts/eval_EEGNet_zs.sh
 #
 
-TARGET_DATASET="DiseaseTUAB"
+TARGET_DATASET="DiseaseTUEP"
 PRETRAIN_PATH="./output_dir/EEGNet_DiseaseCAUEEG_train"
 
 python main.py \

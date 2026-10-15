@@ -5,7 +5,7 @@
 # Run: sh scripts/eval_neurolm_zs.sh
 #
 
-EVAL_DATASETS="CAUEEG TUAB TUEP"
+EVAL_DATASETS="TUEP"
 NEUROLM_PATH="baseline/NeuroLM/checkpoints/NeuroLM-B.pt"
 OUT_DIR="baseline/NeuroLM/out_llm4fc_zeroshot"
 
