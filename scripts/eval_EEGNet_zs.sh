@@ -6,7 +6,7 @@
 #
 
 TARGET_DATASET="DiseaseTUEP"
-PRETRAIN_PATH="./output_dir/EEGNet_DiseaseCAUEEG_train"
+PRETRAIN_PATH="./output_dir/EEGNet_DiseaseTUAB_train"
 
 python main.py \
     --model "EEGNet" \
@@ -20,4 +20,5 @@ python main.py \
     --p1 4 \
     --p2 8 \
     --dropout 0.5 \
+    --append _tuab \
     --do_test

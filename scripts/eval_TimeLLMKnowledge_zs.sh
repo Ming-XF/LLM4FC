@@ -6,7 +6,7 @@
 #
 
 TARGET_DATASET="DiseaseTUEP"
-PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train"
+PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseTUAB_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
@@ -30,4 +30,5 @@ python main.py \
     --proto_preselect 1000 \
     --proto_per_phrase 100 \
     --use_patch_embeds \
+    --append _tuab \
     --do_test

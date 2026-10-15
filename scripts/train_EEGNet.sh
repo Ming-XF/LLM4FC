@@ -4,8 +4,11 @@
 # Run: sh scripts/train_EEGNet.sh
 #
 
-DATASET="DiseaseCAUEEG"
+DATASET="DiseaseTUAB"
 EARLY_STOP_METRIC="AUC"
+
+# H800 本机卡间 P2P 直连损坏（NCCL BROADCAST 无限挂起），必须禁用 P2P 走共享内存
+export NCCL_P2P_DISABLE=1
 
 deepspeed --num_gpus=2 main.py \
     --model "EEGNet" \
