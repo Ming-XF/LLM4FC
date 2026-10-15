@@ -5,7 +5,7 @@
 # Run: sh scripts/eval_TimeLLMKnowledge_zs.sh
 #
 
-TARGET_DATASET="DiseaseTUAB"
+TARGET_DATASET="DiseaseTUEP"
 PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
