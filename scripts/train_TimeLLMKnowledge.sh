@@ -21,8 +21,8 @@ deepspeed --num_gpus=2 main.py \
     --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
-    --model_dir output_dir/fusion_gate \
-    --append _fusion_gate \
+    --model_dir output_dir/nofusion \
+    --append _nofusion \
     --d_model 128 \
     --num_heads 8 \
     --dropout 0.1 \
@@ -33,7 +33,7 @@ deepspeed --num_gpus=2 main.py \
     --num_prototypes 1000 \
     --readout_layers 4 \
     --use_local_knowledge \
-    --use_knowledge_fusion \
+    --no-use_knowledge_fusion \
     --freeze_head_bias \
     --use_semantic_prototypes \
     --proto_preselect 1000 \
