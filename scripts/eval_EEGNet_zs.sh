@@ -5,8 +5,8 @@
 # Run: sh scripts/eval_EEGNet_zs.sh
 #
 
-TARGET_DATASET="DiseaseTUEP"
-PRETRAIN_PATH="./output_dir/EEGNet_DiseaseTUAB_train"
+TARGET_DATASET="DiseaseTUAB"
+PRETRAIN_PATH="./output_dir/EEGNet_DiseaseTUEP_train"
 
 python main.py \
     --model "EEGNet" \
@@ -20,5 +20,5 @@ python main.py \
     --p1 4 \
     --p2 8 \
     --dropout 0.5 \
-    --append _tuab \
+    --append _tuep \
     --do_test

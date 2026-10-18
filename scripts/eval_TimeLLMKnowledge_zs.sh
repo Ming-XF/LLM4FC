@@ -5,8 +5,8 @@
 # Run: sh scripts/eval_TimeLLMKnowledge_zs.sh
 #
 
-TARGET_DATASET="DiseaseTUEP"
-PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseTUAB_train"
+TARGET_DATASET="DiseaseTUAB"
+PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseTUEP_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
@@ -30,5 +30,5 @@ python main.py \
     --proto_preselect 1000 \
     --proto_per_phrase 100 \
     --use_patch_embeds \
-    --append _tuab \
+    --append _tuep \
     --do_test

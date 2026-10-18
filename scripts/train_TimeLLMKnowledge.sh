@@ -5,7 +5,7 @@
 # Run: sh scripts/train_TimeLLMKnowledge.sh
 #
 
-DATASET="DiseaseTUAB"
+DATASET="DiseaseTUEP"
 EARLY_STOP_METRIC="AUC"
 
 # H800 本机卡间 P2P 直连损坏（NCCL BROADCAST 无限挂起），必须禁用 P2P 走共享内存

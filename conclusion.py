@@ -8,11 +8,12 @@ conclusion.py
 
 数据来源(全部从磁盘现有文件解析, 不重新训练):
   1. log_dir/train_{MODEL}_Disease{DOMAIN}.log              -> 同域测试 (best-epoch 指标块)
-  2. log_dir/test_{MODEL}[_tuab]_zero-shot_Disease{T}.log   -> 零样本跨域测试
+  2. log_dir/test_{MODEL}[_tuab|_tuep]_zero-shot_Disease{T}.log -> 零样本跨域测试
   3. baseline/NeuroLM/out_llm4fc/test_results.json          -> NeuroLM (CAUEEG 微调, 评估三域)
   4. baseline/NeuroLM/out_llm4fc_tuab/test_results.json     -> NeuroLM (TUAB 微调, 评估三域)
+  5. baseline/NeuroLM/out_llm4fc_tuep/test_results.json     -> NeuroLM (TUEP 微调, 评估三域)
 
-输出: 按训练域分两张对比表 (训练域 = CAUEEG / TUAB)。
+输出: 按训练域分三张对比表 (训练域 = CAUEEG / TUAB / TUEP)。
 
 用法:
   python conclusion.py [--out conclusion.html]
@@ -84,19 +85,20 @@ def discover_trainer_experiments():
             "mode": "同域", "metrics": metrics, "src": p,
             "checkpoint": None,
         })
-    # 零样本: test_{MODEL}[_tuab]_zero-shot_Disease{TARGET}.log
+    # 零样本: test_{MODEL}[_tuab|_tuep]_zero-shot_Disease{TARGET}.log
     for p in sorted(LOG_DIR.glob("test_*zero-shot_Disease*.log")):
-        m = re.match(r"test_(\w+?)(_tuab)?_zero-shot_Disease(\w+)\.log", p.name)
+        m = re.match(r"test_(\w+?)(_tuab|_tuep)?_zero-shot_Disease(\w+)\.log",
+                     p.name)
         if not m:
             continue
-        model, tuab, target = m.groups()
+        model, suffix, target = m.groups()
         metrics = parse_trainer_log(p)
         if not metrics:
             print(f"[warn] 未在 {p} 中找到指标块, 跳过", file=sys.stderr)
             continue
         exps.append({
             "model": model,
-            "source": "TUAB" if tuab else "CAUEEG",
+            "source": {"_tuab": "TUAB", "_tuep": "TUEP"}.get(suffix, "CAUEEG"),
             "target": target,
             "mode": "零样本",
             "metrics": metrics,
@@ -120,8 +122,10 @@ def _neurolm_window(data):
 
 def discover_neurolm_experiments():
     exps = []
-    # 微调模型: out_llm4fc (CAUEEG 训练) / out_llm4fc_tuab (TUAB 训练)
-    for sub, source in [("out_llm4fc", "CAUEEG"), ("out_llm4fc_tuab", "TUAB")]:
+    # 微调模型: out_llm4fc (CAUEEG 训练) / out_llm4fc_tuab (TUAB 训练) /
+    #          out_llm4fc_tuep (TUEP 训练)
+    for sub, source in [("out_llm4fc", "CAUEEG"), ("out_llm4fc_tuab", "TUAB"),
+                        ("out_llm4fc_tuep", "TUEP")]:
         p = NEUROLM_OUT / sub / "test_results.json"
         if not p.exists():
             print(f"[warn] 未找到 {p}, 跳过", file=sys.stderr)
@@ -253,7 +257,7 @@ def _source_table(exps, source):
 
 
 def build_html(exps):
-    tables = "\n".join(_source_table(exps, s) for s in ("CAUEEG", "TUAB"))
+    tables = "\n".join(_source_table(exps, s) for s in ("CAUEEG", "TUAB", "TUEP"))
 
     sources = sorted({str(e["src"]) for e in exps})
     notes = []
