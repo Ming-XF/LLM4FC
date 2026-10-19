@@ -1,9 +1,11 @@
 """分组 patch embedding：FC 图 / 相对功率 PSD → 组统计量 token。
 
-FCEmbed：静态 FC 相关矩阵 (B,1,19,19) → 2D CNN → (B, 9, 128)
-SpecEmbed：相对功率 PSD (B,1,19,F) → 2D CNN → (B, 13, 128)
-两个网络相互独立（不共用类、不共用权重）——FC 相关矩阵与频谱矩阵
-结构不同，各自定义。
+FCEmbed：静态 FC 相关矩阵 (B,1,19,19) → 非对称核 2D CNN(k=(1,6)/(6,1)，
+通道全程 32) + 逐方向 AdaptiveAvgPool1d(2) → (B,32,2,2) → flatten(128)
+→ RMSNorm → Linear → (B, 9, 128)
+SpecEmbed：相对功率 PSD (B,19,F) → 1D CNN(k=6,s=6) + AdaptiveAvgPool1d(8)
+→ flatten(256) → RMSNorm → Linear → (B, 13, 128)（与 PatchStem 同构）
+两个网络相互独立（不共用类、不共用权重）。
 
 relative_psd_matrix 保留为在线参考实现；当前 TimeLLMKnowledge 主路径读取
 data/knowledge_preprocess.py 生成的离线相对 PSD。两者均使用 4s Hann 窗、
@@ -16,6 +18,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .knowledge_compiler import rms_norm
 from .local_stats import _welch_windows
 
 _EPS = 1e-12
@@ -34,36 +37,53 @@ def relative_psd_matrix(x, hz, fmin=0.5, fmax=45.0):
 
 
 class FCEmbed(nn.Module):
-    """静态 FC 相关矩阵 (B,1,19,19) → 2D CNN → (B, 9, 128)。"""
+    """静态 FC 相关矩阵 (B,1,19,19) → 非对称核 2D CNN → (B, 9, 128)。
+
+    Conv2d(1→32, k=(1,6)) → GELU → AdaptiveAvgPool1d(2)（沿通道对维）
+    → Conv2d(32→32, k=(6,1)) → GELU → AdaptiveAvgPool1d(2)（沿通道维）
+    → (B,32,2,2) → flatten(128) → RMSNorm → Linear(128→9·d_model)。
+    """
 
     def __init__(self, out_tokens, d_model, mid=32):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, mid, 3, padding=1)
-        self.conv2 = nn.Conv2d(mid, mid, 3, padding=1)
-        self.head = nn.Linear(mid, out_tokens * d_model)
+        self.conv1 = nn.Conv2d(1, mid, (1, 6))
+        self.conv2 = nn.Conv2d(mid, mid, (6, 1))
+        self.head = nn.Linear(mid * 2 * 2, out_tokens * d_model)
         self.out_tokens = out_tokens
         self.d_model = d_model
 
+    @staticmethod
+    def _pool1d(h, out_len):
+        """对 4D 特征图沿最后一维做 AdaptiveAvgPool1d(out_len)。"""
+        b, c, hh, ww = h.shape
+        p = F.adaptive_avg_pool1d(h.flatten(0, 1), out_len)  # (B·C, hh, out)
+        return p.unflatten(0, (b, c))                        # (B, C, hh, out)
+
     def forward(self, x):
-        h = F.gelu(self.conv1(x))
-        h = F.gelu(self.conv2(h))
-        h = F.adaptive_avg_pool2d(h, (1, 1)).squeeze(-1).squeeze(-1)
+        h = F.gelu(self.conv1(x))                     # (B, 32, 19, 14)
+        h = self._pool1d(h, 2)                        # 沿 W 维 → (B, 32, 19, 2)
+        h = F.gelu(self.conv2(h))                     # (B, 32, 14, 2)
+        h = self._pool1d(h.permute(0, 1, 3, 2), 2)    # 沿 H 维 → (B, 32, 2, 2)
+        h = rms_norm(h.flatten(1))                    # (B, 128)
         return self.head(h).view(h.shape[0], self.out_tokens, self.d_model)
 
 
 class SpecEmbed(nn.Module):
-    """相对功率 PSD (B,1,19,F) → 2D CNN → (B, 13, 128)。"""
+    """相对功率 PSD (B,19,F) → 1D CNN → (B, 13, 128)（与 PatchStem 同构）。
 
-    def __init__(self, out_tokens, d_model, mid=32):
+    Conv1d(19→32, k=6, stride=6) → GELU → AdaptiveAvgPool1d(8)
+    → flatten(256) → RMSNorm → Linear(256→13·d_model)。
+    """
+
+    def __init__(self, out_tokens, d_model, mid=32, in_channels=19, kernel=6):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, mid, 3, padding=1)
-        self.conv2 = nn.Conv2d(mid, mid, 3, padding=1)
-        self.head = nn.Linear(mid, out_tokens * d_model)
+        self.conv = nn.Conv1d(in_channels, mid, kernel, stride=kernel)
+        self.head = nn.Linear(mid * 8, out_tokens * d_model)
         self.out_tokens = out_tokens
         self.d_model = d_model
 
     def forward(self, x):
-        h = F.gelu(self.conv1(x))
-        h = F.gelu(self.conv2(h))
-        h = F.adaptive_avg_pool2d(h, (1, 1)).squeeze(-1).squeeze(-1)
+        h = F.gelu(self.conv(x))                      # (B, 32, ~F/6)
+        h = F.adaptive_avg_pool1d(h, 8)               # (B, 32, 8)
+        h = rms_norm(h.flatten(1))                    # (B, 256)
         return self.head(h).view(h.shape[0], self.out_tokens, self.d_model)

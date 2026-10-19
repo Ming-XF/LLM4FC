@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# TimeLLMKnowledge k6 前端实验 training script
+# 与主方法唯一差别: FCEmbed 非对称核 k=(1,6)/(6,1) + 逐方向 AdaptiveAvgPool1d(2)
+# + GELU + flatten 后 RMSNorm; SpecEmbed 改 1D CNN(k=6,s=6)+pool(8) (与 PatchStem 同构)
+# No external arguments; edit the variables below.
+# Run: sh scripts/train_TimeLLMKnowledge_k6.sh
+#
+
+DATASET="DiseaseCAUEEG"
+EARLY_STOP_METRIC="AUC"
+
+# H800 本机卡间 P2P 直连损坏（NCCL BROADCAST 无限挂起），必须禁用 P2P 走共享内存
+export NCCL_P2P_DISABLE=1
+
+deepspeed --num_gpus=2 main.py \
+    --model "TimeLLMKnowledge" \
+    --num_epochs 200 \
+    --num_repeat 1 \
+    --save_steps 25 \
+    --schedule 'cos' \
+    --warmup_steps 400 \
+    --early_stop_patience 20 \
+    --early_stop_metric "$EARLY_STOP_METRIC" \
+    --dataset "$DATASET" \
+    --model_dir output_dir/k6 \
+    --append _k6 \
+    --d_model 128 \
+    --num_heads 8 \
+    --dropout 0.1 \
+    --llm_type llama \
+    --llm_path ./model/deepseek-r1-distill-llama-8B \
+    --llm_init pretrained \
+    --use_task_prompt \
+    --num_prototypes 1000 \
+    --readout_layers 4 \
+    --use_local_knowledge \
+    --use_knowledge_fusion \
+    --freeze_head_bias \
+    --use_semantic_prototypes \
+    --proto_preselect 1000 \
+    --proto_per_phrase 100 \
+    --use_patch_embeds \
+    --deepspeed \
+    --deepspeed_config deepspeed/train_patch.json \
+    --do_train \
+    --do_evaluate \
+    --do_test

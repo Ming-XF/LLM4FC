@@ -356,7 +356,7 @@ class Model(nn.Module):
         FC 图 2D CNN → 9；相对 PSD 2D CNN → 13；形态 PatchStem 投影 → 10。"""
         if self.use_patch_embeds:
             fc_t = self.fc_embed(static_fc.unsqueeze(1))        # (B, 9, d)
-            spec_t = self.spec_embed(relative_psd.unsqueeze(1)) # (B, 13, d)
+            spec_t = self.spec_embed(relative_psd)              # (B, 13, d)
             morph_t = self.morph_head(self.patch_stem(x_z)).view(
                 x_z.shape[0], self.num_morph_stats, self.d_model)
             return torch.cat([fc_t, spec_t, morph_t], dim=1)
