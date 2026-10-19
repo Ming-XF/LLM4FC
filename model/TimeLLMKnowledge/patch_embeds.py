@@ -1,7 +1,7 @@
 """分组 patch embedding：FC 图 / 相对功率 PSD → 组统计量 token。
 
 FCEmbed：静态 FC 相关矩阵 (B,1,19,19) → 非对称核 2D CNN(k=(1,6)/(6,1)，
-通道全程 32) + 逐方向 AdaptiveAvgPool1d(2) → (B,32,2,2) → flatten(128)
+通道全程 32) + 逐方向 AdaptiveAvgPool1d(2/4) → (B,32,2,4) → flatten(256)
 → RMSNorm → Linear → (B, 9, 128)
 SpecEmbed：相对功率 PSD (B,19,F) → 1D CNN(k=6,s=6) + AdaptiveAvgPool1d(8)
 → flatten(256) → RMSNorm → Linear → (B, 13, 128)（与 PatchStem 同构）
@@ -40,15 +40,18 @@ class FCEmbed(nn.Module):
     """静态 FC 相关矩阵 (B,1,19,19) → 非对称核 2D CNN → (B, 9, 128)。
 
     Conv2d(1→32, k=(1,6)) → GELU → AdaptiveAvgPool1d(2)（沿通道对维）
-    → Conv2d(32→32, k=(6,1)) → GELU → AdaptiveAvgPool1d(2)（沿通道维）
-    → (B,32,2,2) → flatten(128) → RMSNorm → Linear(128→9·d_model)。
+    → Conv2d(32→32, k=(6,1)) → GELU → AdaptiveAvgPool1d(4)（沿通道维）
+    → (B,32,2,4) → flatten(256) → RMSNorm → Linear(256→9·d_model)。
+
+    forward 返回 (tokens, feat)：feat = head 之前的 (B,256) 组特征，
+    供融合路径使用。
     """
 
     def __init__(self, out_tokens, d_model, mid=32):
         super().__init__()
         self.conv1 = nn.Conv2d(1, mid, (1, 6))
         self.conv2 = nn.Conv2d(mid, mid, (6, 1))
-        self.head = nn.Linear(mid * 2 * 2, out_tokens * d_model)
+        self.head = nn.Linear(mid * 2 * 4, out_tokens * d_model)
         self.out_tokens = out_tokens
         self.d_model = d_model
 
@@ -63,9 +66,11 @@ class FCEmbed(nn.Module):
         h = F.gelu(self.conv1(x))                     # (B, 32, 19, 14)
         h = self._pool1d(h, 2)                        # 沿 W 维 → (B, 32, 19, 2)
         h = F.gelu(self.conv2(h))                     # (B, 32, 14, 2)
-        h = self._pool1d(h.permute(0, 1, 3, 2), 2)    # 沿 H 维 → (B, 32, 2, 2)
-        h = rms_norm(h.flatten(1))                    # (B, 128)
-        return self.head(h).view(h.shape[0], self.out_tokens, self.d_model)
+        h = self._pool1d(h.permute(0, 1, 3, 2), 4)    # 沿 H 维 → (B, 32, 2, 4)
+        feat = rms_norm(h.flatten(1))                 # (B, 256) 组特征(分化前)
+        tokens = self.head(feat).view(
+            feat.shape[0], self.out_tokens, self.d_model)
+        return tokens, feat
 
 
 class SpecEmbed(nn.Module):
@@ -73,6 +78,9 @@ class SpecEmbed(nn.Module):
 
     Conv1d(19→32, k=6, stride=6) → GELU → AdaptiveAvgPool1d(8)
     → flatten(256) → RMSNorm → Linear(256→13·d_model)。
+
+    forward 返回 (tokens, feat)：feat = head 之前的 (B,256) 组特征，
+    供融合路径使用。
     """
 
     def __init__(self, out_tokens, d_model, mid=32, in_channels=19, kernel=6):
@@ -85,5 +93,7 @@ class SpecEmbed(nn.Module):
     def forward(self, x):
         h = F.gelu(self.conv(x))                      # (B, 32, ~F/6)
         h = F.adaptive_avg_pool1d(h, 8)               # (B, 32, 8)
-        h = rms_norm(h.flatten(1))                    # (B, 256)
-        return self.head(h).view(h.shape[0], self.out_tokens, self.d_model)
+        feat = rms_norm(h.flatten(1))                 # (B, 256) 组特征(分化前)
+        tokens = self.head(feat).view(
+            feat.shape[0], self.out_tokens, self.d_model)
+        return tokens, feat

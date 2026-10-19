@@ -18,15 +18,16 @@
   见 semantic_prototypes.py）。--no-use_semantic_prototypes 回退旧路径。
 
 序列：[全局 32][局部 6×32][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
-→ 末 K 层 prompt 末位位置聚合 → 4096→128 隐层（知识特征在此直接融合）→ GELU → Dropout → 输出投影（bias 固定源域先验）。
+→ 末 K 层 prompt 末位位置聚合 → 4096→256 隐层（三组组特征在此直接融合）→ GELU → Dropout → 输出投影（bias 固定源域先验）。
 
 捷径解除：
   - 读出位置为任务 prompt 末位 token（冻结词表向量，不可学习；
     无 prompt 时退化为固定 ":" token 缓冲）；
   - 层聚合权重固定均匀；
   - 输出头 bias 冻结在归一化标签先验（回归 0.5 / 分类 0）；
-  - fusion：z = 全局/局部平衡池化(q) → 128 维隐层直接相加（fused = h1 + z），
-    经 GELU 后走共享输出投影，给知识路径一条不经过冻结 LLM 的特征直连。
+  - fusion：z = 3×7 个 256 维组特征（Linear 分化前）全局/局部平衡池化 →
+    256 维隐层直接相加（fused = h1 + α·z），经 GELU 后走共享输出投影，
+    给知识路径一条不经过冻结 LLM 的特征直连。
 """
 
 from math import sqrt
@@ -319,13 +320,13 @@ class Model(nn.Module):
         rms = rv.pow(2).mean().sqrt().clamp_min(_EPS)
         self.register_buffer("readout_token", rv / rms * ref_rms)
 
-        # ── 输出头：4096→128→output_dim，知识特征在 128 维隐层直接融合 ──
+        # ── 输出头：4096→256→output_dim，三组组特征(256)在 256 维隐层直接融合 ──
         self.task_type = config.task_type
         self.output_head = nn.Sequential(
             RMSNorm(self.d_llm, learnable=True),
-            nn.Linear(self.d_llm, config.d_model),
+            nn.Linear(self.d_llm, 256),
         )
-        self.output_proj = nn.Linear(config.d_model, config.output_dim)
+        self.output_proj = nn.Linear(256, config.output_dim)
         self.output_dropout = nn.Dropout(config.dropout)
         # 有界标量门控：α = α_max·σ(g)，初始 α≈0.1（与旧 bypass_gate init 同义）
         self.fusion_gate = nn.Parameter(torch.tensor(config.fusion_gate_init))
@@ -352,17 +353,22 @@ class Model(nn.Module):
         return self
 
     def _group_raw_tokens(self, x_z, static_fc, relative_psd):
-        """组装 (B, 32, d_model) 分组 raw token：
-        FC 图 2D CNN → 9；相对 PSD 2D CNN → 13；形态 PatchStem 投影 → 10。"""
+        """组装 (B, 32, d_model) 分组 raw token + 三组 256 维组特征(分化前)。
+
+        返回 (group_raw, group_feat)：group_feat = (fc_f, spec_f, morph_f)，
+        供融合路径使用（Linear 分化前的 3×7 个组向量）；旧路径无组特征
+        → 返回 None。"""
         if self.use_patch_embeds:
-            fc_t = self.fc_embed(static_fc.unsqueeze(1))        # (B, 9, d)
-            spec_t = self.spec_embed(relative_psd)              # (B, 13, d)
-            morph_t = self.morph_head(self.patch_stem(x_z)).view(
+            fc_t, fc_f = self.fc_embed(static_fc.unsqueeze(1))  # (B,9,d),(B,256)
+            spec_t, spec_f = self.spec_embed(relative_psd)      # (B,13,d),(B,256)
+            morph_f = self.patch_stem(x_z)                      # (B,256)
+            morph_t = self.morph_head(morph_f).view(
                 x_z.shape[0], self.num_morph_stats, self.d_model)
-            return torch.cat([fc_t, spec_t, morph_t], dim=1)
+            return torch.cat([fc_t, spec_t, morph_t], dim=1), \
+                (fc_f, spec_f, morph_f)
         # 旧路径（消融对照）：共享 PatchStem → 全 32 统计量投影
         return self.raw_projection(self.patch_stem(x_z)).view(
-            x_z.shape[0], self.config.num_stats, self.d_model)
+            x_z.shape[0], self.config.num_stats, self.d_model), None
 
     def forward(self, x, global_fc, global_psd,
                 local_fc, local_psd, local_mask, labels):
@@ -418,14 +424,15 @@ class Model(nn.Module):
                 B * nseg, N, seg_len)
 
         # ── raw patch 编译为知识 query ──
-        group_raw_g = self._group_raw_tokens(
+        group_raw_g, group_feat_g = self._group_raw_tokens(
             x_z, global_fc.to(torch.float32), global_psd.to(torch.float32))
         q_g = self.knowledge_compiler(group_raw_g)               # (B, 32, d)
+        group_feat_l = None
         if nseg > 0:
             fc_l = local_fc.reshape(B * nseg, N, N).to(torch.float32)
             psd_l = local_psd.reshape(
                 B * nseg, N, local_psd.shape[-1]).to(torch.float32)
-            group_raw_l = self._group_raw_tokens(xl, fc_l, psd_l)
+            group_raw_l, group_feat_l = self._group_raw_tokens(xl, fc_l, psd_l)
             q_l = self.knowledge_compiler(group_raw_l)
 
         # ── reprogram → soft prompt (4096) ──
@@ -560,12 +567,13 @@ class Model(nn.Module):
         h1 = self.output_head(
             agg.to(dtype=self.output_head[1].weight.dtype))     # (B, d_model)
 
-        # ── 知识特征融合：全局/局部平衡池化 → 128 维隐层直接相加 ──
-        if self.config.use_knowledge_fusion:
-            z_g = q_all[:, :self.config.num_stats].mean(dim=1)
-            z_l = (q_all[:, self.config.num_stats:].mean(dim=1)
-                   if q_all.shape[1] > self.config.num_stats else 0.0)
-            z = rms_norm(0.5 * (z_g + z_l))                     # (B, d_model)
+        # ── 组特征融合(分化前)：3×7 个 256 维组向量全局/局部平衡池化 → 256 维隐层直接相加 ──
+        if self.config.use_knowledge_fusion and group_feat_g is not None:
+            z_g = torch.stack(group_feat_g, dim=1).mean(dim=1)  # (B, 256)
+            z_l = (torch.stack(group_feat_l, dim=1).view(
+                B, nseg * 3, 256).mean(dim=1)
+                   if group_feat_l is not None else 0.0)        # (B, 256)
+            z = rms_norm(0.5 * (z_g + z_l))                     # (B, 256)
             alpha = self.config.fusion_alpha_max * torch.sigmoid(
                 self.fusion_gate)                               # 标量，∈[0, α_max]
             fused = h1 + alpha * z
