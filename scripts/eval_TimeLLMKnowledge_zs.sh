@@ -6,7 +6,7 @@
 #
 
 TARGET_DATASET="DiseaseTUEP"
-PRETRAIN_PATH="./output_dir/v3/TimeLLMKnowledge_DiseaseCAUEEG_train"
+PRETRAIN_PATH="./output_dir/last/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
@@ -34,5 +34,5 @@ python main.py \
     --knowledge_aspect_mix 0.6 \
     --knowledge_anchor_fusion 0.1 \
     --use_patch_embeds \
-    --append _v3 \
+    --append _last \
     --do_test

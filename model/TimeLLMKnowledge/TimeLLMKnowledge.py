@@ -18,13 +18,13 @@
   Linear(M→P) 得到自己的描述原型库。--no-use_semantic_prototypes 回退旧路径。
 
 序列：[全局 3N][局部 6×3N][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
-→ 全部 32 层 prompt 末位位置逐层 RMSNorm 等权平均聚合 → 4096→256 隐层
+→ 末层 prompt 末位位置 hidden state（无聚合/归一化）→ 4096→256 隐层
 → GELU → Dropout → 输出投影（bias 固定源域先验）。
 
 捷径解除：
   - 读出位置为任务 prompt 末位 token（冻结词表向量，不可学习；
     无 prompt 时退化为固定 ":" token 缓冲）；
-  - 层聚合权重固定均匀（全部 32 层，排除 h0 embedding 输出）；
+  - 读出只取末层 hidden state（无层聚合/归一化）；
   - 输出头 bias 冻结在归一化标签先验（回归 0.5 / 分类 0）；
   - 无特征融合直连（fusion/bypass 路径已整体移除）。
 
@@ -622,12 +622,8 @@ class Model(nn.Module):
             )
         all_hidden = outputs.hidden_states   # h0(embedding 输出) + 32 层
 
-        # ── 全部 32 层（排除 h0 embedding 输出）READOUT 位置聚合读出 ──
-        hs = torch.stack(
-            [h[:, readout_idx, :].float() for h in all_hidden[1:]], dim=1)
-        # 逐层固定 RMS 归一化（无参数，防各层范数差异主导聚合）
-        hs = hs / (hs.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
-        agg = hs.mean(dim=1)                                    # (B, 4096)
+        # ── 末层 hidden state 读出（第 32 层，READOUT 位置，无聚合/归一化）──
+        agg = all_hidden[-1][:, readout_idx, :].float()         # (B, 4096)
 
         h1 = self.output_head(
             agg.to(dtype=self.output_head[1].weight.dtype))     # (B, d_model)

@@ -7,8 +7,8 @@
 
 DATASET="DiseaseCAUEEG"
 EARLY_STOP_METRIC="AUC"
-APPEND="_v3"
-MODEL_DIR="output_dir/v3"
+APPEND="_last"
+MODEL_DIR="output_dir/last"
 
 # H800 本机卡间 P2P 直连损坏（NCCL BROADCAST 无限挂起），必须禁用 P2P 走共享内存
 export NCCL_P2P_DISABLE=1
