@@ -25,7 +25,7 @@
 </head>
 <body>
 <h1>LLM4FC 实验结果对比 (EEGNet / TimeLLMKnowledge / NeuroLM)</h1>
-<div class="sub">疾病分类任务 · 按训练域分表 · 每个测试域两列 (AUC / Acc) · 生成于 2026-10-18 12:42:40</div>
+<div class="sub">疾病分类任务 · 按训练域分表 · 每个测试域两列 (AUC / Acc) · 生成于 2026-10-22 18:47:25</div>
 <h2>训练域 = CAUEEG</h2>
 <table>
   <thead>
@@ -82,51 +82,51 @@ Specificity: 0.3302
 Sensitivity: 0.6290"><span>0.4819</span></td></tr>
 <tr><td class="model" style="--mc:#7c3aed">TimeLLMKnowledge</td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → CAUEEG (同域)
 来源: /root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseCAUEEG.log
-Loss: 0.6589
-Auc: 0.7366
-Accuracy: 0.6697
-Precision: 0.6139
-Specificity: 0.6834
-Sensitivity: 0.6519"><span>0.7366</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → CAUEEG (同域)
+Loss: 0.6879
+Auc: 0.7589
+Accuracy: 0.6992
+Precision: 0.6635
+Specificity: 0.7540
+Sensitivity: 0.6283"><span>0.7589</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → CAUEEG (同域)
 来源: /root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseCAUEEG.log
-Loss: 0.6589
-Auc: 0.7366
-Accuracy: 0.6697
-Precision: 0.6139
-Specificity: 0.6834
-Sensitivity: 0.6519"><span>0.6697</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → TUAB (零样本)
+Loss: 0.6879
+Auc: 0.7589
+Accuracy: 0.6992
+Precision: 0.6635
+Specificity: 0.7540
+Sensitivity: 0.6283"><span>0.6992</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → TUAB (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_zero-shot_DiseaseTUAB.log
-checkpoint: ./output_dir/fusion_gate/TimeLLMKnowledge_DiseaseCAUEEG_train
-Loss: 0.7435
-Auc: 0.7909
-Accuracy: 0.5972
-Precision: 0.5737
-Specificity: 0.1701
-Sensitivity: 0.9670"><span class="best">0.7909</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → TUAB (零样本)
+checkpoint: ./output_dir/last/TimeLLMKnowledge_DiseaseCAUEEG_train
+Loss: 0.6075
+Auc: 0.7912
+Accuracy: 0.6808
+Precision: 0.6544
+Specificity: 0.4772
+Sensitivity: 0.8571"><span class="best">0.7912</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → TUAB (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_zero-shot_DiseaseTUAB.log
-checkpoint: ./output_dir/fusion_gate/TimeLLMKnowledge_DiseaseCAUEEG_train
-Loss: 0.7435
-Auc: 0.7909
-Accuracy: 0.5972
-Precision: 0.5737
-Specificity: 0.1701
-Sensitivity: 0.9670"><span>0.5972</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → TUEP (零样本)
+checkpoint: ./output_dir/last/TimeLLMKnowledge_DiseaseCAUEEG_train
+Loss: 0.6075
+Auc: 0.7912
+Accuracy: 0.6808
+Precision: 0.6544
+Specificity: 0.4772
+Sensitivity: 0.8571"><span>0.6808</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → TUEP (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_zero-shot_DiseaseTUEP.log
 checkpoint: ./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train
-Loss: 0.9922
-Auc: 0.6283
-Accuracy: 0.5743
-Precision: 0.5499
-Specificity: 0.2494
-Sensitivity: 0.8894"><span class="best">0.6283</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → TUEP (零样本)
+Loss: 0.7379
+Auc: 0.6142
+Accuracy: 0.5661
+Precision: 0.5431
+Specificity: 0.2067
+Sensitivity: 0.9147"><span class="best">0.6142</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 CAUEEG → TUEP (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_zero-shot_DiseaseTUEP.log
 checkpoint: ./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train
-Loss: 0.9922
-Auc: 0.6283
-Accuracy: 0.5743
-Precision: 0.5499
-Specificity: 0.2494
-Sensitivity: 0.8894"><span class="best">0.5743</span></td></tr>
+Loss: 0.7379
+Auc: 0.6142
+Accuracy: 0.5661
+Precision: 0.5431
+Specificity: 0.2067
+Sensitivity: 0.9147"><span class="best">0.5661</span></td></tr>
 <tr><td class="model" style="--mc:#059669">NeuroLM</td><td class="cell" title="NeuroLM | 训练域 CAUEEG → CAUEEG (同域)
 来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc/test_results.json
 window: AUC=0.7996  PR-AUC=0.7873  Acc=0.7249  BAcc=0.7324  F1=0.7147
@@ -216,55 +216,55 @@ Specificity: 0.6841
 Sensitivity: 0.3963"><span>0.5380</span></td></tr>
 <tr><td class="model" style="--mc:#7c3aed">TimeLLMKnowledge</td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → CAUEEG (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuab_zero-shot_DiseaseCAUEEG.log
-checkpoint: ./output_dir/TimeLLMKnowledge_DiseaseTUAB_train
-Loss: 0.7147
-Auc: 0.6666
-Accuracy: 0.6324
-Precision: 0.5707
-Specificity: 0.6333
-Sensitivity: 0.6313"><span class="best">0.6666</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → CAUEEG (零样本)
+checkpoint: ./output_dir/last/TimeLLMKnowledge_DiseaseTUAB_train
+Loss: 0.8319
+Auc: 0.6434
+Accuracy: 0.6272
+Precision: 0.5783
+Specificity: 0.6993
+Sensitivity: 0.5339"><span>0.6434</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → CAUEEG (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuab_zero-shot_DiseaseCAUEEG.log
-checkpoint: ./output_dir/TimeLLMKnowledge_DiseaseTUAB_train
-Loss: 0.7147
-Auc: 0.6666
-Accuracy: 0.6324
-Precision: 0.5707
-Specificity: 0.6333
-Sensitivity: 0.6313"><span class="best">0.6324</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → TUAB (同域)
+checkpoint: ./output_dir/last/TimeLLMKnowledge_DiseaseTUAB_train
+Loss: 0.8319
+Auc: 0.6434
+Accuracy: 0.6272
+Precision: 0.5783
+Specificity: 0.6993
+Sensitivity: 0.5339"><span class="best">0.6272</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → TUAB (同域)
 来源: /root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseTUAB.log
-Loss: 0.5373
-Auc: 0.8334
-Accuracy: 0.7600
-Precision: 0.8383
-Specificity: 0.8481
-Sensitivity: 0.6835"><span>0.8334</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → TUAB (同域)
+Loss: 0.5520
+Auc: 0.8439
+Accuracy: 0.7765
+Precision: 0.8162
+Specificity: 0.8051
+Sensitivity: 0.7517"><span>0.8439</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → TUAB (同域)
 来源: /root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseTUAB.log
-Loss: 0.5373
-Auc: 0.8334
-Accuracy: 0.7600
-Precision: 0.8383
-Specificity: 0.8481
-Sensitivity: 0.6835"><span>0.7600</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → TUEP (零样本)
+Loss: 0.5520
+Auc: 0.8439
+Accuracy: 0.7765
+Precision: 0.8162
+Specificity: 0.8051
+Sensitivity: 0.7517"><span>0.7765</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → TUEP (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuab_zero-shot_DiseaseTUEP.log
-checkpoint: ./output_dir/TimeLLMKnowledge_DiseaseTUAB_train
-Loss: 1.3667
-Auc: 0.5095
-Accuracy: 0.5099
-Precision: 0.5123
-Specificity: 0.2922
-Sensitivity: 0.7212"><span>0.5095</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → TUEP (零样本)
+checkpoint: ./output_dir/last/TimeLLMKnowledge_DiseaseCAUEEG_train
+Loss: 2.1833
+Auc: 0.4497
+Accuracy: 0.5018
+Precision: 0.5064
+Specificity: 0.2660
+Sensitivity: 0.7304"><span>0.4497</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUAB → TUEP (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuab_zero-shot_DiseaseTUEP.log
-checkpoint: ./output_dir/TimeLLMKnowledge_DiseaseTUAB_train
-Loss: 1.3667
-Auc: 0.5095
-Accuracy: 0.5099
-Precision: 0.5123
-Specificity: 0.2922
-Sensitivity: 0.7212"><span>0.5099</span></td></tr>
+checkpoint: ./output_dir/last/TimeLLMKnowledge_DiseaseCAUEEG_train
+Loss: 2.1833
+Auc: 0.4497
+Accuracy: 0.5018
+Precision: 0.5064
+Specificity: 0.2660
+Sensitivity: 0.7304"><span>0.5018</span></td></tr>
 <tr><td class="model" style="--mc:#059669">NeuroLM</td><td class="cell" title="NeuroLM | 训练域 TUAB → CAUEEG (零样本)
 来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuab/test_results.json
 window: AUC=0.6602  PR-AUC=0.6126  Acc=0.5540  BAcc=0.5772  F1=0.5970
-window(val): AUC=0.7254  Acc=0.6545"><span>0.6602</span></td><td class="cell" title="NeuroLM | 训练域 TUAB → CAUEEG (零样本)
+window(val): AUC=0.7254  Acc=0.6545"><span class="best">0.6602</span></td><td class="cell" title="NeuroLM | 训练域 TUAB → CAUEEG (零样本)
 来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuab/test_results.json
 window: AUC=0.6602  PR-AUC=0.6126  Acc=0.5540  BAcc=0.5772  F1=0.5970
 window(val): AUC=0.7254  Acc=0.6545"><span>0.5540</span></td><td class="cell" title="NeuroLM | 训练域 TUAB → TUAB (同域)
@@ -339,50 +339,50 @@ Sensitivity: 0.0943"><span>0.5058</span></td></tr>
 <tr><td class="model" style="--mc:#7c3aed">TimeLLMKnowledge</td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → CAUEEG (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuep_zero-shot_DiseaseCAUEEG.log
 checkpoint: ./output_dir/TimeLLMKnowledge_DiseaseTUEP_train
-Loss: 0.8346
-Auc: 0.5616
-Accuracy: 0.5244
-Precision: 0.4686
-Specificity: 0.4032
-Sensitivity: 0.6814"><span class="best">0.5616</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → CAUEEG (零样本)
+Loss: 2.2763
+Auc: 0.5247
+Accuracy: 0.4357
+Precision: 0.4357
+Specificity: 0.0000
+Sensitivity: 1.0000"><span class="best">0.5247</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → CAUEEG (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuep_zero-shot_DiseaseCAUEEG.log
 checkpoint: ./output_dir/TimeLLMKnowledge_DiseaseTUEP_train
-Loss: 0.8346
-Auc: 0.5616
-Accuracy: 0.5244
-Precision: 0.4686
-Specificity: 0.4032
-Sensitivity: 0.6814"><span>0.5244</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → TUAB (零样本)
+Loss: 2.2763
+Auc: 0.5247
+Accuracy: 0.4357
+Precision: 0.4357
+Specificity: 0.0000
+Sensitivity: 1.0000"><span>0.4357</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → TUAB (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuep_zero-shot_DiseaseTUAB.log
 checkpoint: ./output_dir/TimeLLMKnowledge_DiseaseTUEP_train
-Loss: 0.8954
-Auc: 0.5683
-Accuracy: 0.5512
-Precision: 0.6445
-Specificity: 0.7690
-Sensitivity: 0.3626"><span>0.5683</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → TUAB (零样本)
+Loss: 1.2180
+Auc: 0.5203
+Accuracy: 0.5359
+Precision: 0.5359
+Specificity: 0.0000
+Sensitivity: 1.0000"><span>0.5203</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → TUAB (零样本)
 来源: /root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuep_zero-shot_DiseaseTUAB.log
 checkpoint: ./output_dir/TimeLLMKnowledge_DiseaseTUEP_train
-Loss: 0.8954
-Auc: 0.5683
-Accuracy: 0.5512
-Precision: 0.6445
-Specificity: 0.7690
-Sensitivity: 0.3626"><span class="best">0.5512</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → TUEP (同域)
+Loss: 1.2180
+Auc: 0.5203
+Accuracy: 0.5359
+Precision: 0.5359
+Specificity: 0.0000
+Sensitivity: 1.0000"><span>0.5359</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → TUEP (同域)
 来源: /root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseTUEP.log
-Loss: 0.7830
-Auc: 0.6959
-Accuracy: 0.6297
-Precision: 0.6657
-Specificity: 0.7173
-Sensitivity: 0.5448"><span class="best">0.6959</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → TUEP (同域)
+Loss: 1.0802
+Auc: 0.6983
+Accuracy: 0.6565
+Precision: 0.6424
+Specificity: 0.5796
+Sensitivity: 0.7310"><span class="best">0.6983</span></td><td class="cell" title="TimeLLMKnowledge | 训练域 TUEP → TUEP (同域)
 来源: /root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseTUEP.log
-Loss: 0.7830
-Auc: 0.6959
-Accuracy: 0.6297
-Precision: 0.6657
-Specificity: 0.7173
-Sensitivity: 0.5448"><span class="best">0.6297</span></td></tr>
+Loss: 1.0802
+Auc: 0.6983
+Accuracy: 0.6565
+Precision: 0.6424
+Specificity: 0.5796
+Sensitivity: 0.7310"><span class="best">0.6565</span></td></tr>
 <tr><td class="model" style="--mc:#059669">NeuroLM</td><td class="cell" title="NeuroLM | 训练域 TUEP → CAUEEG (零样本)
 来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuep/test_results.json
 window: AUC=0.4897  PR-AUC=0.4287  Acc=0.4357  BAcc=0.5000  F1=0.6070
@@ -395,7 +395,7 @@ window: AUC=0.6047  PR-AUC=0.6402  Acc=0.5359  BAcc=0.5000  F1=0.6979
 window(val): AUC=0.6337  Acc=0.4928"><span class="best">0.6047</span></td><td class="cell" title="NeuroLM | 训练域 TUEP → TUAB (零样本)
 来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuep/test_results.json
 window: AUC=0.6047  PR-AUC=0.6402  Acc=0.5359  BAcc=0.5000  F1=0.6979
-window(val): AUC=0.6337  Acc=0.4928"><span>0.5359</span></td><td class="cell" title="NeuroLM | 训练域 TUEP → TUEP (同域)
+window(val): AUC=0.6337  Acc=0.4928"><span class="best">0.5359</span></td><td class="cell" title="NeuroLM | 训练域 TUEP → TUEP (同域)
 来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuep/test_results.json
 window: AUC=0.6833  PR-AUC=0.6407  Acc=0.5076  BAcc=0.5000  F1=0.6734
 window(val): AUC=0.5888  Acc=0.5146"><span>0.6833</span></td><td class="cell" title="NeuroLM | 训练域 TUEP → TUEP (同域)
@@ -404,7 +404,7 @@ window: AUC=0.6833  PR-AUC=0.6407  Acc=0.5076  BAcc=0.5000  F1=0.6734
 window(val): AUC=0.5888  Acc=0.5146"><span>0.5076</span></td></tr>
   </tbody>
 </table>
-<div class="notes"><b>说明</b><ul><li>· EEGNet / TimeLLMKnowledge 指标来自 trainer 日志(测试集, best-epoch 模型); NeuroLM 指标为 window 级(测试集), subject 级见悬浮提示。</li><li>· <b>加粗</b> = 该测试域该指标的最佳值; 各格悬浮提示标注同域/零样本及完整指标。</li><li>· 注意: TimeLLMKnowledge CAUEEG→TUAB 零样本所用 checkpoint 为 <code>./output_dir/fusion_gate/TimeLLMKnowledge_DiseaseCAUEEG_train</code>(fusion_gate 消融变体, 该目录现已被清理, 仅保留日志结果)。</li></ul></div>
+<div class="notes"><b>说明</b><ul><li>· EEGNet / TimeLLMKnowledge 指标来自 trainer 日志(测试集, best-epoch 模型); NeuroLM 指标为 window 级(测试集), subject 级见悬浮提示。</li><li>· <b>加粗</b> = 该测试域该指标的最佳值; 各格悬浮提示标注同域/零样本及完整指标。</li></ul></div>
 <div class="srcs"><b>数据来源</b><ul><li><code>/root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc/test_results.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuab/test_results.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuep/test_results.json</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuab_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuab_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuep_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuep_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuab_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuab_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuep_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuep_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_EEGNet_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_EEGNet_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_EEGNet_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseTUEP.log</code></li></ul></div>
 </body>
 </html>

@@ -264,12 +264,6 @@ def build_html(exps):
     notes.append("· EEGNet / TimeLLMKnowledge 指标来自 trainer 日志(测试集, best-epoch 模型); "
                  "NeuroLM 指标为 window 级(测试集), subject 级见悬浮提示。")
     notes.append("· <b>加粗</b> = 该测试域该指标的最佳值; 各格悬浮提示标注同域/零样本及完整指标。")
-    for e in exps:
-        if e["checkpoint"] and "fusion_gate" in e["checkpoint"]:
-            notes.append("· 注意: TimeLLMKnowledge CAUEEG→TUAB 零样本所用 checkpoint 为 "
-                         f"<code>{escape(e['checkpoint'])}</code>(fusion_gate 消融变体, "
-                         "该目录现已被清理, 仅保留日志结果)。")
-            break
 
     src_items = "".join(f"<li><code>{escape(s)}</code></li>" for s in sources)
     note_items = "".join(f"<li>{n}</li>" for n in notes)
