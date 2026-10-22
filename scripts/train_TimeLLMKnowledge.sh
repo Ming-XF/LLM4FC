@@ -7,6 +7,8 @@
 
 DATASET="DiseaseCAUEEG"
 EARLY_STOP_METRIC="AUC"
+APPEND="_nolocal"
+MODEL_DIR="output_dir/nolocal"
 
 # H800 本机卡间 P2P 直连损坏（NCCL BROADCAST 无限挂起），必须禁用 P2P 走共享内存
 export NCCL_P2P_DISABLE=1
@@ -24,7 +26,8 @@ deepspeed --num_gpus=2 main.py \
     --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
-    --model_dir output_dir \
+    --model_dir "$MODEL_DIR" \
+    --append "$APPEND" \
     --d_model 128 \
     --num_heads 8 \
     --dropout 0.1 \
@@ -33,7 +36,7 @@ deepspeed --num_gpus=2 main.py \
     --llm_init pretrained \
     --use_task_prompt \
     --num_prototypes 1000 \
-    --use_local_knowledge \
+    --no-use_local_knowledge \
     --contrast_lambda 0.1 \
     --freeze_head_bias \
     --use_semantic_prototypes \

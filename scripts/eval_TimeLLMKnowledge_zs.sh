@@ -5,8 +5,8 @@
 # Run: sh scripts/eval_TimeLLMKnowledge_zs.sh
 #
 
-TARGET_DATASET="DiseaseTUAB"
-PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train"
+TARGET_DATASET="DiseaseTUEP"
+PRETRAIN_PATH="./output_dir/nolocal/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
@@ -22,7 +22,7 @@ python main.py \
     --llm_init pretrained \
     --use_task_prompt \
     --num_prototypes 1000 \
-    --use_local_knowledge \
+    --no-use_local_knowledge \
     --contrast_lambda 0.1 \
     --freeze_head_bias \
     --use_semantic_prototypes \
@@ -34,4 +34,5 @@ python main.py \
     --knowledge_aspect_mix 0.6 \
     --knowledge_anchor_fusion 0.1 \
     --use_patch_embeds \
+    --append _nolocal \
     --do_test

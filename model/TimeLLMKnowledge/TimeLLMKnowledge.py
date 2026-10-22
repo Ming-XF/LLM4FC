@@ -2,6 +2,7 @@
 
 输入三段：
   离线整分钟静态 FC / 相对 PSD + 在线波形编码 → 3 个全局 family queries
+  （--no-use_global_knowledge 可关闭全局块，仅保留局部块）
   离线 6 个 10s FC / 相对 PSD + 在线波形编码 → 每片段 3 个局部 queries
   任务 prompt（不变）
 
@@ -17,7 +18,8 @@
   refined knowledge；每个 refined knowledge 再预选 M 个描述，经共享
   Linear(M→P) 得到自己的描述原型库。--no-use_semantic_prototypes 回退旧路径。
 
-序列：[全局 3N][局部 6×3N][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
+序列：[全局 3N][局部 6×3N][任务 prompt(末位 ":" 为读出位置)]
+（--no-use_global_knowledge 时去掉全局块）→ 冻结 LLM
 → 末层 prompt 末位位置 hidden state（无聚合/归一化）→ 4096→256 隐层
 → GELU → Dropout → 输出投影（bias 固定源域先验）。
 
@@ -29,7 +31,8 @@
   - 无特征融合直连（fusion/bypass 路径已整体移除）。
 
 监督对比学习（三族组特征，映射知识特征之前）：
-  三族编码器（FC/频谱/形态）输出的组特征（全局 + 6×局部段，Linear 分化前）
+  三族编码器（FC/频谱/形态）输出的组特征（全局 + 6×局部段，关全局时仅局部段，
+  Linear 分化前）
   按族做逐块 RMSNorm 后池化为 3 个 256 维向量（每族 1 个/窗口），经共享
   Linear(256→128) 投影后按族独立计算监督 InfoNCE（同标签互为正对，无温度），
   loss = CE + contrast_lambda·NCE（回归任务跳过）。
@@ -145,6 +148,7 @@ class TimeLLMKnowledgeConfig(BaseConfig):
                  hz=200,
                  num_local_segments=6,
                  use_local_knowledge=True,
+                 use_global_knowledge=True,
                  contrast_lambda=0.1,
                  freeze_head_bias=True,
                  phrase_beta_init=0.25,
@@ -176,6 +180,7 @@ class TimeLLMKnowledgeConfig(BaseConfig):
         self.hz = hz
         self.num_local_segments = num_local_segments
         self.use_local_knowledge = use_local_knowledge
+        self.use_global_knowledge = use_global_knowledge
         self.contrast_lambda = contrast_lambda
         self.freeze_head_bias = freeze_head_bias
         self.phrase_beta_init = phrase_beta_init
@@ -459,10 +464,18 @@ class Model(nn.Module):
                 B * nseg, N, seg_len)
 
         # ── raw patch 编译为知识 query ──
-        group_raw_g, group_feat_g = self._group_raw_tokens(
-            x_z, global_fc.to(torch.float32), global_psd.to(torch.float32))
-        q_g = self.knowledge_compiler(group_raw_g)               # (B, 3, d)
+        use_global = self.config.use_global_knowledge
+        assert use_global or nseg > 0, (
+            "global knowledge disabled requires local knowledge "
+            "(--no-use_global_knowledge 需配合 --use_local_knowledge)")
+        group_feat_g = None
+        q_g = None
+        if use_global:
+            group_raw_g, group_feat_g = self._group_raw_tokens(
+                x_z, global_fc.to(torch.float32), global_psd.to(torch.float32))
+            q_g = self.knowledge_compiler(group_raw_g)           # (B, 3, d)
         group_feat_l = None
+        q_l = None
         if nseg > 0:
             fc_l = local_fc.reshape(B * nseg, N, N).to(torch.float32)
             psd_l = local_psd.reshape(
@@ -472,46 +485,55 @@ class Model(nn.Module):
 
         # ── 对比学习组特征（映射知识特征之前）：三族各 1 个 256 维向量/窗口 ──
         contrast_vec = None
-        if self.use_patch_embeds and group_feat_g is not None:
-            feats_g = torch.stack(group_feat_g, dim=1)           # (B, 3, 256)
+        if self.use_patch_embeds:
+            feats_blocks = []
+            if group_feat_g is not None:
+                feats_blocks.append(
+                    torch.stack(group_feat_g, dim=1).unsqueeze(1))  # (B,1,3,256)
             if group_feat_l is not None:
-                feats_l = torch.stack(group_feat_l, dim=1).view(
-                    B, nseg, 3, 256)                             # (B, 6, 3, 256)
-                feats = torch.cat([feats_g.unsqueeze(1), feats_l],
-                                  dim=1).permute(0, 2, 1, 3)     # (B, 3, 7, 256)
-            else:
-                feats = feats_g                                  # (B, 3, 256)
-            # 逐块固定 RMSNorm 后族内均值（防全局/局部范数差主导）
-            feats = feats / (feats.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
-            contrast_vec = feats.mean(dim=-2)                    # (B, 3, 256)
+                feats_blocks.append(
+                    torch.stack(group_feat_l, dim=1).view(
+                        B, nseg, 3, 256))                       # (B,6,3,256)
+            if feats_blocks:
+                feats = torch.cat(feats_blocks, dim=1).permute(
+                    0, 2, 1, 3)                                 # (B,3,K,256)
+                # 逐块固定 RMSNorm 后族内均值（防全局/局部范数差主导）
+                feats = feats / (feats.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
+                contrast_vec = feats.mean(dim=-2)               # (B,3,256)
 
         # ── reprogram → soft prompt (4096) ──
         reprogram_dtype = \
             self.reprogramming_layer.query_projection.weight.dtype
         num_anchors = self.config.num_anchors
+        knowledge_parts = []
+        q_parts = []
         if self.use_semantic_prototypes:
             # Bank order is aspect-major: [FC x N, spectrum x N, morphology x N].
             banks_base = self.semantic_bank().reshape(
                 self.num_aspects * num_anchors,
                 self.config.description_prototypes,
                 self.d_llm)
-            q_g_reprogram = q_g.repeat_interleave(num_anchors, dim=1)
-            soft_g = self.reprogramming_layer(
-                q_g_reprogram.to(dtype=reprogram_dtype),
-                banks_base.to(dtype=reprogram_dtype),
-                banks_base.to(dtype=reprogram_dtype))           # (B, 3N, 4096)
+            if q_g is not None:
+                q_g_reprogram = q_g.repeat_interleave(num_anchors, dim=1)
+                soft_g = self.reprogramming_layer(
+                    q_g_reprogram.to(dtype=reprogram_dtype),
+                    banks_base.to(dtype=reprogram_dtype),
+                    banks_base.to(dtype=reprogram_dtype))       # (B, 3N, 4096)
+                knowledge_parts.append(soft_g)
+                q_parts.append(q_g)
         else:
             # 旧路径（消融基线）：全词表学习混合 mapping_layer
             word_embeddings = self.word_embeddings.permute(1, 0).to(
                 dtype=self.mapping_layer.weight.dtype)
             source_embeddings = self.mapping_layer(
                 word_embeddings).permute(1, 0)                  # (M, 4096)
-            soft_g = self.reprogramming_layer(
-                q_g.to(dtype=reprogram_dtype),
-                source_embeddings.to(dtype=reprogram_dtype),
-                source_embeddings.to(dtype=reprogram_dtype))    # (B, 3, 4096)
-        knowledge = soft_g
-        q_all = q_g
+            if q_g is not None:
+                soft_g = self.reprogramming_layer(
+                    q_g.to(dtype=reprogram_dtype),
+                    source_embeddings.to(dtype=reprogram_dtype),
+                    source_embeddings.to(dtype=reprogram_dtype))  # (B, 3, 4096)
+                knowledge_parts.append(soft_g)
+                q_parts.append(q_g)
         if nseg > 0:
             if self.use_semantic_prototypes:
                 # Every local block reuses the same frozen semantic ids and
@@ -533,10 +555,11 @@ class Model(nn.Module):
                     source_embeddings.to(dtype=reprogram_dtype),
                     source_embeddings.to(dtype=reprogram_dtype)
                 ).view(B, nseg * self.num_aspects, self.d_llm)  # (B, 6x3, 4096)
-            knowledge = torch.cat([soft_g, soft_l], dim=1)      # (B, S_k, 4096)
-            q_all = torch.cat(
-                [q_g, q_l.view(B, nseg * self.num_aspects, self.d_model)],
-                dim=1)
+            knowledge_parts.append(soft_l)
+            q_parts.append(
+                q_l.view(B, nseg * self.num_aspects, self.d_model))
+        knowledge = torch.cat(knowledge_parts, dim=1)           # (B, S_k, 4096)
+        q_all = torch.cat(q_parts, dim=1)
 
         # ── aspect phrase 融合：phrase 只作身份锚点 ──
         if self.use_semantic_prototypes:
@@ -547,13 +570,14 @@ class Model(nn.Module):
             # The full-vocabulary ablation emits one token per aspect.
             phrase_base = self.knowledge_compiler.phrase_bank
         phrase_slots = phrase_base.shape[0]
-        phrase_g = phrase_base.unsqueeze(0).expand(B, -1, -1)
-        phrase = phrase_g
+        phrase_parts = []
+        if q_g is not None:
+            phrase_parts.append(phrase_base.unsqueeze(0).expand(B, -1, -1))
         if nseg > 0:
-            phrase_l = phrase_base.unsqueeze(0).unsqueeze(0).expand(
+            phrase_parts.append(phrase_base.unsqueeze(0).unsqueeze(0).expand(
                 B, nseg, -1, -1).reshape(
-                B, nseg * phrase_slots, self.d_llm)
-            phrase = torch.cat([phrase_g, phrase_l], dim=1)
+                B, nseg * phrase_slots, self.d_llm))
+        phrase = torch.cat(phrase_parts, dim=1)
         knowledge = self.ref_rms * rms_norm(
             knowledge + self.phrase_beta * phrase)
         S_k = knowledge.shape[1]

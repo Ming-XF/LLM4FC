@@ -38,6 +38,7 @@ def init_model_config(args, data_config: DataConfig):
             llm_init=args.llm_init,
             use_task_prompt=args.use_task_prompt,
             use_local_knowledge=args.use_local_knowledge,
+            use_global_knowledge=args.use_global_knowledge,
             contrast_lambda=args.contrast_lambda,
             freeze_head_bias=args.freeze_head_bias,
             use_semantic_prototypes=args.use_semantic_prototypes,
@@ -151,6 +152,10 @@ def init_config():
     model_group.add_argument("--use_local_knowledge",
                              action=argparse.BooleanOptionalAction, default=True,
                              help="TimeLLMKnowledge: append 6x10s local knowledge blocks")
+    model_group.add_argument("--use_global_knowledge",
+                             action=argparse.BooleanOptionalAction, default=True,
+                             help="TimeLLMKnowledge: prepend full-minute global "
+                                  "knowledge blocks")
     model_group.add_argument("--contrast_lambda", default=0.1, type=float,
                              help="TimeLLMKnowledge: weight of the supervised "
                                   "contrastive loss on family-wise encoder "
