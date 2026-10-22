@@ -1,8 +1,8 @@
-"""TimeLLMKnowledge v2: 全局+局部 raw 知识 Token 编译器。
+"""TimeLLMKnowledge v3: three-family, two-level semantic knowledge bank.
 
 输入三段：
-  离线整分钟静态 FC / 相对 PSD + 在线波形编码 → 32 个全局 raw tokens
-  离线 6 个 10s FC / 相对 PSD + 在线波形编码 → 每片段 32 个局部 raw tokens
+  离线整分钟静态 FC / 相对 PSD + 在线波形编码 → 3 个全局 family queries
+  离线 6 个 10s FC / 相对 PSD + 在线波形编码 → 每片段 3 个局部 queries
   任务 prompt（不变）
 
 编码（全局块与局部块共享编译器参数）：
@@ -12,22 +12,27 @@
   q → reprogram（跨注意力到语义原型 bank，v3）→ soft prompt (4096)
   k_i = ref_rms·RMSNorm(soft_prompt_i + β·phrase_i)   ← phrase 只作身份锚点
 
-语义原型（v3，替代全词表学习混合 mapping_layer）：
-  每短语在冻结词表里取余弦 top-K 近邻候选，共享 Linear 压缩到 P 个原型，
-  第 i 个知识 token 只在其短语的 P 个原型上做注意力（确定性、域无关预选；
-  见 semantic_prototypes.py）。--no-use_semantic_prototypes 回退旧路径。
+语义原型（两级候选库）：
+  三个方面文本在冻结词表中预选 K 个候选，经共享 Linear(K→N) 融合为 N 个
+  refined knowledge；每个 refined knowledge 再预选 M 个描述，经共享
+  Linear(M→P) 得到自己的描述原型库。--no-use_semantic_prototypes 回退旧路径。
 
-序列：[全局 32][局部 6×32][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
-→ 末 K 层 prompt 末位位置聚合 → 4096→256 隐层（三组组特征在此直接融合）→ GELU → Dropout → 输出投影（bias 固定源域先验）。
+序列：[全局 3N][局部 6×3N][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
+→ 全部 32 层 prompt 末位位置逐层 RMSNorm 等权平均聚合 → 4096→256 隐层
+→ GELU → Dropout → 输出投影（bias 固定源域先验）。
 
 捷径解除：
   - 读出位置为任务 prompt 末位 token（冻结词表向量，不可学习；
     无 prompt 时退化为固定 ":" token 缓冲）；
-  - 层聚合权重固定均匀；
+  - 层聚合权重固定均匀（全部 32 层，排除 h0 embedding 输出）；
   - 输出头 bias 冻结在归一化标签先验（回归 0.5 / 分类 0）；
-  - fusion：z = 3×7 个 256 维组特征（Linear 分化前）全局/局部平衡池化 →
-    256 维隐层直接相加（fused = h1 + α·z），经 GELU 后走共享输出投影，
-    给知识路径一条不经过冻结 LLM 的特征直连。
+  - 无特征融合直连（fusion/bypass 路径已整体移除）。
+
+监督对比学习（三族组特征，映射知识特征之前）：
+  三族编码器（FC/频谱/形态）输出的组特征（全局 + 6×局部段，Linear 分化前）
+  按族做逐块 RMSNorm 后池化为 3 个 256 维向量（每族 1 个/窗口），经共享
+  Linear(256→128) 投影后按族独立计算监督 InfoNCE（同标签互为正对，无温度），
+  loss = CE + contrast_lambda·NCE（回归任务跳过）。
 """
 
 from math import sqrt
@@ -135,20 +140,22 @@ class TimeLLMKnowledgeConfig(BaseConfig):
                  n_heads=8,
                  num_prototypes=1000,
                  dropout=0.1,
-                 num_stats=32,
-                 readout_layers=4,
+                 num_aspects=3,
                  d_feat=256,
                  hz=200,
                  num_local_segments=6,
                  use_local_knowledge=True,
-                 use_knowledge_fusion=True,
+                 contrast_lambda=0.1,
                  freeze_head_bias=True,
                  phrase_beta_init=0.25,
-                 fusion_alpha_max=0.5,
-                 fusion_gate_init=-1.39,
                  use_semantic_prototypes=True,
-                 proto_preselect=1000,
-                 proto_per_phrase=100,
+                 anchor_candidates=1000,
+                 num_anchors=10,
+                 description_candidates=1000,
+                 description_prototypes=100,
+                 semantic_similarity='centered_cosine',
+                 semantic_aspect_mix=0.6,
+                 semantic_anchor_fusion=0.1,
                  use_patch_embeds=True,
                  task_type='classification',
                  output_dim=2,
@@ -158,27 +165,28 @@ class TimeLLMKnowledgeConfig(BaseConfig):
                  use_task_prompt=False,
                  llm_init='pretrained'):
         super().__init__(node_size=node_size, output_dim=output_dim)
-        assert 1 <= readout_layers <= 32, \
-            f"readout_layers={readout_layers} 超出 1..32（K>32 会读入 h0）"
         self.time_series_size = time_series_size
         self.d_model = d_model
         self.n_heads = n_heads
         self.num_prototypes = num_prototypes
         self.dropout = dropout
-        self.num_stats = num_stats
-        self.readout_layers = readout_layers
+        self.num_aspects = num_aspects
+        self.num_stats = num_aspects
         self.d_feat = d_feat
         self.hz = hz
         self.num_local_segments = num_local_segments
         self.use_local_knowledge = use_local_knowledge
-        self.use_knowledge_fusion = use_knowledge_fusion
+        self.contrast_lambda = contrast_lambda
         self.freeze_head_bias = freeze_head_bias
         self.phrase_beta_init = phrase_beta_init
-        self.fusion_alpha_max = fusion_alpha_max
-        self.fusion_gate_init = fusion_gate_init
         self.use_semantic_prototypes = use_semantic_prototypes
-        self.proto_preselect = proto_preselect
-        self.proto_per_phrase = proto_per_phrase
+        self.anchor_candidates = anchor_candidates
+        self.num_anchors = num_anchors
+        self.description_candidates = description_candidates
+        self.description_prototypes = description_prototypes
+        self.semantic_similarity = semantic_similarity
+        self.semantic_aspect_mix = semantic_aspect_mix
+        self.semantic_anchor_fusion = semantic_anchor_fusion
         self.use_patch_embeds = use_patch_embeds
         self.task_type = task_type
         self.output_dim = output_dim
@@ -260,29 +268,23 @@ class Model(nn.Module):
             llm_type=self.llm_type,
         )
 
-        # ── raw 分支：分组 patch 嵌入（FC 图 / 相对 PSD / 形态 PatchStem）──
-        # schema 分组：FC 9 | 频谱 13 | 形态时域 10（与 graph_evidence 输出一致）
-        self.num_fc_stats = 9
-        self.num_spec_stats = 13
-        self.num_morph_stats = 10
-        assert (self.num_fc_stats + self.num_spec_stats
-                + self.num_morph_stats) == config.num_stats
+        # ── raw 分支：三个方面各生成一个 d_model query ──
+        self.num_aspects = config.num_aspects
+        if self.num_aspects != 3:
+            raise ValueError("TimeLLMKnowledge 当前固定使用 FC/频谱/形态三个方面")
         self.use_patch_embeds = config.use_patch_embeds
         if self.use_patch_embeds:
-            self.fc_embed = FCEmbed(
-                out_tokens=self.num_fc_stats, d_model=config.d_model)
-            self.spec_embed = SpecEmbed(
-                out_tokens=self.num_spec_stats, d_model=config.d_model)
-            self.morph_head = nn.Linear(
-                config.d_feat, self.num_morph_stats * config.d_model)
+            self.fc_embed = FCEmbed(d_model=config.d_model)
+            self.spec_embed = SpecEmbed(d_model=config.d_model)
+            self.morph_head = nn.Linear(config.d_feat, config.d_model)
             self.raw_projection = None
         else:
-            # 旧路径（消融对照）：共享 PatchStem → 全 32 统计量投影
+            # 旧路径（消融对照）：共享 PatchStem → 三方面投影
             self.fc_embed = None
             self.spec_embed = None
             self.morph_head = None
             self.raw_projection = nn.Linear(
-                config.d_feat, config.num_stats * config.d_model)
+                config.d_feat, self.num_aspects * config.d_model)
 
         # ── 语义原型 bank（替代 mapping_layer）或旧全词表学习混合（消融开关）──
         self.use_semantic_prototypes = config.use_semantic_prototypes
@@ -291,8 +293,13 @@ class Model(nn.Module):
                 phrase_bank=self.knowledge_compiler.phrase_bank,
                 word_embeddings=self.word_embeddings,
                 tokenizer=self.tokenizer,
-                preselect=config.proto_preselect,
-                per_phrase=config.proto_per_phrase,
+                anchor_candidates=config.anchor_candidates,
+                num_anchors=config.num_anchors,
+                description_candidates=config.description_candidates,
+                num_prototypes=config.description_prototypes,
+                similarity=config.semantic_similarity,
+                aspect_mix=config.semantic_aspect_mix,
+                anchor_fusion_init=config.semantic_anchor_fusion,
             )
             self.mapping_layer = None
         else:
@@ -320,7 +327,7 @@ class Model(nn.Module):
         rms = rv.pow(2).mean().sqrt().clamp_min(_EPS)
         self.register_buffer("readout_token", rv / rms * ref_rms)
 
-        # ── 输出头：4096→256→output_dim，三组组特征(256)在 256 维隐层直接融合 ──
+        # ── 输出头：4096→256→output_dim（无特征融合直连）──
         self.task_type = config.task_type
         self.output_head = nn.Sequential(
             RMSNorm(self.d_llm, learnable=True),
@@ -328,8 +335,8 @@ class Model(nn.Module):
         )
         self.output_proj = nn.Linear(256, config.output_dim)
         self.output_dropout = nn.Dropout(config.dropout)
-        # 有界标量门控：α = α_max·σ(g)，初始 α≈0.1（与旧 bypass_gate init 同义）
-        self.fusion_gate = nn.Parameter(torch.tensor(config.fusion_gate_init))
+        # 监督对比投影头：三族组特征共享（256→128，无温度 InfoNCE）
+        self.contrast_head = nn.Linear(256, 128)
         if config.freeze_head_bias:
             # bias 冻结在归一化标签先验（均值预测"送分项"提前给）
             prior = 0.5 if self.task_type == 'regression' else 0.0
@@ -353,22 +360,50 @@ class Model(nn.Module):
         return self
 
     def _group_raw_tokens(self, x_z, static_fc, relative_psd):
-        """组装 (B, 32, d_model) 分组 raw token + 三组 256 维组特征(分化前)。
+        """组装 (B, 3, d_model) 方面 query + 三组 256 维组特征。
 
         返回 (group_raw, group_feat)：group_feat = (fc_f, spec_f, morph_f)，
-        供融合路径使用（Linear 分化前的 3×7 个组向量）；旧路径无组特征
+        供对比学习使用；旧路径无组特征
         → 返回 None。"""
         if self.use_patch_embeds:
-            fc_t, fc_f = self.fc_embed(static_fc.unsqueeze(1))  # (B,9,d),(B,256)
-            spec_t, spec_f = self.spec_embed(relative_psd)      # (B,13,d),(B,256)
+            fc_t, fc_f = self.fc_embed(static_fc.unsqueeze(1))  # (B,d),(B,256)
+            spec_t, spec_f = self.spec_embed(relative_psd)      # (B,d),(B,256)
             morph_f = self.patch_stem(x_z)                      # (B,256)
-            morph_t = self.morph_head(morph_f).view(
-                x_z.shape[0], self.num_morph_stats, self.d_model)
-            return torch.cat([fc_t, spec_t, morph_t], dim=1), \
+            morph_t = self.morph_head(morph_f)                   # (B,d)
+            return torch.stack([fc_t, spec_t, morph_t], dim=1), \
                 (fc_f, spec_f, morph_f)
-        # 旧路径（消融对照）：共享 PatchStem → 全 32 统计量投影
+        # 旧路径（消融对照）：共享 PatchStem → 三方面投影
         return self.raw_projection(self.patch_stem(x_z)).view(
-            x_z.shape[0], self.config.num_stats, self.d_model), None
+            x_z.shape[0], self.num_aspects, self.d_model), None
+
+    def _contrastive_loss(self, v, labels):
+        """监督对比损失：三族组特征（映射知识特征之前）逐族独立 InfoNCE。
+
+        v: (B, 3, 256) 三族（FC/频谱/形态）组特征，labels: (B,) 类索引。
+        同标签互为正对、自身排除，无温度（logits = 归一化内积）。
+        无正对的行跳过；各族损失取平均；整批无正对时返回 None。
+        """
+        p = F.normalize(self.contrast_head(v), dim=-1)          # (B, 3, 128)
+        B = p.shape[0]
+        eye = torch.eye(B, device=p.device, dtype=torch.bool)
+        pos_mask = (labels.unsqueeze(0) == labels.unsqueeze(1)) & ~eye
+        total = 0.0
+        count = 0
+        for i in range(p.shape[1]):
+            sim = p[:, i] @ p[:, i].T                          # (B, B)
+            has_pos = pos_mask.any(dim=1)
+            if not bool(has_pos.any()):
+                continue
+            numer = torch.logsumexp(
+                sim.masked_fill(~pos_mask, float('-inf')), dim=1)
+            denom = torch.logsumexp(
+                sim.masked_fill(eye, float('-inf')), dim=1)
+            row_loss = (denom - numer)[has_pos]
+            total = total + row_loss.mean()
+            count += 1
+        if count == 0:
+            return None
+        return total / count
 
     def forward(self, x, global_fc, global_psd,
                 local_fc, local_psd, local_mask, labels):
@@ -426,7 +461,7 @@ class Model(nn.Module):
         # ── raw patch 编译为知识 query ──
         group_raw_g, group_feat_g = self._group_raw_tokens(
             x_z, global_fc.to(torch.float32), global_psd.to(torch.float32))
-        q_g = self.knowledge_compiler(group_raw_g)               # (B, 32, d)
+        q_g = self.knowledge_compiler(group_raw_g)               # (B, 3, d)
         group_feat_l = None
         if nseg > 0:
             fc_l = local_fc.reshape(B * nseg, N, N).to(torch.float32)
@@ -435,17 +470,36 @@ class Model(nn.Module):
             group_raw_l, group_feat_l = self._group_raw_tokens(xl, fc_l, psd_l)
             q_l = self.knowledge_compiler(group_raw_l)
 
+        # ── 对比学习组特征（映射知识特征之前）：三族各 1 个 256 维向量/窗口 ──
+        contrast_vec = None
+        if self.use_patch_embeds and group_feat_g is not None:
+            feats_g = torch.stack(group_feat_g, dim=1)           # (B, 3, 256)
+            if group_feat_l is not None:
+                feats_l = torch.stack(group_feat_l, dim=1).view(
+                    B, nseg, 3, 256)                             # (B, 6, 3, 256)
+                feats = torch.cat([feats_g.unsqueeze(1), feats_l],
+                                  dim=1).permute(0, 2, 1, 3)     # (B, 3, 7, 256)
+            else:
+                feats = feats_g                                  # (B, 3, 256)
+            # 逐块固定 RMSNorm 后族内均值（防全局/局部范数差主导）
+            feats = feats / (feats.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
+            contrast_vec = feats.mean(dim=-2)                    # (B, 3, 256)
+
         # ── reprogram → soft prompt (4096) ──
         reprogram_dtype = \
             self.reprogramming_layer.query_projection.weight.dtype
+        num_anchors = self.config.num_anchors
         if self.use_semantic_prototypes:
-            # 语义原型：每知识 token 只在其短语的 P 个原型上做注意力
-            phrase_ids_g = torch.arange(self.config.num_stats, device=device)
-            banks_g = self.semantic_bank(phrase_ids_g)          # (32, P, 4096)
+            # Bank order is aspect-major: [FC x N, spectrum x N, morphology x N].
+            banks_base = self.semantic_bank().reshape(
+                self.num_aspects * num_anchors,
+                self.config.description_prototypes,
+                self.d_llm)
+            q_g_reprogram = q_g.repeat_interleave(num_anchors, dim=1)
             soft_g = self.reprogramming_layer(
-                q_g.to(dtype=reprogram_dtype),
-                banks_g.to(dtype=reprogram_dtype),
-                banks_g.to(dtype=reprogram_dtype))              # (B, 32, 4096)
+                q_g_reprogram.to(dtype=reprogram_dtype),
+                banks_base.to(dtype=reprogram_dtype),
+                banks_base.to(dtype=reprogram_dtype))           # (B, 3N, 4096)
         else:
             # 旧路径（消融基线）：全词表学习混合 mapping_layer
             word_embeddings = self.word_embeddings.permute(1, 0).to(
@@ -455,38 +509,50 @@ class Model(nn.Module):
             soft_g = self.reprogramming_layer(
                 q_g.to(dtype=reprogram_dtype),
                 source_embeddings.to(dtype=reprogram_dtype),
-                source_embeddings.to(dtype=reprogram_dtype))    # (B, 32, 4096)
+                source_embeddings.to(dtype=reprogram_dtype))    # (B, 3, 4096)
         knowledge = soft_g
         q_all = q_g
         if nseg > 0:
             if self.use_semantic_prototypes:
-                # 每个 10s 段内统计量 schema 与全局相同 → 复用同一份 bank
-                banks_l = banks_g
+                # Every local block reuses the same frozen semantic ids and
+                # trainable candidate-space mappings.
+                q_l_reprogram = q_l.view(
+                    B, nseg * self.num_aspects, self.d_model
+                ).repeat_interleave(num_anchors, dim=1)
+                banks_l = banks_base.repeat(nseg, 1, 1)
                 soft_l = self.reprogramming_layer(
-                    q_l.to(dtype=reprogram_dtype),
+                    q_l_reprogram.to(dtype=reprogram_dtype),
                     banks_l.to(dtype=reprogram_dtype),
                     banks_l.to(dtype=reprogram_dtype)
-                ).view(B, nseg * self.config.num_stats, self.d_llm)
+                ).view(B, nseg * self.num_aspects * num_anchors, self.d_llm)
             else:
+                q_l_reprogram = q_l.view(
+                    B, nseg * self.num_aspects, self.d_model)
                 soft_l = self.reprogramming_layer(
-                    q_l.to(dtype=reprogram_dtype),
+                    q_l_reprogram.to(dtype=reprogram_dtype),
                     source_embeddings.to(dtype=reprogram_dtype),
                     source_embeddings.to(dtype=reprogram_dtype)
-                ).view(B, nseg * self.config.num_stats, self.d_llm)
+                ).view(B, nseg * self.num_aspects, self.d_llm)  # (B, 6x3, 4096)
             knowledge = torch.cat([soft_g, soft_l], dim=1)      # (B, S_k, 4096)
             q_all = torch.cat(
-                [q_g, q_l.view(B, nseg * self.config.num_stats, self.d_model)],
+                [q_g, q_l.view(B, nseg * self.num_aspects, self.d_model)],
                 dim=1)
 
-        # ── phrase 融合：k = ref_rms·RMSNorm(soft + β·phrase)，phrase 冻结 ──
-        phrase_g = self.knowledge_compiler.phrase_bank.unsqueeze(0).expand(
-            B, -1, -1)
+        # ── aspect phrase 融合：phrase 只作身份锚点 ──
+        if self.use_semantic_prototypes:
+            # One phrase identity is repeated for each refined anchor.
+            phrase_base = self.knowledge_compiler.phrase_bank.repeat_interleave(
+                num_anchors, dim=0)
+        else:
+            # The full-vocabulary ablation emits one token per aspect.
+            phrase_base = self.knowledge_compiler.phrase_bank
+        phrase_slots = phrase_base.shape[0]
+        phrase_g = phrase_base.unsqueeze(0).expand(B, -1, -1)
         phrase = phrase_g
         if nseg > 0:
-            phrase_l = self.knowledge_compiler.phrase_bank.unsqueeze(
-                0).unsqueeze(0).expand(
-                    B, nseg, -1, -1).reshape(
-                        B, nseg * self.config.num_stats, self.d_llm)
+            phrase_l = phrase_base.unsqueeze(0).unsqueeze(0).expand(
+                B, nseg, -1, -1).reshape(
+                B, nseg * phrase_slots, self.d_llm)
             phrase = torch.cat([phrase_g, phrase_l], dim=1)
         knowledge = self.ref_rms * rms_norm(
             knowledge + self.phrase_beta * phrase)
@@ -556,10 +622,9 @@ class Model(nn.Module):
             )
         all_hidden = outputs.hidden_states   # h0(embedding 输出) + 32 层
 
-        # ── 最后 K 层 READOUT 位置聚合读出 ──
-        K = self.config.readout_layers
+        # ── 全部 32 层（排除 h0 embedding 输出）READOUT 位置聚合读出 ──
         hs = torch.stack(
-            [h[:, readout_idx, :].float() for h in all_hidden[-K:]], dim=1)
+            [h[:, readout_idx, :].float() for h in all_hidden[1:]], dim=1)
         # 逐层固定 RMS 归一化（无参数，防各层范数差异主导聚合）
         hs = hs / (hs.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
         agg = hs.mean(dim=1)                                    # (B, 4096)
@@ -567,32 +632,25 @@ class Model(nn.Module):
         h1 = self.output_head(
             agg.to(dtype=self.output_head[1].weight.dtype))     # (B, d_model)
 
-        # ── 组特征融合(分化前)：3×7 个 256 维组向量全局/局部平衡池化 → 256 维隐层直接相加 ──
-        if self.config.use_knowledge_fusion and group_feat_g is not None:
-            z_g = torch.stack(group_feat_g, dim=1).mean(dim=1)  # (B, 256)
-            z_l = (torch.stack(group_feat_l, dim=1).view(
-                B, nseg * 3, 256).mean(dim=1)
-                   if group_feat_l is not None else 0.0)        # (B, 256)
-            z = rms_norm(0.5 * (z_g + z_l))                     # (B, 256)
-            alpha = self.config.fusion_alpha_max * torch.sigmoid(
-                self.fusion_gate)                               # 标量，∈[0, α_max]
-            fused = h1 + alpha * z
-        else:
-            alpha = None
-            fused = h1
+        logits = self.output_proj(self.output_dropout(F.gelu(h1)))
 
-        logits = self.output_proj(self.output_dropout(F.gelu(fused)))
-
+        contrast_loss = torch.zeros((), device=logits.device)
         if self.task_type == 'regression':
             prediction = logits.squeeze(-1)
             if labels.dim() > 1 and labels.shape[-1] == 1:
                 labels = labels.squeeze(-1)
             loss = F.huber_loss(
                 prediction.float(), labels.float(), delta=1.0)
+            # 回归任务跳过对比学习（同标签配对不适用）
         else:
             if labels.dim() > 1 and labels.shape[-1] > 1:
                 labels = labels.argmax(dim=-1)
             loss = F.cross_entropy(logits.float(), labels)
+            if contrast_vec is not None and self.config.contrast_lambda > 0:
+                c_loss = self._contrastive_loss(contrast_vec, labels)
+                if c_loss is not None:
+                    contrast_loss = c_loss
+                    loss = loss + self.config.contrast_lambda * contrast_loss
 
         return ModelOutputs(
             logits=logits,
@@ -601,7 +659,7 @@ class Model(nn.Module):
                 'q': q_all,
                 'knowledge': knowledge,
                 'readout_agg': agg,
-                'fusion_gate': alpha,
+                'contrast_loss': contrast_loss,
                 'raw_gate': self.knowledge_compiler.raw_gate,
                 'phrase_beta': self.phrase_beta,
             },

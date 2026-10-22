@@ -37,14 +37,17 @@ def init_model_config(args, data_config: DataConfig):
             llm_path=args.llm_path,
             llm_init=args.llm_init,
             use_task_prompt=args.use_task_prompt,
-            readout_layers=args.readout_layers,
             use_local_knowledge=args.use_local_knowledge,
-            use_knowledge_fusion=args.use_knowledge_fusion,
-            fusion_alpha_max=args.fusion_alpha_max,
+            contrast_lambda=args.contrast_lambda,
             freeze_head_bias=args.freeze_head_bias,
             use_semantic_prototypes=args.use_semantic_prototypes,
-            proto_preselect=args.proto_preselect,
-            proto_per_phrase=args.proto_per_phrase,
+            anchor_candidates=args.knowledge_anchor_candidates,
+            num_anchors=args.knowledge_anchors,
+            description_candidates=args.knowledge_description_candidates,
+            description_prototypes=args.knowledge_description_prototypes,
+            semantic_similarity=args.knowledge_similarity,
+            semantic_aspect_mix=args.knowledge_aspect_mix,
+            semantic_anchor_fusion=args.knowledge_anchor_fusion,
             use_patch_embeds=args.use_patch_embeds,
         )
         model = TimeLLMKnowledgeModel(model_config)
@@ -138,39 +141,54 @@ def init_config():
                              help="LLM weight init for ablation: 'pretrained' (default) "
                                   "or 'random' (same arch, randomly-initialized weights, "
                                   "to test whether pretrained knowledge contributes)")
-    model_group.add_argument("--num_prototypes", default=500, type=int, help="Number of text prototypes")
+    model_group.add_argument(
+        "--num_prototypes", default=500, type=int,
+        help="Full-vocabulary fallback prototypes when semantic bank is disabled")
     model_group.add_argument("--d_ff", default=128, type=int, help="LLM output truncation dim")
     model_group.add_argument("--use_task_prompt", action="store_true",
                              help="TimeLLM: include task description prompt")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
-    model_group.add_argument("--readout_layers", default=4, type=int,
-                             help="TimeLLMKnowledge: number of final LLM layers "
-                                  "aggregated for READOUT position readout (K)")
     model_group.add_argument("--use_local_knowledge",
                              action=argparse.BooleanOptionalAction, default=True,
                              help="TimeLLMKnowledge: append 6x10s local knowledge blocks")
-    model_group.add_argument("--use_knowledge_fusion",
-                             action=argparse.BooleanOptionalAction, default=True,
-                             help="TimeLLMKnowledge: fuse balanced-pooled "
-                                  "knowledge features into the 128-dim head "
-                                  "hidden state")
-    model_group.add_argument("--fusion_alpha_max", default=0.5, type=float,
-                             help="TimeLLMKnowledge: upper bound of the "
-                                  "sigmoid fusion gate (alpha)")
+    model_group.add_argument("--contrast_lambda", default=0.1, type=float,
+                             help="TimeLLMKnowledge: weight of the supervised "
+                                  "contrastive loss on family-wise encoder "
+                                  "features (0 disables it)")
     model_group.add_argument("--freeze_head_bias",
                              action=argparse.BooleanOptionalAction, default=True,
                              help="TimeLLMKnowledge: freeze output-head bias at normalized label prior")
     model_group.add_argument("--use_semantic_prototypes",
                              action=argparse.BooleanOptionalAction, default=True,
-                             help="TimeLLMKnowledge: per-phrase vocab-neighborhood "
-                                  "semantic prototype bank (cosine top-K + shared "
-                                  "Linear) instead of learned full-vocab mapping_layer")
-    model_group.add_argument("--proto_preselect", default=1000, type=int,
-                             help="TimeLLMKnowledge: per-phrase top-K vocab "
-                                  "candidates for semantic prototypes")
-    model_group.add_argument("--proto_per_phrase", default=100, type=int,
-                             help="TimeLLMKnowledge: prototypes per phrase after "
-                                  "shared Linear compression")
+                             help="TimeLLMKnowledge: use the two-level "
+                                  "semantic candidate bank instead of the "
+                                  "full-vocabulary mapping ablation")
+    model_group.add_argument(
+        "--knowledge_anchor_candidates", "--proto_anchor_candidates",
+        dest="knowledge_anchor_candidates", default=1000, type=int,
+        help="TimeLLMKnowledge: first-level vocabulary candidates per aspect")
+    model_group.add_argument(
+        "--knowledge_anchors", "--proto_anchors",
+        dest="knowledge_anchors", default=10, type=int,
+        help="TimeLLMKnowledge: refined knowledge anchors per aspect")
+    model_group.add_argument(
+        "--knowledge_description_candidates", "--proto_preselect",
+        dest="knowledge_description_candidates", default=1000, type=int,
+        help="TimeLLMKnowledge: second-level description candidates per anchor")
+    model_group.add_argument(
+        "--knowledge_description_prototypes", "--proto_per_phrase",
+        dest="knowledge_description_prototypes", default=100, type=int,
+        help="TimeLLMKnowledge: descriptions retained per anchor after mapping")
+    model_group.add_argument(
+        "--knowledge_similarity", choices=["cosine", "centered_cosine"],
+        default="centered_cosine",
+        help="Similarity used for frozen vocabulary candidate retrieval")
+    model_group.add_argument(
+        "--knowledge_aspect_mix", default=0.6, type=float,
+        help="Weight of aspect text when selecting second-level descriptions")
+    model_group.add_argument(
+        "--knowledge_anchor_fusion", default=0.1, type=float,
+        help="Trainable refined-anchor residual added to description prototypes")
     model_group.add_argument("--use_patch_embeds",
                              action=argparse.BooleanOptionalAction, default=True,
                              help="TimeLLMKnowledge: per-group patch embeddings "
