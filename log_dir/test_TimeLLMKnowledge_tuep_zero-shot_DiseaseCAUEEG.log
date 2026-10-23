@@ -1,5 +1,5 @@
-10/22/2026 17:27:20 - INFO - __main__ -   ==================== Explicit args ====================
-  append: _tuep
+10/23/2026 15:45:39 - INFO - __main__ -   ==================== Explicit args ====================
+  append: _win5_tuep
   batch_size: 16
   contrast_lambda: 0.1
   d_model: 128
@@ -21,20 +21,19 @@
   model: TimeLLMKnowledge
   num_heads: 8
   num_prototypes: 1000
-  pretrain_path: ./output_dir/TimeLLMKnowledge_DiseaseTUEP_train
-  use_local_knowledge: True
+  pretrain_path: ./output_dir/win5/TimeLLMKnowledge_DiseaseTUEP_train
   use_patch_embeds: True
   use_semantic_prototypes: True
   use_task_prompt: True
   [effective] batch_size: 16, learning_rate: 0.0001
-10/22/2026 17:27:20 - INFO - __main__ -   ==================== Full args (resolved) ====================
+10/23/2026 15:45:39 - INFO - __main__ -   ==================== Full args (resolved) ====================
   D: 2
   F1: 8
   abla_channel: -1
   abla_vae: n
   activation: gelu
   alpha: 1.0
-  append: _tuep
+  append: _win5_tuep
   batch_size: 16
   beta: 1.0
   beta1: 0.9
@@ -94,7 +93,7 @@
   optimizer: Adam
   p1: 4
   p2: 8
-  pretrain_path: ./output_dir/TimeLLMKnowledge_DiseaseTUEP_train
+  pretrain_path: ./output_dir/win5/TimeLLMKnowledge_DiseaseTUEP_train
   project: 
   save_steps: 200
   schedule: cos
@@ -102,7 +101,6 @@
   standard_split: False
   target_learning_rate: 1e-05
   train_set: 0.6
-  use_local_knowledge: True
   use_patch_embeds: True
   use_semantic_prototypes: True
   use_task_prompt: True
@@ -111,13 +109,13 @@
   wandb_entity: cwg
   warmup_steps: 400
   weight_decay: 0.0001
-10/22/2026 17:27:20 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
-10/22/2026 17:27:20 - INFO - utils.trainer -     583 keys not in checkpoint (kept from init)
-10/22/2026 17:27:20 - INFO - utils.trainer -   Model loaded from ./output_dir/TimeLLMKnowledge_DiseaseTUEP_train/TimeLLMKnowledge-0.bin (34/35 keys)
-10/22/2026 17:27:20 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
-10/22/2026 17:27:45 - INFO - utils.trainer -   Loss: 2.27634
-10/22/2026 17:27:45 - INFO - utils.trainer -   AUC: 0.52468
-10/22/2026 17:27:45 - INFO - utils.trainer -   Accuracy: 0.43573
-10/22/2026 17:27:45 - INFO - utils.trainer -   Precision: 0.43573
-10/22/2026 17:27:45 - INFO - utils.trainer -   Specificity: 0.00000
-10/22/2026 17:27:45 - INFO - utils.trainer -   Sensitivity: 1.00000
+10/23/2026 15:45:39 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+10/23/2026 15:45:39 - INFO - utils.trainer -     583 keys not in checkpoint (kept from init)
+10/23/2026 15:45:39 - INFO - utils.trainer -   Model loaded from ./output_dir/win5/TimeLLMKnowledge_DiseaseTUEP_train/TimeLLMKnowledge-0.bin (34/35 keys)
+10/23/2026 15:45:39 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
+10/23/2026 15:45:58 - INFO - utils.trainer -   Loss: 0.92345
+10/23/2026 15:45:58 - INFO - utils.trainer -   AUC: 0.53823
+10/23/2026 15:45:58 - INFO - utils.trainer -   Accuracy: 0.48201
+10/23/2026 15:45:58 - INFO - utils.trainer -   Precision: 0.45195
+10/23/2026 15:45:58 - INFO - utils.trainer -   Specificity: 0.16856
+10/23/2026 15:45:58 - INFO - utils.trainer -   Sensitivity: 0.88791

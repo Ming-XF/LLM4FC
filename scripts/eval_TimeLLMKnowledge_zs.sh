@@ -5,8 +5,8 @@
 # Run: sh scripts/eval_TimeLLMKnowledge_zs.sh
 #
 
-TARGET_DATASET="DiseaseTUEP"
-PRETRAIN_PATH="./output_dir/win5/TimeLLMKnowledge_DiseaseCAUEEG_train"
+TARGET_DATASET="DiseaseTUAB"
+PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
@@ -33,5 +33,4 @@ python main.py \
     --knowledge_aspect_mix 0.6 \
     --knowledge_anchor_fusion 0.1 \
     --use_patch_embeds \
-    --append _win5 \
     --do_test
