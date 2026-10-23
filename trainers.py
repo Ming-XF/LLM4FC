@@ -60,11 +60,9 @@ class TimeLLMKnowledgeTrainer(Trainer):
             labels = labels.float()
         kwargs = {
             "x": inputs['time_series'].float().to(self.device),
-            "global_fc": inputs['global_fc'].float().to(self.device),
-            "global_psd": inputs['global_psd'].float().to(self.device),
-            "local_fc": inputs['local_fc'].float().to(self.device),
-            "local_psd": inputs['local_psd'].float().to(self.device),
-            "local_mask": inputs['local_mask'].bool().to(self.device),
+            "window_fc": inputs['window_fc'].float().to(self.device),
+            "window_psd": inputs['window_psd'].float().to(self.device),
+            "window_mask": inputs['window_mask'].bool().to(self.device),
             "labels": labels.to(self.device),
         }
         return kwargs

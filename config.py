@@ -25,7 +25,9 @@ def init_model_config(args, data_config: DataConfig):
             node_size=data_config.node_size,
             time_series_size=data_config.time_series_size,
             hz=data_config.hz,
-            num_local_segments=data_config.num_local_segments,
+            num_knowledge_windows=data_config.num_knowledge_windows,
+            window_seconds=data_config.window_seconds,
+            stride_seconds=data_config.stride_seconds,
             d_model=args.d_model,
             n_heads=args.num_heads,
             num_prototypes=args.num_prototypes,
@@ -37,8 +39,6 @@ def init_model_config(args, data_config: DataConfig):
             llm_path=args.llm_path,
             llm_init=args.llm_init,
             use_task_prompt=args.use_task_prompt,
-            use_local_knowledge=args.use_local_knowledge,
-            use_global_knowledge=args.use_global_knowledge,
             contrast_lambda=args.contrast_lambda,
             freeze_head_bias=args.freeze_head_bias,
             use_semantic_prototypes=args.use_semantic_prototypes,
@@ -149,13 +149,6 @@ def init_config():
     model_group.add_argument("--use_task_prompt", action="store_true",
                              help="TimeLLM: include task description prompt")
     model_group.add_argument("--num_windows", default=10, type=int, help="Number of DFC time windows")
-    model_group.add_argument("--use_local_knowledge",
-                             action=argparse.BooleanOptionalAction, default=True,
-                             help="TimeLLMKnowledge: append 6x10s local knowledge blocks")
-    model_group.add_argument("--use_global_knowledge",
-                             action=argparse.BooleanOptionalAction, default=True,
-                             help="TimeLLMKnowledge: prepend full-minute global "
-                                  "knowledge blocks")
     model_group.add_argument("--contrast_lambda", default=0.1, type=float,
                              help="TimeLLMKnowledge: weight of the supervised "
                                   "contrastive loss on family-wise encoder "

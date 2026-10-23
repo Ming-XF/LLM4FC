@@ -25,7 +25,10 @@ class DataConfig:
         self.abla_channel = args.abla_channel
         self.abla_vae = args.abla_vae
         self.hz = None
-        self.num_local_segments = 6
+        # 统一滑动知识窗口参数：由 sidecar 元数据覆盖（单源为数据）
+        self.num_knowledge_windows = 7
+        self.window_seconds = 30
+        self.stride_seconds = 5
 
         # 任务类型：由各数据集 load_data 显式设置；
         # 未设置时根据 output_dim 推断（向后兼容旧数据集）

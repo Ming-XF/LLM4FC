@@ -1,12 +1,12 @@
 """TimeLLMKnowledge v3: three-family, two-level semantic knowledge bank.
 
-输入三段：
-  离线整分钟静态 FC / 相对 PSD + 在线波形编码 → 3 个全局 family queries
-  （--no-use_global_knowledge 可关闭全局块，仅保留局部块）
-  离线 6 个 10s FC / 相对 PSD + 在线波形编码 → 每片段 3 个局部 queries
+输入：
+  统一滑动窗口（窗口数/窗长/步长全部来自 sidecar 元数据，
+  经 data_config 传入；例：11×10s 窗、步长 5s）：
+  离线静态 FC / 相对 PSD + 在线波形编码 → 每窗 3 个 family queries
   任务 prompt（不变）
 
-编码（全局块与局部块共享编译器参数）：
+编码（所有窗口共享编译器参数）：
   q_i = g_raw·RMSNorm(patch_i)                                     (128)
   patch_i：FC 组=FC 图 2D CNN、频谱组=相对 PSD 2D CNN、
            形态组=PatchStem 投影（--no-use_patch_embeds 回退旧共享路径）
@@ -18,8 +18,7 @@
   refined knowledge；每个 refined knowledge 再预选 M 个描述，经共享
   Linear(M→P) 得到自己的描述原型库。--no-use_semantic_prototypes 回退旧路径。
 
-序列：[全局 3N][局部 6×3N][任务 prompt(末位 ":" 为读出位置)]
-（--no-use_global_knowledge 时去掉全局块）→ 冻结 LLM
+序列：[N_win×3N 滑动窗口知识][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
 → 末层 prompt 末位位置 hidden state（无聚合/归一化）→ 4096→256 隐层
 → GELU → Dropout → 输出投影（bias 固定源域先验）。
 
@@ -31,9 +30,8 @@
   - 无特征融合直连（fusion/bypass 路径已整体移除）。
 
 监督对比学习（三族组特征，映射知识特征之前）：
-  三族编码器（FC/频谱/形态）输出的组特征（全局 + 6×局部段，关全局时仅局部段，
-  Linear 分化前）
-  按族做逐块 RMSNorm 后池化为 3 个 256 维向量（每族 1 个/窗口），经共享
+  三族编码器（FC/频谱/形态）输出的组特征（7 个滑动窗口，Linear 分化前）
+  按族做逐窗 RMSNorm 后池化为 3 个 256 维向量（每族 1 个/窗口），经共享
   Linear(256→128) 投影后按族独立计算监督 InfoNCE（同标签互为正对，无温度），
   loss = CE + contrast_lambda·NCE（回归任务跳过）。
 """
@@ -146,9 +144,9 @@ class TimeLLMKnowledgeConfig(BaseConfig):
                  num_aspects=3,
                  d_feat=256,
                  hz=200,
-                 num_local_segments=6,
-                 use_local_knowledge=True,
-                 use_global_knowledge=True,
+                 num_knowledge_windows=7,
+                 window_seconds=30,
+                 stride_seconds=5,
                  contrast_lambda=0.1,
                  freeze_head_bias=True,
                  phrase_beta_init=0.25,
@@ -178,9 +176,9 @@ class TimeLLMKnowledgeConfig(BaseConfig):
         self.num_stats = num_aspects
         self.d_feat = d_feat
         self.hz = hz
-        self.num_local_segments = num_local_segments
-        self.use_local_knowledge = use_local_knowledge
-        self.use_global_knowledge = use_global_knowledge
+        self.num_knowledge_windows = num_knowledge_windows
+        self.window_seconds = window_seconds
+        self.stride_seconds = stride_seconds
         self.contrast_lambda = contrast_lambda
         self.freeze_head_bias = freeze_head_bias
         self.phrase_beta_init = phrase_beta_init
@@ -410,17 +408,29 @@ class Model(nn.Module):
             return None
         return total / count
 
-    def forward(self, x, global_fc, global_psd,
-                local_fc, local_psd, local_mask, labels):
+    def forward(self, x, window_fc, window_psd, window_mask, labels):
         B, N, T = x.shape
         device = x.device
 
-        if global_fc.shape != (B, N, N):
+        nwin = self.config.num_knowledge_windows
+        win_len = int(self.config.window_seconds * self.config.hz)
+        stride = int(self.config.stride_seconds * self.config.hz)
+        if window_fc.shape != (B, nwin, N, N):
             raise ValueError(
-                f"global_fc must have shape {(B, N, N)}, got {tuple(global_fc.shape)}")
-        if global_psd.ndim != 3 or global_psd.shape[:2] != (B, N):
+                f"window_fc must have shape {(B, nwin, N, N)}, "
+                f"got {tuple(window_fc.shape)}")
+        if (window_psd.ndim != 4 or
+                window_psd.shape[:3] != (B, nwin, N)):
             raise ValueError(
-                f"global_psd must have shape (B, N, F), got {tuple(global_psd.shape)}")
+                f"window_psd must have shape (B, {nwin}, N, F), "
+                f"got {tuple(window_psd.shape)}")
+        if window_mask.shape != (B, nwin):
+            raise ValueError(
+                f"window_mask must have shape {(B, nwin)}, "
+                f"got {tuple(window_mask.shape)}")
+        if not bool(window_mask.all()):
+            raise ValueError(
+                "TimeLLMKnowledge requires all sliding windows to be valid")
 
         # ── 逐通道 z-score（幅度不变性：跨域零样本迁移的关键）──
         mean = x.mean(dim=-1, keepdim=True)
@@ -428,138 +438,69 @@ class Model(nn.Module):
         x_z = (x - mean) / (std + 1e-5)
         x_z = x_z.to(torch.float32)
 
-        # ── 局部波形：与离线 sidecar 一致，固定切成 6 个 10s 段 ──
-        nseg = 0
-        if self.config.use_local_knowledge:
-            seg_len = 10 * self.config.hz
-            nseg = self.config.num_local_segments
-            expected_local_fc = (B, nseg, N, N)
-            if local_fc.shape != expected_local_fc:
-                raise ValueError(
-                    f"local_fc must have shape {expected_local_fc}, "
-                    f"got {tuple(local_fc.shape)}")
-            if (local_psd.ndim != 4 or
-                    local_psd.shape[:3] != (B, nseg, N)):
-                raise ValueError(
-                    f"local_psd must have shape (B, {nseg}, N, F), "
-                    f"got {tuple(local_psd.shape)}")
-            if local_psd.shape[-1] != global_psd.shape[-1]:
-                raise ValueError("Global and local PSD frequency dimensions differ")
-            if local_mask.shape != (B, nseg):
-                raise ValueError(
-                    f"local_mask must have shape {(B, nseg)}, "
-                    f"got {tuple(local_mask.shape)}")
-            if not bool(local_mask.all()):
-                raise ValueError(
-                    "Current one-minute TimeLLMKnowledge input requires all "
-                    "six local segments to be valid")
-            required_length = nseg * seg_len
-            if T < required_length:
-                raise ValueError(
-                    f"Raw waveform has {T} samples, but {required_length} are "
-                    "required to align with offline local features")
-            xl = x_z[:, :, :required_length]
-            xl = xl.view(B, N, nseg, seg_len)
-            xl = xl.permute(0, 2, 1, 3).contiguous().view(
-                B * nseg, N, seg_len)
+        # ── 统一滑动窗口：在线波形与离线 sidecar 对齐切窗 ──
+        required_length = (nwin - 1) * stride + win_len
+        if T < required_length:
+            raise ValueError(
+                f"Raw waveform has {T} samples, but {required_length} are "
+                "required to align with offline sliding windows")
+        xw = x_z[:, :, :required_length]
 
-        # ── raw patch 编译为知识 query ──
-        use_global = self.config.use_global_knowledge
-        assert use_global or nseg > 0, (
-            "global knowledge disabled requires local knowledge "
-            "(--no-use_global_knowledge 需配合 --use_local_knowledge)")
-        group_feat_g = None
-        q_g = None
-        if use_global:
-            group_raw_g, group_feat_g = self._group_raw_tokens(
-                x_z, global_fc.to(torch.float32), global_psd.to(torch.float32))
-            q_g = self.knowledge_compiler(group_raw_g)           # (B, 3, d)
-        group_feat_l = None
-        q_l = None
-        if nseg > 0:
-            fc_l = local_fc.reshape(B * nseg, N, N).to(torch.float32)
-            psd_l = local_psd.reshape(
-                B * nseg, N, local_psd.shape[-1]).to(torch.float32)
-            group_raw_l, group_feat_l = self._group_raw_tokens(xl, fc_l, psd_l)
-            q_l = self.knowledge_compiler(group_raw_l)
+        # ── 每窗 raw patch 编译为知识 query ──
+        q_wins = []
+        feat_wins = []
+        for k in range(nwin):
+            s = k * stride
+            win = xw[:, :, s:s + win_len]
+            fc_k = window_fc[:, k].to(torch.float32)
+            psd_k = window_psd[:, k].to(torch.float32)
+            group_raw, group_feat = self._group_raw_tokens(win, fc_k, psd_k)
+            q_wins.append(self.knowledge_compiler(group_raw))   # (B, 3, d)
+            if group_feat is not None:
+                feat_wins.append(torch.stack(group_feat, dim=1))  # (B, 3, 256)
+        q_all = torch.stack(q_wins, dim=1)                      # (B, nwin, 3, d)
+        q_flat = q_all.reshape(B, nwin * self.num_aspects, self.d_model)
+        q_all = q_flat                                          # 诊断输出用扁平形式
 
         # ── 对比学习组特征（映射知识特征之前）：三族各 1 个 256 维向量/窗口 ──
         contrast_vec = None
-        if self.use_patch_embeds:
-            feats_blocks = []
-            if group_feat_g is not None:
-                feats_blocks.append(
-                    torch.stack(group_feat_g, dim=1).unsqueeze(1))  # (B,1,3,256)
-            if group_feat_l is not None:
-                feats_blocks.append(
-                    torch.stack(group_feat_l, dim=1).view(
-                        B, nseg, 3, 256))                       # (B,6,3,256)
-            if feats_blocks:
-                feats = torch.cat(feats_blocks, dim=1).permute(
-                    0, 2, 1, 3)                                 # (B,3,K,256)
-                # 逐块固定 RMSNorm 后族内均值（防全局/局部范数差主导）
-                feats = feats / (feats.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
-                contrast_vec = feats.mean(dim=-2)               # (B,3,256)
+        if self.use_patch_embeds and feat_wins:
+            feats = torch.stack(feat_wins, dim=1)               # (B, nwin, 3, 256)
+            feats = feats.permute(0, 2, 1, 3)                   # (B, 3, nwin, 256)
+            # 逐窗固定 RMSNorm 后族内均值（防窗间范数差主导）
+            feats = feats / (feats.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
+            contrast_vec = feats.mean(dim=-2)                   # (B, 3, 256)
 
         # ── reprogram → soft prompt (4096) ──
         reprogram_dtype = \
             self.reprogramming_layer.query_projection.weight.dtype
         num_anchors = self.config.num_anchors
-        knowledge_parts = []
-        q_parts = []
         if self.use_semantic_prototypes:
             # Bank order is aspect-major: [FC x N, spectrum x N, morphology x N].
             banks_base = self.semantic_bank().reshape(
                 self.num_aspects * num_anchors,
                 self.config.description_prototypes,
                 self.d_llm)
-            if q_g is not None:
-                q_g_reprogram = q_g.repeat_interleave(num_anchors, dim=1)
-                soft_g = self.reprogramming_layer(
-                    q_g_reprogram.to(dtype=reprogram_dtype),
-                    banks_base.to(dtype=reprogram_dtype),
-                    banks_base.to(dtype=reprogram_dtype))       # (B, 3N, 4096)
-                knowledge_parts.append(soft_g)
-                q_parts.append(q_g)
+            # Every window reuses the same frozen semantic ids and
+            # trainable candidate-space mappings.
+            q_reprogram = q_flat.repeat_interleave(num_anchors, dim=1)
+            banks_w = banks_base.repeat(nwin, 1, 1)
+            knowledge = self.reprogramming_layer(
+                q_reprogram.to(dtype=reprogram_dtype),
+                banks_w.to(dtype=reprogram_dtype),
+                banks_w.to(dtype=reprogram_dtype)
+            ).view(B, nwin * self.num_aspects * num_anchors, self.d_llm)
         else:
             # 旧路径（消融基线）：全词表学习混合 mapping_layer
             word_embeddings = self.word_embeddings.permute(1, 0).to(
                 dtype=self.mapping_layer.weight.dtype)
             source_embeddings = self.mapping_layer(
                 word_embeddings).permute(1, 0)                  # (M, 4096)
-            if q_g is not None:
-                soft_g = self.reprogramming_layer(
-                    q_g.to(dtype=reprogram_dtype),
-                    source_embeddings.to(dtype=reprogram_dtype),
-                    source_embeddings.to(dtype=reprogram_dtype))  # (B, 3, 4096)
-                knowledge_parts.append(soft_g)
-                q_parts.append(q_g)
-        if nseg > 0:
-            if self.use_semantic_prototypes:
-                # Every local block reuses the same frozen semantic ids and
-                # trainable candidate-space mappings.
-                q_l_reprogram = q_l.view(
-                    B, nseg * self.num_aspects, self.d_model
-                ).repeat_interleave(num_anchors, dim=1)
-                banks_l = banks_base.repeat(nseg, 1, 1)
-                soft_l = self.reprogramming_layer(
-                    q_l_reprogram.to(dtype=reprogram_dtype),
-                    banks_l.to(dtype=reprogram_dtype),
-                    banks_l.to(dtype=reprogram_dtype)
-                ).view(B, nseg * self.num_aspects * num_anchors, self.d_llm)
-            else:
-                q_l_reprogram = q_l.view(
-                    B, nseg * self.num_aspects, self.d_model)
-                soft_l = self.reprogramming_layer(
-                    q_l_reprogram.to(dtype=reprogram_dtype),
-                    source_embeddings.to(dtype=reprogram_dtype),
-                    source_embeddings.to(dtype=reprogram_dtype)
-                ).view(B, nseg * self.num_aspects, self.d_llm)  # (B, 6x3, 4096)
-            knowledge_parts.append(soft_l)
-            q_parts.append(
-                q_l.view(B, nseg * self.num_aspects, self.d_model))
-        knowledge = torch.cat(knowledge_parts, dim=1)           # (B, S_k, 4096)
-        q_all = torch.cat(q_parts, dim=1)
+            knowledge = self.reprogramming_layer(
+                q_flat.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype),
+                source_embeddings.to(dtype=reprogram_dtype)
+            ).view(B, nwin * self.num_aspects, self.d_llm)
 
         # ── aspect phrase 融合：phrase 只作身份锚点 ──
         if self.use_semantic_prototypes:
@@ -570,14 +511,9 @@ class Model(nn.Module):
             # The full-vocabulary ablation emits one token per aspect.
             phrase_base = self.knowledge_compiler.phrase_bank
         phrase_slots = phrase_base.shape[0]
-        phrase_parts = []
-        if q_g is not None:
-            phrase_parts.append(phrase_base.unsqueeze(0).expand(B, -1, -1))
-        if nseg > 0:
-            phrase_parts.append(phrase_base.unsqueeze(0).unsqueeze(0).expand(
-                B, nseg, -1, -1).reshape(
-                B, nseg * phrase_slots, self.d_llm))
-        phrase = torch.cat(phrase_parts, dim=1)
+        phrase = phrase_base.unsqueeze(0).unsqueeze(0).expand(
+            B, nwin, -1, -1).reshape(
+            B, nwin * phrase_slots, self.d_llm)
         knowledge = self.ref_rms * rms_norm(
             knowledge + self.phrase_beta * phrase)
         S_k = knowledge.shape[1]

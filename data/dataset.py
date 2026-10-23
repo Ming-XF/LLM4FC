@@ -88,9 +88,9 @@ class BaseDataset(Dataset):
         try:
             required = {
                 'feature_version', 'source_size', 'source_mtime_ns',
-                'source_shape', 'hz', 'num_local_segments', 'sample_index',
-                'subject_id', 'global_fc', 'local_fc', 'global_psd',
-                'local_psd', 'local_mask',
+                'source_shape', 'hz', 'num_windows', 'window_seconds',
+                'stride_seconds', 'sample_index',
+                'subject_id', 'window_fc', 'window_psd', 'window_mask',
             }
             missing = required.difference(features.files)
             if missing:
@@ -147,13 +147,13 @@ class BaseDataset(Dataset):
                         f"Feature source metadata {feature_field!r} does not "
                         f"match raw NPZ")
 
-            num_segments = int(np.asarray(features['num_local_segments']).item())
+            num_windows = int(np.asarray(features['num_windows']).item())
+            window_seconds = int(np.asarray(features['window_seconds']).item())
+            stride_seconds = int(np.asarray(features['stride_seconds']).item())
             expected = {
-                'global_fc': (num_samples, num_channels, num_channels),
-                'local_fc': (num_samples, num_segments, num_channels, num_channels),
-                'global_psd': (num_samples, num_channels, None),
-                'local_psd': (num_samples, num_segments, num_channels, None),
-                'local_mask': (num_samples, num_segments),
+                'window_fc': (num_samples, num_windows, num_channels, num_channels),
+                'window_psd': (num_samples, num_windows, num_channels, None),
+                'window_mask': (num_samples, num_windows),
             }
             arrays = {}
             for name, shape in expected.items():
@@ -164,12 +164,12 @@ class BaseDataset(Dataset):
                     raise ValueError(
                         f"Feature {name} has shape {array.shape}, expected {shape}")
                 arrays[name] = array
-            if arrays['global_psd'].shape[-1] != arrays['local_psd'].shape[-1]:
-                raise ValueError("Global and local PSD frequency dimensions differ")
 
             self.all_data.update(arrays)
             self.data_config.hz = hz
-            self.data_config.num_local_segments = num_segments
+            self.data_config.num_knowledge_windows = num_windows
+            self.data_config.window_seconds = window_seconds
+            self.data_config.stride_seconds = stride_seconds
         finally:
             features.close()
 
@@ -179,16 +179,12 @@ class BaseDataset(Dataset):
             return None
         return {
             'time_series': time_series,
-            'global_fc': torch.from_numpy(
-                self.all_data['global_fc'][sample_idx]).float(),
-            'global_psd': torch.from_numpy(
-                self.all_data['global_psd'][sample_idx]).float(),
-            'local_fc': torch.from_numpy(
-                self.all_data['local_fc'][sample_idx]).float(),
-            'local_psd': torch.from_numpy(
-                self.all_data['local_psd'][sample_idx]).float(),
-            'local_mask': torch.from_numpy(
-                self.all_data['local_mask'][sample_idx]).bool(),
+            'window_fc': torch.from_numpy(
+                self.all_data['window_fc'][sample_idx]).float(),
+            'window_psd': torch.from_numpy(
+                self.all_data['window_psd'][sample_idx]).float(),
+            'window_mask': torch.from_numpy(
+                self.all_data['window_mask'][sample_idx]).bool(),
             'labels': labels,
         }
 

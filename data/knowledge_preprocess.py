@@ -16,9 +16,10 @@ import numpy as np
 import torch
 
 
-FEATURE_VERSION = "timellmknowledge_v1"
-DEFAULT_NUM_LOCAL_SEGMENTS = 6
-DEFAULT_LOCAL_SECONDS = 10
+FEATURE_VERSION = "timellmknowledge_v2"
+DEFAULT_NUM_WINDOWS = 7
+DEFAULT_WINDOW_SECONDS = 30
+DEFAULT_STRIDE_SECONDS = 5
 DEFAULT_PSD_WINDOW_SECONDS = 4
 DEFAULT_PSD_OVERLAP = 0.5
 DEFAULT_FMIN = 0.5
@@ -87,8 +88,9 @@ def _relative_psd(x, hz, window_seconds, overlap, fmin, fmax):
 def preprocess_timellmknowledge_features(
         input_npz,
         output_npz=None,
-        num_local_segments=DEFAULT_NUM_LOCAL_SEGMENTS,
-        local_seconds=DEFAULT_LOCAL_SECONDS,
+        num_windows=DEFAULT_NUM_WINDOWS,
+        window_seconds=DEFAULT_WINDOW_SECONDS,
+        stride_seconds=DEFAULT_STRIDE_SECONDS,
         psd_window_seconds=DEFAULT_PSD_WINDOW_SECONDS,
         psd_overlap=DEFAULT_PSD_OVERLAP,
         fmin=DEFAULT_FMIN,
@@ -127,12 +129,14 @@ def preprocess_timellmknowledge_features(
         if subject_id.shape[0] != num_samples:
             raise ValueError("subject_id length does not match timeseries")
 
-        segment_length = int(local_seconds * hz)
-        required_length = num_local_segments * segment_length
+        window_length = int(window_seconds * hz)
+        stride = int(stride_seconds * hz)
+        required_length = (num_windows - 1) * stride + window_length
         if num_timepoints < required_length:
             raise ValueError(
-                f"Need at least {required_length} samples for {num_local_segments} local "
-                f"segments, got {num_timepoints}")
+                f"Need at least {required_length} samples for {num_windows} "
+                f"{window_seconds}s windows (stride {stride_seconds}s), "
+                f"got {num_timepoints}")
 
         probe = torch.as_tensor(
             np.asarray(time_series[0:1], dtype=np.float32), device=device)
@@ -144,18 +148,12 @@ def preprocess_timellmknowledge_features(
         with tempfile.TemporaryDirectory(
                 prefix="timellmknowledge_", dir=output_path.parent) as temp_dir:
             temp_dir = Path(temp_dir)
-            global_fc = np.memmap(
-                temp_dir / "global_fc.dat", mode="w+", dtype=np.float32,
-                shape=(num_samples, num_channels, num_channels))
-            local_fc = np.memmap(
-                temp_dir / "local_fc.dat", mode="w+", dtype=np.float32,
-                shape=(num_samples, num_local_segments, num_channels, num_channels))
-            global_psd = np.memmap(
-                temp_dir / "global_psd.dat", mode="w+", dtype=np.float32,
-                shape=(num_samples, num_channels, num_freqs))
-            local_psd = np.memmap(
-                temp_dir / "local_psd.dat", mode="w+", dtype=np.float32,
-                shape=(num_samples, num_local_segments, num_channels, num_freqs))
+            window_fc = np.memmap(
+                temp_dir / "window_fc.dat", mode="w+", dtype=np.float32,
+                shape=(num_samples, num_windows, num_channels, num_channels))
+            window_psd = np.memmap(
+                temp_dir / "window_psd.dat", mode="w+", dtype=np.float32,
+                shape=(num_samples, num_windows, num_channels, num_freqs))
 
             with torch.no_grad():
                 for start in range(0, num_samples, batch_size):
@@ -163,33 +161,19 @@ def preprocess_timellmknowledge_features(
                     x = torch.as_tensor(
                         np.asarray(time_series[start:stop], dtype=np.float32),
                         device=device)
-                    g_fc = _correlation_matrix(x)
-                    g_psd, _ = _relative_psd(
-                        x, hz, psd_window_seconds, psd_overlap, fmin, fmax)
-
-                    local = x[..., :required_length]
-                    local = local.reshape(
-                        stop - start, num_channels, num_local_segments,
-                        segment_length)
-                    local = local.permute(0, 2, 1, 3).contiguous().reshape(
-                        (stop - start) * num_local_segments,
-                        num_channels, segment_length)
-                    l_fc = _correlation_matrix(local).reshape(
-                        stop - start, num_local_segments,
-                        num_channels, num_channels)
-                    l_psd, _ = _relative_psd(
-                        local, hz, psd_window_seconds, psd_overlap, fmin, fmax)
-                    l_psd = l_psd.reshape(
-                        stop - start, num_local_segments,
-                        num_channels, num_freqs)
-
-                    global_fc[start:stop] = g_fc.cpu().numpy()
-                    global_psd[start:stop] = g_psd.cpu().numpy()
-                    local_fc[start:stop] = l_fc.cpu().numpy()
-                    local_psd[start:stop] = l_psd.cpu().numpy()
+                    xw = x[..., :required_length]
+                    for k in range(num_windows):
+                        s = k * stride
+                        win = xw[..., s:s + window_length]
+                        w_fc = _correlation_matrix(win)
+                        w_psd, _ = _relative_psd(
+                            win, hz, psd_window_seconds, psd_overlap,
+                            fmin, fmax)
+                        window_fc[start:stop, k] = w_fc.cpu().numpy()
+                        window_psd[start:stop, k] = w_psd.cpu().numpy()
                     print(f"  processed {stop}/{num_samples}", flush=True)
 
-            for array in (global_fc, local_fc, global_psd, local_psd):
+            for array in (window_fc, window_psd):
                 array.flush()
 
             stat = input_path.stat()
@@ -210,9 +194,9 @@ def preprocess_timellmknowledge_features(
                     source_mtime_ns=np.asarray(stat.st_mtime_ns, dtype=np.int64),
                     source_shape=np.asarray(time_series.shape, dtype=np.int64),
                     hz=np.asarray(hz, dtype=np.int64),
-                    num_local_segments=np.asarray(
-                        num_local_segments, dtype=np.int64),
-                    local_seconds=np.asarray(local_seconds, dtype=np.int64),
+                    num_windows=np.asarray(num_windows, dtype=np.int64),
+                    window_seconds=np.asarray(window_seconds, dtype=np.int64),
+                    stride_seconds=np.asarray(stride_seconds, dtype=np.int64),
                     psd_window_seconds=np.asarray(
                         psd_window_seconds, dtype=np.int64),
                     psd_overlap=np.asarray(psd_overlap, dtype=np.float32),
@@ -221,12 +205,10 @@ def preprocess_timellmknowledge_features(
                     frequencies=retained_freqs.cpu().numpy().astype(np.float32),
                     sample_index=np.arange(num_samples, dtype=np.int64),
                     subject_id=subject_id.astype(str),
-                    global_fc=global_fc,
-                    local_fc=local_fc,
-                    global_psd=global_psd,
-                    local_psd=local_psd,
-                    local_mask=np.ones(
-                        (num_samples, num_local_segments), dtype=np.bool_),
+                    window_fc=window_fc,
+                    window_psd=window_psd,
+                    window_mask=np.ones(
+                        (num_samples, num_windows), dtype=np.bool_),
                     **source_metadata,
                 )
                 os.replace(temporary_output, output_path)
@@ -248,6 +230,9 @@ def _parse_args():
     parser.add_argument(
         "--all-supported", action="store_true",
         help="process all CAUEEG, TUAB, and TUEP task NPZ files that exist")
+    parser.add_argument("--num-windows", type=int, default=DEFAULT_NUM_WINDOWS)
+    parser.add_argument("--window-seconds", type=int, default=DEFAULT_WINDOW_SECONDS)
+    parser.add_argument("--stride-seconds", type=int, default=DEFAULT_STRIDE_SECONDS)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--overwrite", action="store_true")
@@ -264,14 +249,20 @@ def main():
                 print(f"Skip missing raw NPZ: {raw_path}")
                 continue
             preprocess_timellmknowledge_features(
-                raw_path, batch_size=args.batch_size, device=args.device,
+                raw_path, num_windows=args.num_windows,
+                window_seconds=args.window_seconds,
+                stride_seconds=args.stride_seconds,
+                batch_size=args.batch_size, device=args.device,
                 overwrite=args.overwrite)
         return
     if not args.input:
         raise ValueError("Specify --input or --all-supported")
     preprocess_timellmknowledge_features(
-        args.input, output_npz=args.output, batch_size=args.batch_size,
-        device=args.device, overwrite=args.overwrite)
+        args.input, output_npz=args.output, num_windows=args.num_windows,
+        window_seconds=args.window_seconds,
+        stride_seconds=args.stride_seconds,
+        batch_size=args.batch_size, device=args.device,
+        overwrite=args.overwrite)
 
 
 if __name__ == "__main__":
