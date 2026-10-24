@@ -240,13 +240,19 @@ def main(args):
 
                 # run = wandb.init(project=args.project, entity=args.wandb_entity, reinit=True, group=f"{group_name}", tags=[args.dataset])
 
-                trainer = eval(args.model + 'Trainer')(args, local_rank=local_rank, task_id=i)
                 if args.abla_channel >= 0:
-                    init_logger(f'{args.log_dir}/train_{args.model}{args.append}_wo_C{args.abla_channel}_{args.dataset}.log')
+                    log_file = (f'{args.log_dir}/train_{args.model}{args.append}'
+                                f'_wo_C{args.abla_channel}_{args.dataset}.log')
                 elif args.abla_vae != "n":
-                    init_logger(f'{args.log_dir}/train_{args.model}{args.append}_wo_{args.abla_vae}_{args.dataset}.log')
+                    log_file = (f'{args.log_dir}/train_{args.model}{args.append}'
+                                f'_wo_{args.abla_vae}_{args.dataset}.log')
                 else:
-                    init_logger(f'{args.log_dir}/train_{args.model}{args.append}_{args.dataset}.log')
+                    log_file = (f'{args.log_dir}/train_{args.model}{args.append}'
+                                f'_{args.dataset}.log')
+                # 生成锚点记录需写入本次运行日志（生成发生在 init_logger 之前）
+                args.gen_log_path = log_file
+                trainer = eval(args.model + 'Trainer')(args, local_rank=local_rank, task_id=i)
+                init_logger(log_file)
                 if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
                     logger.info(f"{'#'*10} Repeat:{i} {'#'*10}")
                     log_explicit_args(args)
@@ -272,17 +278,23 @@ def main(args):
     elif args.do_test:
         if transfer_mode and is_zero_shot:
             # ── Zero-shot 纯评估（无训练）──
-            trainer = eval(args.model + 'Trainer')(args)
-            init_logger(f'{args.log_dir}/test_{args.model}{args.append}'
+            log_file = (f'{args.log_dir}/test_{args.model}{args.append}'
                         f'_zero-shot_{args.dataset}.log')
+            # 生成锚点记录需写入本次运行日志（生成发生在 init_logger 之前）
+            args.gen_log_path = log_file
+            trainer = eval(args.model + 'Trainer')(args)
+            init_logger(log_file)
             log_explicit_args(args)
             trainer.load_model(path=args.pretrain_path)
             trainer.model.eval()
             trainer.evaluate()
         else:
-            trainer = eval(args.model + 'Trainer')(args)
-            init_logger(f'{args.log_dir}/test_{args.model}{args.append}'
+            log_file = (f'{args.log_dir}/test_{args.model}{args.append}'
                         f'_{args.dataset}.log')
+            # 生成锚点记录需写入本次运行日志（生成发生在 init_logger 之前）
+            args.gen_log_path = log_file
+            trainer = eval(args.model + 'Trainer')(args)
+            init_logger(log_file)
             log_explicit_args(args)
             trainer.load_model()
             trainer.evaluate()

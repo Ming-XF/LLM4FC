@@ -5,14 +5,15 @@
 # Run: sh scripts/eval_TimeLLMKnowledge_zs.sh
 #
 
-TARGET_DATASET="DiseaseTUAB"
-PRETRAIN_PATH="./output_dir/TimeLLMKnowledge_DiseaseCAUEEG_train"
+TARGET_DATASET="DiseaseTUEP"
+PRETRAIN_PATH="./output_dir/api300/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
     --dataset "$TARGET_DATASET" \
     --pretrain_path "$PRETRAIN_PATH" \
     --few_shot 0 \
+    --append "_api300" \
     --batch_size 16 \
     --d_model 128 \
     --num_heads 8 \
@@ -25,6 +26,8 @@ python main.py \
     --contrast_lambda 0.1 \
     --freeze_head_bias \
     --use_semantic_prototypes \
+    --anchor_select api \
+    --gen_num_keywords 300 \
     --knowledge_anchor_candidates 1000 \
     --knowledge_anchors 10 \
     --knowledge_description_candidates 1000 \

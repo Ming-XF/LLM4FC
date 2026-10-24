@@ -1,18 +1,15 @@
-10/23/2026 02:14:44 - INFO - __main__ -   ########## Repeat:0 ##########
-10/23/2026 02:14:44 - INFO - __main__ -   ==================== Explicit args ====================
-  append: _win7
+10/24/2026 22:12:17 - INFO - __main__ -   ==================== Explicit args ====================
+  anchor_select: api
+  append: _api0
+  batch_size: 16
   contrast_lambda: 0.1
   d_model: 128
-  dataset: DiseaseCAUEEG
-  deepspeed: True
-  deepspeed_config: deepspeed/train_patch.json
-  do_evaluate: True
+  dataset: DiseaseTUAB
   do_test: True
-  do_train: True
   dropout: 0.1
-  early_stop_metric: AUC
-  early_stop_patience: 20
+  few_shot: 0
   freeze_head_bias: True
+  gen_num_keywords: 100
   knowledge_anchor_candidates: 1000
   knowledge_anchor_fusion: 0.1
   knowledge_anchors: 10
@@ -23,29 +20,24 @@
   llm_init: pretrained
   llm_path: ./model/deepseek-r1-distill-llama-8B
   llm_type: llama
-  local_rank: 0
   model: TimeLLMKnowledge
-  model_dir: output_dir/win7
-  num_epochs: 200
   num_heads: 8
   num_prototypes: 1000
-  num_repeat: 1
-  save_steps: 25
-  schedule: cos
+  pretrain_path: ./output_dir/api0/TimeLLMKnowledge_DiseaseCAUEEG_train
   use_patch_embeds: True
   use_semantic_prototypes: True
   use_task_prompt: True
-  warmup_steps: 400
-  [effective] batch_size: 32, learning_rate: 0.0001
-10/23/2026 02:14:44 - INFO - __main__ -   ==================== Full args (resolved) ====================
+  [effective] batch_size: 16, learning_rate: 0.0001
+10/24/2026 22:12:17 - INFO - __main__ -   ==================== Full args (resolved) ====================
   D: 2
   F1: 8
   abla_channel: -1
   abla_vae: n
   activation: gelu
   alpha: 1.0
-  append: _win7
-  batch_size: 32
+  anchor_select: api
+  append: _api0
+  batch_size: 16
   beta: 1.0
   beta1: 0.9
   beta2: 0.98
@@ -53,18 +45,18 @@
   d_ff: 128
   d_model: 128
   data_processors: 0
-  dataset: DiseaseCAUEEG
-  deepspeed: True
-  deepspeed_config: deepspeed/train_patch.json
+  dataset: DiseaseTUAB
+  deepspeed: False
+  deepspeed_config: ds_config_zero3.json
   device: cuda
   distill: False
-  do_evaluate: True
+  do_evaluate: False
   do_parallel: False
   do_test: True
-  do_train: True
+  do_train: False
   drop_last: False
   dropout: 0.1
-  early_stop_metric: AUC
+  early_stop_metric: Loss
   early_stop_patience: 20
   eps: 1e-08
   epsilon: 1e-09
@@ -73,6 +65,8 @@
   few_shot_seed: 42
   freeze_head_bias: True
   frequency: 500
+  gen_log_path: ./log_dir/test_TimeLLMKnowledge_api0_zero-shot_DiseaseTUAB.log
+  gen_num_keywords: 100
   initializer: None
   k: 5
   knowledge_anchor_candidates: 1000
@@ -92,7 +86,7 @@
   max_learning_rate: 0.001
   max_steps: -1
   model: TimeLLMKnowledge
-  model_dir: output_dir/win7
+  model_dir: output_dir
   no_weight_decay: False
   num_epochs: 200
   num_heads: 8
@@ -104,9 +98,9 @@
   optimizer: Adam
   p1: 4
   p2: 8
-  pretrain_path: 
+  pretrain_path: ./output_dir/api0/TimeLLMKnowledge_DiseaseCAUEEG_train
   project: 
-  save_steps: 25
+  save_steps: 200
   schedule: cos
   sparsity: 0.7
   standard_split: False
@@ -120,10 +114,13 @@
   wandb_entity: cwg
   warmup_steps: 400
   weight_decay: 0.0001
-10/23/2026 02:14:44 - INFO - utils.trainer -   ***** Running training *****
-10/23/2026 02:14:44 - INFO - utils.trainer -     Num examples = 56
-10/23/2026 02:14:44 - INFO - utils.trainer -     Num Epochs = 200
-10/23/2026 02:14:44 - INFO - utils.trainer -     Total train batch size = 32
-10/23/2026 02:14:44 - INFO - utils.trainer -     warmup steps = 400
-10/23/2026 02:14:44 - INFO - utils.trainer -     Total optimization steps = 11200
-10/23/2026 02:14:44 - INFO - utils.trainer -     Save steps = 25
+10/24/2026 22:12:17 - INFO - utils.trainer -     1 prompt-buffer key(s) skipped (kept target-task prompt)
+10/24/2026 22:12:17 - INFO - utils.trainer -     583 keys not in checkpoint (kept from init)
+10/24/2026 22:12:17 - INFO - utils.trainer -   Model loaded from ./output_dir/api0/TimeLLMKnowledge_DiseaseCAUEEG_train/TimeLLMKnowledge-0.bin (33/34 keys)
+10/24/2026 22:12:17 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
+10/24/2026 22:12:31 - INFO - utils.trainer -   Loss: 1.11456
+10/24/2026 22:12:31 - INFO - utils.trainer -   AUC: 0.70501
+10/24/2026 22:12:31 - INFO - utils.trainer -   Accuracy: 0.67138
+10/24/2026 22:12:31 - INFO - utils.trainer -   Precision: 0.68033
+10/24/2026 22:12:31 - INFO - utils.trainer -   Specificity: 0.60406
+10/24/2026 22:12:31 - INFO - utils.trainer -   Sensitivity: 0.72967

@@ -42,6 +42,10 @@ def init_model_config(args, data_config: DataConfig):
             contrast_lambda=args.contrast_lambda,
             freeze_head_bias=args.freeze_head_bias,
             use_semantic_prototypes=args.use_semantic_prototypes,
+            anchor_select=args.anchor_select,
+            gen_num_keywords=args.gen_num_keywords,
+            gen_log_path=getattr(args, 'gen_log_path', None),
+            generate_at_init=args.do_train and not args.pretrain_path,
             anchor_candidates=args.knowledge_anchor_candidates,
             num_anchors=args.knowledge_anchors,
             description_candidates=args.knowledge_description_candidates,
@@ -181,6 +185,20 @@ def init_config():
         "--knowledge_similarity", choices=["cosine", "centered_cosine"],
         default="centered_cosine",
         help="Similarity used for frozen vocabulary candidate retrieval")
+    model_group.add_argument(
+        "--anchor_select", choices=["cosine", "api"], default="cosine",
+        help="TimeLLMKnowledge: first-level anchor candidate source — "
+             "cosine retrieval over the frozen vocabulary (default) or "
+             "external DeepSeek API keyword list ('api', cached to "
+             "api_anchor_keywords.json; delete the file to regenerate)")
+    model_group.add_argument(
+        "--gen_num_keywords", default=100, type=int,
+        help="TimeLLMKnowledge: number of keywords requested from the "
+             "DeepSeek API per aspect when --anchor_select api; the parsed "
+             "list is also truncated to this count. The anchor pool size K "
+             "is the deduplicated token count of these keywords (same cache "
+             "on train and eval runs). Delete api_anchor_keywords.json to "
+             "regenerate with a new value.")
     model_group.add_argument(
         "--knowledge_aspect_mix", default=0.6, type=float,
         help="Weight of aspect text when selecting second-level descriptions")

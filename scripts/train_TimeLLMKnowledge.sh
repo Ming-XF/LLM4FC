@@ -24,7 +24,8 @@ deepspeed --num_gpus=2 main.py \
     --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
-    --model_dir output_dir \
+    --append "_api300" \
+    --model_dir output_dir/api300 \
     --d_model 128 \
     --num_heads 8 \
     --dropout 0.1 \
@@ -36,6 +37,8 @@ deepspeed --num_gpus=2 main.py \
     --contrast_lambda 0.1 \
     --freeze_head_bias \
     --use_semantic_prototypes \
+    --anchor_select api \
+    --gen_num_keywords 300 \
     --knowledge_anchor_candidates 1000 \
     --knowledge_anchors 10 \
     --knowledge_description_candidates 1000 \

@@ -43,8 +43,7 @@ class FCEmbed(nn.Module):
     → Conv2d(32→32, k=(6,1)) → GELU → AdaptiveAvgPool1d(4)（沿通道维）
     → (B,32,2,4) → flatten(256) → RMSNorm → Linear(256→d_model)。
 
-    forward 返回 (tokens, feat)：feat = head 之前的 (B,256) 组特征，
-    供融合路径使用。
+    forward 返回族 token (B, d_model)。
     """
 
     def __init__(self, d_model, mid=32):
@@ -66,9 +65,8 @@ class FCEmbed(nn.Module):
         h = self._pool1d(h, 2)                        # 沿 W 维 → (B, 32, 19, 2)
         h = F.gelu(self.conv2(h))                     # (B, 32, 14, 2)
         h = self._pool1d(h.permute(0, 1, 3, 2), 4)    # 沿 H 维 → (B, 32, 2, 4)
-        feat = rms_norm(h.flatten(1))                 # (B, 256) 组特征(分化前)
-        token = self.head(feat)
-        return token, feat
+        feat = rms_norm(h.flatten(1))                 # (B, 256) 主干特征
+        return self.head(feat)                        # (B, d_model) 族 token
 
 
 class SpecEmbed(nn.Module):
@@ -77,8 +75,7 @@ class SpecEmbed(nn.Module):
     Conv1d(19→32, k=6, stride=6) → GELU → AdaptiveAvgPool1d(8)
     → flatten(256) → RMSNorm → Linear(256→d_model)。
 
-    forward 返回 (tokens, feat)：feat = head 之前的 (B,256) 组特征，
-    供融合路径使用。
+    forward 返回族 token (B, d_model)。
     """
 
     def __init__(self, d_model, mid=32, in_channels=19, kernel=6):
@@ -90,6 +87,5 @@ class SpecEmbed(nn.Module):
     def forward(self, x):
         h = F.gelu(self.conv(x))                      # (B, 32, ~F/6)
         h = F.adaptive_avg_pool1d(h, 8)               # (B, 32, 8)
-        feat = rms_norm(h.flatten(1))                 # (B, 256) 组特征(分化前)
-        token = self.head(feat)
-        return token, feat
+        feat = rms_norm(h.flatten(1))                 # (B, 256) 主干特征
+        return self.head(feat)                        # (B, d_model) 族 token

@@ -16,7 +16,8 @@
 语义原型（两级候选库）：
   三个方面文本在冻结词表中预选 K 个候选，经共享 Linear(K→N) 融合为 N 个
   refined knowledge；每个 refined knowledge 再预选 M 个描述，经共享
-  Linear(M→P) 得到自己的描述原型库。--no-use_semantic_prototypes 回退旧路径。
+  Linear(M→P) 得到自己的描述原型库。--anchor_select api 时第一级候选
+  改为外部 DeepSeek API 生成的关键词（缓存文件优先）。--no-use_semantic_prototypes 回退旧路径。
 
 序列：[N_win×3N 滑动窗口知识][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
 → 末层 prompt 末位位置 hidden state（无聚合/归一化）→ 4096→256 隐层
@@ -29,10 +30,10 @@
   - 输出头 bias 冻结在归一化标签先验（回归 0.5 / 分类 0）；
   - 无特征融合直连（fusion/bypass 路径已整体移除）。
 
-监督对比学习（三族组特征，映射知识特征之前）：
-  三族编码器（FC/频谱/形态）输出的组特征（7 个滑动窗口，Linear 分化前）
-  按族做逐窗 RMSNorm 后池化为 3 个 256 维向量（每族 1 个/窗口），经共享
-  Linear(256→128) 投影后按族独立计算监督 InfoNCE（同标签互为正对，无温度），
+监督对比学习（三族 token，族输出投影之后）：
+  三族编码器（FC/频谱/形态）输出的族 token（每窗每族 1 个，d_model=128 维）
+  按族做逐窗 RMSNorm 后跨窗口池化为 3 个 d_model 维向量，L2 归一化后
+  按族独立计算监督 InfoNCE（同标签互为正对，无温度），
   loss = CE + contrast_lambda·NCE（回归任务跳过）。
 """
 
@@ -44,10 +45,12 @@ import torch.nn.functional as F
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 
 from ..base import BaseConfig, ModelOutputs
-from .knowledge_compiler import KnowledgeCompiler, rms_norm
+from .knowledge_compiler import KnowledgeCompiler, rms_norm, _PHRASES
 from .patch_embeds import FCEmbed, SpecEmbed
 from .prompts import get_prompt_config
-from .semantic_prototypes import SemanticPrototypeBank
+from .semantic_prototypes import (
+    SemanticPrototypeBank, api_keyword_candidate_embeddings,
+    api_keyword_pool_size)
 
 _EPS = 1e-8
 
@@ -151,6 +154,10 @@ class TimeLLMKnowledgeConfig(BaseConfig):
                  freeze_head_bias=True,
                  phrase_beta_init=0.25,
                  use_semantic_prototypes=True,
+                 anchor_select='cosine',
+                 gen_num_keywords=100,
+                 gen_log_path=None,
+                 generate_at_init=True,
                  anchor_candidates=1000,
                  num_anchors=10,
                  description_candidates=1000,
@@ -183,6 +190,10 @@ class TimeLLMKnowledgeConfig(BaseConfig):
         self.freeze_head_bias = freeze_head_bias
         self.phrase_beta_init = phrase_beta_init
         self.use_semantic_prototypes = use_semantic_prototypes
+        self.anchor_select = anchor_select
+        self.gen_num_keywords = gen_num_keywords
+        self.gen_log_path = gen_log_path
+        self.generate_at_init = generate_at_init
         self.anchor_candidates = anchor_candidates
         self.num_anchors = num_anchors
         self.description_candidates = description_candidates
@@ -271,6 +282,27 @@ class Model(nn.Module):
             llm_type=self.llm_type,
         )
 
+        # ── 第一级候选来源：余弦检索（默认）或外部 API 关键词（缓存优先） ──
+        anchor_embeds = None
+        anchor_candidates = config.anchor_candidates
+        if config.anchor_select == 'api':
+            if config.generate_at_init:
+                anchor_embeds, anchor_candidates = api_keyword_candidate_embeddings(
+                    self._word_embeddings, self.tokenizer, _PHRASES,
+                    num_keywords=config.gen_num_keywords,
+                    gen_log_path=config.gen_log_path)
+            else:
+                # 评估端跳过生成：K 由关键词缓存推导（去重 token 数取
+                # 三方面最大，只读缓存不调 API），占位嵌入只保证形状，
+                # 内容由 load_model 用 checkpoint 中的
+                # anchor_candidate_embeddings buffer 覆盖
+                d_llm = self._word_embeddings.weight.shape[1]
+                anchor_candidates = api_keyword_pool_size(
+                    self.tokenizer, _PHRASES, config.gen_num_keywords)
+                anchor_embeds = torch.zeros(
+                    config.num_aspects, anchor_candidates, d_llm,
+                    dtype=self._word_embeddings.weight.dtype)
+
         # ── raw 分支：三个方面各生成一个 d_model query ──
         self.num_aspects = config.num_aspects
         if self.num_aspects != 3:
@@ -296,13 +328,14 @@ class Model(nn.Module):
                 phrase_bank=self.knowledge_compiler.phrase_bank,
                 word_embeddings=self.word_embeddings,
                 tokenizer=self.tokenizer,
-                anchor_candidates=config.anchor_candidates,
+                anchor_candidates=anchor_candidates,
                 num_anchors=config.num_anchors,
                 description_candidates=config.description_candidates,
                 num_prototypes=config.description_prototypes,
                 similarity=config.semantic_similarity,
                 aspect_mix=config.semantic_aspect_mix,
                 anchor_fusion_init=config.semantic_anchor_fusion,
+                anchor_candidate_embeddings=anchor_embeds,
             )
             self.mapping_layer = None
         else:
@@ -338,8 +371,6 @@ class Model(nn.Module):
         )
         self.output_proj = nn.Linear(256, config.output_dim)
         self.output_dropout = nn.Dropout(config.dropout)
-        # 监督对比投影头：三族组特征共享（256→128，无温度 InfoNCE）
-        self.contrast_head = nn.Linear(256, 128)
         if config.freeze_head_bias:
             # bias 冻结在归一化标签先验（均值预测"送分项"提前给）
             prior = 0.5 if self.task_type == 'regression' else 0.0
@@ -363,30 +394,27 @@ class Model(nn.Module):
         return self
 
     def _group_raw_tokens(self, x_z, static_fc, relative_psd):
-        """组装 (B, 3, d_model) 方面 query + 三组 256 维组特征。
+        """组装 (B, 3, d_model) 方面 query。
 
-        返回 (group_raw, group_feat)：group_feat = (fc_f, spec_f, morph_f)，
-        供对比学习使用；旧路径无组特征
-        → 返回 None。"""
+        三族编码器输出族 token（族输出投影之后）；旧路径（消融对照）
+        共享 PatchStem → 三方面投影。"""
         if self.use_patch_embeds:
-            fc_t, fc_f = self.fc_embed(static_fc.unsqueeze(1))  # (B,d),(B,256)
-            spec_t, spec_f = self.spec_embed(relative_psd)      # (B,d),(B,256)
-            morph_f = self.patch_stem(x_z)                      # (B,256)
-            morph_t = self.morph_head(morph_f)                   # (B,d)
-            return torch.stack([fc_t, spec_t, morph_t], dim=1), \
-                (fc_f, spec_f, morph_f)
+            fc_t = self.fc_embed(static_fc.unsqueeze(1))        # (B, d)
+            spec_t = self.spec_embed(relative_psd)              # (B, d)
+            morph_t = self.morph_head(self.patch_stem(x_z))     # (B, d)
+            return torch.stack([fc_t, spec_t, morph_t], dim=1)
         # 旧路径（消融对照）：共享 PatchStem → 三方面投影
         return self.raw_projection(self.patch_stem(x_z)).view(
-            x_z.shape[0], self.num_aspects, self.d_model), None
+            x_z.shape[0], self.num_aspects, self.d_model)
 
     def _contrastive_loss(self, v, labels):
-        """监督对比损失：三族组特征（映射知识特征之前）逐族独立 InfoNCE。
+        """监督对比损失：三族 token（族输出投影之后）逐族独立 InfoNCE。
 
-        v: (B, 3, 256) 三族（FC/频谱/形态）组特征，labels: (B,) 类索引。
+        v: (B, 3, d_model) 三族（FC/频谱/形态）token，labels: (B,) 类索引。
         同标签互为正对、自身排除，无温度（logits = 归一化内积）。
         无正对的行跳过；各族损失取平均；整批无正对时返回 None。
         """
-        p = F.normalize(self.contrast_head(v), dim=-1)          # (B, 3, 128)
+        p = F.normalize(v, dim=-1)                              # (B, 3, d_model)
         B = p.shape[0]
         eye = torch.eye(B, device=p.device, dtype=torch.bool)
         pos_mask = (labels.unsqueeze(0) == labels.unsqueeze(1)) & ~eye
@@ -448,28 +476,28 @@ class Model(nn.Module):
 
         # ── 每窗 raw patch 编译为知识 query ──
         q_wins = []
-        feat_wins = []
+        tok_wins = []
         for k in range(nwin):
             s = k * stride
             win = xw[:, :, s:s + win_len]
             fc_k = window_fc[:, k].to(torch.float32)
             psd_k = window_psd[:, k].to(torch.float32)
-            group_raw, group_feat = self._group_raw_tokens(win, fc_k, psd_k)
+            group_raw = self._group_raw_tokens(win, fc_k, psd_k)
             q_wins.append(self.knowledge_compiler(group_raw))   # (B, 3, d)
-            if group_feat is not None:
-                feat_wins.append(torch.stack(group_feat, dim=1))  # (B, 3, 256)
+            if self.use_patch_embeds:
+                tok_wins.append(group_raw)                      # (B, 3, d_model)
         q_all = torch.stack(q_wins, dim=1)                      # (B, nwin, 3, d)
         q_flat = q_all.reshape(B, nwin * self.num_aspects, self.d_model)
         q_all = q_flat                                          # 诊断输出用扁平形式
 
-        # ── 对比学习组特征（映射知识特征之前）：三族各 1 个 256 维向量/窗口 ──
+        # ── 对比学习特征（族 token，输出投影之后）：每窗每族 1 个 d_model 维向量 ──
         contrast_vec = None
-        if self.use_patch_embeds and feat_wins:
-            feats = torch.stack(feat_wins, dim=1)               # (B, nwin, 3, 256)
-            feats = feats.permute(0, 2, 1, 3)                   # (B, 3, nwin, 256)
+        if self.use_patch_embeds and tok_wins:
+            toks = torch.stack(tok_wins, dim=1)                 # (B, nwin, 3, d_model)
+            toks = toks.permute(0, 2, 1, 3)                     # (B, 3, nwin, d_model)
             # 逐窗固定 RMSNorm 后族内均值（防窗间范数差主导）
-            feats = feats / (feats.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
-            contrast_vec = feats.mean(dim=-2)                   # (B, 3, 256)
+            toks = toks / (toks.pow(2).mean(-1, keepdim=True).sqrt().add(_EPS))
+            contrast_vec = toks.mean(dim=-2)                    # (B, 3, d_model)
 
         # ── reprogram → soft prompt (4096) ──
         reprogram_dtype = \
