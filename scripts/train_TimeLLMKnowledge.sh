@@ -24,8 +24,8 @@ deepspeed --num_gpus=2 main.py \
     --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
-    --append "_api300" \
-    --model_dir output_dir/api300 \
+    --append "_apimean300" \
+    --model_dir output_dir/apimean300 \
     --d_model 128 \
     --num_heads 8 \
     --dropout 0.1 \

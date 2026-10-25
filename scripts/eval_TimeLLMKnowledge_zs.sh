@@ -6,14 +6,14 @@
 #
 
 TARGET_DATASET="DiseaseTUEP"
-PRETRAIN_PATH="./output_dir/api300/TimeLLMKnowledge_DiseaseCAUEEG_train"
+PRETRAIN_PATH="./output_dir/apimean300/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
     --dataset "$TARGET_DATASET" \
     --pretrain_path "$PRETRAIN_PATH" \
     --few_shot 0 \
-    --append "_api300" \
+    --append "_apimean300" \
     --batch_size 16 \
     --d_model 128 \
     --num_heads 8 \

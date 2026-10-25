@@ -194,11 +194,11 @@ def init_config():
     model_group.add_argument(
         "--gen_num_keywords", default=100, type=int,
         help="TimeLLMKnowledge: number of keywords requested from the "
-             "DeepSeek API per aspect when --anchor_select api; the parsed "
-             "list is also truncated to this count. The anchor pool size K "
-             "is the deduplicated token count of these keywords (same cache "
-             "on train and eval runs). Delete api_anchor_keywords.json to "
-             "regenerate with a new value.")
+             "DeepSeek API per aspect when --anchor_select api. Each keyword "
+             "phrase is mean-pooled over its subword tokens into one row, so "
+             "the anchor pool size K equals this count (same cache on train "
+             "and eval runs). Delete api_anchor_keywords.json to regenerate "
+             "with a new value.")
     model_group.add_argument(
         "--knowledge_aspect_mix", default=0.6, type=float,
         help="Weight of aspect text when selecting second-level descriptions")

@@ -17,7 +17,9 @@
   三个方面文本在冻结词表中预选 K 个候选，经共享 Linear(K→N) 融合为 N 个
   refined knowledge；每个 refined knowledge 再预选 M 个描述，经共享
   Linear(M→P) 得到自己的描述原型库。--anchor_select api 时第一级候选
-  改为外部 DeepSeek API 生成的关键词（缓存文件优先）。--no-use_semantic_prototypes 回退旧路径。
+  改为外部 DeepSeek API 生成的关键词（缓存文件优先），每个关键词短语
+  以 subword token 平均池化为一行（一短语一知识行）。
+  --no-use_semantic_prototypes 回退旧路径。
 
 序列：[N_win×3N 滑动窗口知识][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
 → 末层 prompt 末位位置 hidden state（无聚合/归一化）→ 4096→256 隐层
@@ -292,13 +294,12 @@ class Model(nn.Module):
                     num_keywords=config.gen_num_keywords,
                     gen_log_path=config.gen_log_path)
             else:
-                # 评估端跳过生成：K 由关键词缓存推导（去重 token 数取
-                # 三方面最大，只读缓存不调 API），占位嵌入只保证形状，
-                # 内容由 load_model 用 checkpoint 中的
+                # 评估端跳过生成：K = 每方面关键词数（只读缓存不调 API），
+                # 占位嵌入只保证形状，内容由 load_model 用 checkpoint 中的
                 # anchor_candidate_embeddings buffer 覆盖
                 d_llm = self._word_embeddings.weight.shape[1]
                 anchor_candidates = api_keyword_pool_size(
-                    self.tokenizer, _PHRASES, config.gen_num_keywords)
+                    _PHRASES, config.gen_num_keywords)
                 anchor_embeds = torch.zeros(
                     config.num_aspects, anchor_candidates, d_llm,
                     dtype=self._word_embeddings.weight.dtype)

@@ -5,7 +5,9 @@ candidate source. The first-level pool is either cosine-retrieved from the
 frozen vocabulary against the aspect phrase (default) or harvested from
 external DeepSeek API keyword lists (--anchor_select api, cached to
 api_anchor_keywords.json; the cache file is authoritative — if it exists the
-API is not called again). A first candidate pool is linearly fused into
+API is not called again), where each keyword phrase is mean-pooled over its
+subword tokens into one phrase-level row (one row per keyword, no
+cross-keyword token dedup). A first candidate pool is linearly fused into
 several aspect-specific anchors; each anchor then owns a second description
 pool which is compressed into the prototypes consumed by reprogramming.
 """
@@ -136,15 +138,21 @@ def _load_or_fetch_keywords(phrases, num_keywords):
         return {p: data["keywords"][p] for p in phrases}, source
 
 
-def _dedup_token_ids(tokenizer, keywords):
-    """关键词按序 tokenize 后对 token 去重（保持首次出现顺序）。"""
-    ids, seen = [], set()
+def _phrase_mean_embeddings(emb, tokenizer, keywords):
+    """逐关键词短语做 subword token 平均池化：一短语一行平均词向量。
+
+    短语是最小语义单元，其语义由组成 token 的均值承载，不再跨短语
+    展平去重；个别短语 tokenize 为空时补零行兜底（0 行对融合层贡献
+    恒为 0），保证行数 = 关键词数不变。
+    """
+    rows = []
     for kw in keywords:
-        for tid in tokenizer.encode(" " + kw, add_special_tokens=False):
-            if tid not in seen:
-                seen.add(tid)
-                ids.append(tid)
-    return ids
+        ids = tokenizer.encode(" " + kw, add_special_tokens=False)
+        if ids:
+            rows.append(emb[torch.tensor(ids, dtype=torch.long)].mean(dim=0))
+        else:
+            rows.append(torch.zeros(emb.shape[1], dtype=emb.dtype))
+    return torch.stack(rows)                                   # (n_kw, d)
 
 
 def _read_keywords_from_cache(phrases):
@@ -161,51 +169,46 @@ def _read_keywords_from_cache(phrases):
     return data["keywords"]
 
 
-def api_keyword_pool_size(tokenizer, phrases, num_keywords):
-    """评估端占位用：只读缓存计算 K（三方面去重 token 数的最大值），不调 API。
+def api_keyword_pool_size(phrases, num_keywords):
+    """评估端占位用：K = 每方面关键词数（= num_keywords，等长无填充），
+    只读缓存校验齐全性，不调 API。
 
-    训练与评估在同一缓存下得到相同 K，保证 checkpoint 结构一致。
+    训练与评估在同一 num_keywords 下得到相同 K，保证 checkpoint 结构一致。
     """
-    keywords = _read_keywords_from_cache(phrases)
-    K = 0
-    for phrase in phrases:
-        K = max(K, len(_dedup_token_ids(
-            tokenizer, keywords[phrase][:num_keywords])))
-    return K
+    _read_keywords_from_cache(phrases)
+    return num_keywords
 
 
 def api_keyword_candidate_embeddings(word_embeddings, tokenizer, phrases,
                                      num_keywords, gen_log_path=None):
-    """第一级候选：外部 DeepSeek API 关键词（缓存文件优先），本地 tokenize
-    后按首次出现顺序对 token 去重，K = 三方面去重 token 数的最大值（短
-    的方面用零向量填充对齐）。K 是缓存文件的确定性函数：训练端生成与
-    评估端占位（api_keyword_pool_size）在同一缓存下算出相同 K，保证
-    checkpoint 结构一致。返回 (candidate_embeddings (A, K, d_llm) 位于
-    CPU 的 fp32 张量, K)。
+    """第一级候选：外部 DeepSeek API 关键词（缓存文件优先），每个关键词
+    短语的 subword token 词向量求平均，一短语一行；K = 每方面关键词数
+    （= num_keywords），三方面等长、无需填充。K 是缓存文件与
+    num_keywords 的确定性函数：训练端生成与评估端占位
+    （api_keyword_pool_size）得到相同 K，保证 checkpoint 结构一致。
+    返回 (candidate_embeddings (A, K, d_llm) 位于 CPU 的 fp32 张量, K)。
     """
     keywords, source = _load_or_fetch_keywords(phrases, num_keywords)
     used = {p: keywords[p][:num_keywords] for p in phrases}
     emb = word_embeddings.weight.detach().float()
-    aspect_ids = []
-    for phrase in phrases:
-        ids = _dedup_token_ids(tokenizer, used[phrase])
-        aspect_ids.append(ids)
-        print(f"[gen-anchor] '{phrase[:36]}' -> {len(used[phrase])} keywords, "
-              f"{len(ids)} unique tokens ({source})")
-    K = max(len(ids) for ids in aspect_ids)
     candidates = []
-    for ids in aspect_ids:
-        rows = emb[torch.tensor(ids, dtype=torch.long)]       # (k_i, d)
-        if len(ids) < K:
-            # 零填充：0 向量对融合层贡献恒为 0，天然被忽略，
-            # 不再引入 EOS 方向的退化槽位
-            pad = torch.zeros(K - len(ids), rows.shape[1],
+    for phrase in phrases:
+        rows = _phrase_mean_embeddings(emb, tokenizer, used[phrase])
+        candidates.append(rows)
+        print(f"[gen-anchor] '{phrase[:36]}' -> {len(used[phrase])} keywords "
+              f"→ {rows.shape[0]} mean-pooled phrase rows ({source})")
+    K = num_keywords
+    aligned = []
+    for rows in candidates:
+        if rows.shape[0] < K:
+            # 零填充兜底：缓存关键词数不足时对齐，0 行对融合层贡献恒为 0
+            pad = torch.zeros(K - rows.shape[0], rows.shape[1],
                               dtype=rows.dtype)
             rows = torch.cat([rows, pad], dim=0)
-        candidates.append(rows)
+        aligned.append(rows)
     if gen_log_path:
         _append_gen_report(gen_log_path, phrases, used, source, K)
-    return torch.stack(candidates), K
+    return torch.stack(aligned), K
 
 
 def _append_gen_report(gen_log_path, phrases, keywords_by_phrase, source, K):
@@ -224,7 +227,8 @@ def _append_gen_report(gen_log_path, phrases, keywords_by_phrase, source, K):
                         f"({source}):\n")
                 f.write(f"  keywords: {kw}\n")
                 f.write(f"  text: {', '.join(kw)}\n")
-            f.write(f"[gen-anchor] anchor pool K = {K}\n")
+            f.write(f"[gen-anchor] anchor pool K = {K} "
+                    f"(per-keyword mean pooling)\n")
     except OSError as exc:
         print(f"[gen-anchor] 写入日志失败: {exc}")
 
