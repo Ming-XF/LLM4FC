@@ -6,7 +6,9 @@
       缺失标准导联的文件跳过,与旧版行为一致);
   2. 多进程改有序收集(imap,结果按文件收集顺序拼接);
   3. NPZ 写 v2 元数据(preprocessing_version/channel_names/reference/unit);
-  4. 原子写入 save_npz_atomic。
+  4. 原子写入 save_npz_atomic;
+  5. exclude_seizure=True: 按同名 .csv_bi 标注在连续信号层面剔除发作期
+     EEG,再切 1 分钟窗(无标注文件跳过)。
 
 其余与旧版一致:caps=(30, 60)(癫痫/非癫痫)、max_subjects=None、
 70/15/15 分层划分 seed 42、00_epilepsy/01_no_epilepsy 目录结构、
@@ -45,28 +47,44 @@ def _process_tuep_file(args):
     Parameters
     ----------
     args : tuple
-        (edf_path, label, hz, subject_id)
+        (edf_path, label, hz, subject_id, exclude_seizure)
 
     Returns
     -------
     data : ndarray (n_windows, 19, hz*60) or None
     labels : ndarray (n_windows,) or None
     subj_ids : ndarray (n_windows,) or None
+    removed_sec : float or None
+        Seizure seconds cut from this file (0.0 when none / disabled).
     """
-    edf_path, label, hz, subject_id = args
+    edf_path, label, hz, subject_id, exclude_seizure = args
 
     try:
         raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
         data = prepare_common_19_channel_raw(raw, hz)   # (19, n) @ hz, avgref
     except Exception:
-        return None, None, None
+        return None, None, None, None
+
+    # ── 剔除发作期 EEG（连续信号层面，切窗之前）──
+    removed_sec = 0.0
+    if exclude_seizure:
+        csv_bi_path = edf_path[:-4] + '.csv_bi'   # .edf -> .csv_bi
+        intervals = _parse_seizure_intervals(csv_bi_path, hz, data.shape[1])
+        if intervals is None:
+            return None, None, None, None  # 无标注不可验证，跳过该文件
+        if intervals:
+            keep = np.ones(data.shape[1], dtype=bool)
+            for start, stop in intervals:
+                keep[start:stop] = False
+                removed_sec += (stop - start) / hz
+            data = data[:, keep]
 
     # ── Truncate to whole minutes, reshape to 1-minute windows ──
     n_total = data.shape[1]
     window_samples = hz * 60
     n_windows = n_total // window_samples
     if n_windows == 0:
-        return None, None, None
+        return None, None, None, removed_sec
 
     data = data[:, :n_windows * window_samples]
     data = data.reshape(data.shape[0], n_windows, window_samples)
@@ -75,7 +93,7 @@ def _process_tuep_file(args):
     labels_arr = np.full(data.shape[0], label, dtype=np.int8)
     subj_arr = np.full(data.shape[0], subject_id, dtype=np.int32)
 
-    return data.astype(np.float32), labels_arr, subj_arr
+    return data.astype(np.float32), labels_arr, subj_arr, removed_sec
 
 
 def _resolve_param(val, pos):
@@ -88,8 +106,37 @@ def _resolve_param(val, pos):
     return val[0] if pos else val[1]
 
 
+def _parse_seizure_intervals(csv_bi_path, hz, n_samples):
+    """Parse TUH .csv_bi annotations into sample-index seizure intervals.
+
+    Format: ``channel,start_time,stop_time,label,confidence`` with ``#``
+    comment lines.  Returns ``None`` when the annotation file is missing
+    (caller should skip the EDF), or a list of ``(start, stop)`` sample
+    intervals clipped to ``[0, n_samples]`` (empty when no seizures).
+    """
+    if not os.path.exists(csv_bi_path):
+        return None
+    intervals = []
+    with open(csv_bi_path, errors='ignore') as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            parts = line.split(',')
+            if len(parts) < 4 or 'seiz' not in parts[3].lower():
+                continue
+            start = int(float(parts[1]) * hz)
+            stop = int(float(parts[2]) * hz)
+            start = max(0, min(start, n_samples))
+            stop = max(0, min(stop, n_samples))
+            if stop > start:
+                intervals.append((start, stop))
+    return intervals
+
+
 def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject=60,
                             max_subjects=None,
+                            exclude_seizure=True,
                             train_split=0.7, val_split=0.15,
                             output_path=None):
     if output_path is None:
@@ -140,7 +187,7 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
 
     # ── Build multiprocessing task args(按文件收集顺序;imap 有序)──
     task_args = [
-        (edf_path, label, hz, subject_map[subj_str])
+        (edf_path, label, hz, subject_map[subj_str], exclude_seizure)
         for edf_path, label, subj_str in file_list
     ]
 
@@ -149,8 +196,10 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
 
     ts_list, lbl_list, subj_list = [], [], []
     skipped = 0
+    removed_total = 0.0
+    n_seiz_files = 0
     with Pool(processes=n_workers, initializer=_init_worker) as pool:
-        for data, labels_arr, subj_arr in tqdm(
+        for data, labels_arr, subj_arr, removed_sec in tqdm(
                 pool.imap(_process_tuep_file, task_args),
                 total=len(task_args),
                 desc="Processing TUEP"):
@@ -160,9 +209,14 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
             ts_list.append(data)
             lbl_list.append(labels_arr)
             subj_list.append(subj_arr)
+            if removed_sec:
+                removed_total += removed_sec
+                n_seiz_files += 1
 
     if skipped:
-        print(f"Skipped {skipped} files (missing channels or too short)")
+        print(f"Skipped {skipped} files (missing channels, annotation, or too short)")
+    if exclude_seizure:
+        print(f"Excluded seizure EEG: {removed_total:.1f}s from {n_seiz_files} files")
 
     if not ts_list:
         raise RuntimeError("No valid EDF files processed — check dataset path.")
@@ -277,6 +331,8 @@ def disease_tuep_preprocess(path="../data/TUEP", hz=200, max_windows_per_subject
         channel_names=np.asarray(EEG_19_CHANNEL_ORDER),
         reference='average_19_channels',
         unit='V',
+        exclude_seizure=exclude_seizure,
+        seizure_seconds_excluded=float(removed_total) if exclude_seizure else 0.0,
     )
     print(f"Saved to {output_path}")
 
