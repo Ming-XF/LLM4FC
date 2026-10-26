@@ -154,6 +154,53 @@ def discover_neurolm_experiments():
 
 
 # ---------------------------------------------------------------------------
+# 解析: LaBraM 结果 (持久评估日志 baseline/LaBraM/log_llm4fc/<src>__<target>.log)
+# ---------------------------------------------------------------------------
+
+LABRAM_LOG_DIR = REPO / "baseline" / "LaBraM" / "log_llm4fc"
+LABRAM_SRC_MAP = {"out_llm4fc_caueeg": "CAUEEG",
+                  "out_llm4fc_tuab": "TUAB",
+                  "out_llm4fc_tuep": "TUEP"}
+LABRAM_NAME_RE = re.compile(r"(out_llm4fc_\w+)__Disease(\w+)\.log")
+
+
+def discover_labram_experiments():
+    """从 LaBraM --eval 日志提取最终测试指标 (最后一行的整体统计)。"""
+    exps = []
+    if not LABRAM_LOG_DIR.is_dir():
+        print(f"[warn] 未找到 {LABRAM_LOG_DIR}, 跳过 LaBraM", file=sys.stderr)
+        return exps
+    for p in sorted(LABRAM_LOG_DIR.glob("*.log")):
+        m = LABRAM_NAME_RE.match(p.name)
+        if not m:
+            continue
+        source = LABRAM_SRC_MAP.get(m.group(1))
+        target = m.group(2)
+        if source is None or target not in DOMAINS:
+            continue
+        metrics = {}
+        for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+            # 全局真值行（metric_logger global_avg；显示行括号值只是短窗滑动平均）
+            m = re.search(r"======Global: (\{.*\})", line)
+            if not m:
+                continue
+            d = json.loads(m.group(1))
+            if d.get("roc_auc") is not None:
+                metrics["auc"] = float(d["roc_auc"])
+            if d.get("accuracy") is not None:
+                metrics["accuracy"] = float(d["accuracy"])
+        if "auc" not in metrics:
+            print(f"[warn] 未在 {p} 中找到指标, 跳过", file=sys.stderr)
+            continue
+        exps.append({
+            "model": "LaBraM", "source": source, "target": target,
+            "mode": "同域" if source == target else "零样本",
+            "metrics": metrics, "src": p, "checkpoint": None,
+        })
+    return exps
+
+
+# ---------------------------------------------------------------------------
 # HTML 渲染
 # ---------------------------------------------------------------------------
 
@@ -161,6 +208,7 @@ MODEL_COLORS = {
     "EEGNet": "#2563eb",
     "TimeLLMKnowledge": "#7c3aed",
     "NeuroLM": "#059669",
+    "LaBraM": "#b45309",
 }
 
 
@@ -203,7 +251,7 @@ def _metric_td(exp, key, best_val):
             f'<span{style}>{_fmt(v)}</span></td>')
 
 
-MODELS = ["EEGNet", "TimeLLMKnowledge", "NeuroLM"]
+MODELS = ["EEGNet", "TimeLLMKnowledge", "NeuroLM", "LaBraM"]
 
 
 def _source_table(exps, source):
@@ -261,8 +309,9 @@ def build_html(exps):
 
     sources = sorted({str(e["src"]) for e in exps})
     notes = []
-    notes.append("· EEGNet / TimeLLMKnowledge 指标来自 trainer 日志(测试集, best-epoch 模型); "
-                 "NeuroLM 指标为 window 级(测试集), subject 级见悬浮提示。")
+    notes.append("· EEGNet / TimeLLMKnowledge 指标来自 trainer 日志(测试集, best-epoch 模型, 60s 窗输入); "
+                 "NeuroLM / LaBraM 指标为 window 级(测试集, 每 60s 窗取首个 10s 段输入, "
+                 "lr 1e-4 / 200 epochs / patience 20 / val-AUC 选模型), subject 级见悬浮提示。")
     notes.append("· <b>加粗</b> = 该测试域该指标的最佳值; 各格悬浮提示标注同域/零样本及完整指标。")
 
     src_items = "".join(f"<li><code>{escape(s)}</code></li>" for s in sources)
@@ -314,7 +363,8 @@ def main():
                         help="输出 HTML 路径 (默认: 本脚本所在目录下 conclusion.html)")
     args = parser.parse_args()
 
-    exps = discover_trainer_experiments() + discover_neurolm_experiments()
+    exps = (discover_trainer_experiments() + discover_neurolm_experiments()
+            + discover_labram_experiments())
     if not exps:
         print("未解析到任何实验结果, 请确认 log_dir 与 baseline/NeuroLM/out_* 文件存在。",
               file=sys.stderr)

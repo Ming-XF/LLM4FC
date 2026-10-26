@@ -80,7 +80,8 @@ def main():
     else:
         print(f'  [WARN] unknown unit {unit!r}, assuming uV already')
 
-    seg_per_win = int(WINDOW_SECS // SEG_SECS)
+    # 新口径（与 LaBraM 对齐）：每 60s 窗只取第一个 10s 段作为样本
+    seg_per_win = 1
     seg_len = SAMPLE_RATE * SEG_SECS
 
     out_root = os.path.join(args.out_dir, args.dataset)

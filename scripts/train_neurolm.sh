@@ -6,13 +6,13 @@
 # Prerequisite: python baseline/NeuroLM/prepare_llm4fc.py --dataset <DS> for each dataset
 #
 
-TRAIN_DATASET="TUEP"
-EVAL_DATASETS="TUEP CAUEEG TUAB"
-EPOCHS=10
+TRAIN_DATASET="CAUEEG"
+EVAL_DATASETS="CAUEEG TUAB TUEP"
+EPOCHS=200
 BATCH_SIZE=64
-LR=5e-4
-PATIENCE=3
-OUT_DIR="baseline/NeuroLM/out_llm4fc_tuep"
+LR=1e-4
+PATIENCE=20
+OUT_DIR="baseline/NeuroLM/out_llm4fc"
 
 python baseline/NeuroLM/train_instruction_llm4fc.py \
     --train_dataset "$TRAIN_DATASET" \
@@ -25,4 +25,5 @@ python baseline/NeuroLM/train_instruction_llm4fc.py \
     --learning_rate "$LR" \
     --warmup_epochs 1 \
     --patience "$PATIENCE" \
-    --text_max_len 80
+    --text_max_len 80 \
+    --seed 42

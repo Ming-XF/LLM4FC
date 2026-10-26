@@ -332,7 +332,17 @@ def main():
 
     device = 'cuda'
     dtype = torch.bfloat16
+    # ── LLM4FC 口径：全链路可复现（对齐 main.py 的确定性设置）──
+    import random
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    random.seed(args.seed)
     torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cuda.enable_flash_sdp(False)
+    torch.backends.cuda.enable_mem_efficient_sdp(False)
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
@@ -359,9 +369,18 @@ def main():
     if args.train_dataset is not None:
         assert args.train_dataset in datasets, \
             f'train dataset {args.train_dataset} not in eval_datasets'
+        g = torch.Generator()
+        g.manual_seed(args.seed)
+
+        def _worker_init(worker_id):
+            worker_seed = args.seed + worker_id
+            np.random.seed(worker_seed)
+            random.seed(worker_seed)
+
         train_loader = torch.utils.data.DataLoader(
             datasets[args.train_dataset]['train'], batch_size=args.batch_size,
-            shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
+            shuffle=True, num_workers=8, pin_memory=True, drop_last=True,
+            generator=g, worker_init_fn=_worker_init)
 
     # ── optimizer / scheduler ──
     optimizer = model.configure_optimizers(args.weight_decay, args.learning_rate,

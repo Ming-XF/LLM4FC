@@ -20,5 +20,5 @@ python main.py \
     --p1 4 \
     --p2 8 \
     --dropout 0.5 \
-    --append _tuep \
+    --append "_tuep" \
     --do_test
