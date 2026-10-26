@@ -6,14 +6,14 @@
 #
 
 TARGET_DATASET="DiseaseTUEP"
-PRETRAIN_PATH="./output_dir/apimean300/TimeLLMKnowledge_DiseaseCAUEEG_train"
+PRETRAIN_PATH="./output_dir/apimix/TimeLLMKnowledge_DiseaseCAUEEG_train"
 
 python main.py \
     --model "TimeLLMKnowledge" \
     --dataset "$TARGET_DATASET" \
     --pretrain_path "$PRETRAIN_PATH" \
     --few_shot 0 \
-    --append "_apimean300" \
+    --append "_apimix" \
     --batch_size 16 \
     --d_model 128 \
     --num_heads 8 \
@@ -26,7 +26,7 @@ python main.py \
     --contrast_lambda 0.1 \
     --freeze_head_bias \
     --use_semantic_prototypes \
-    --anchor_select api \
+    --anchor_select api_mix \
     --gen_num_keywords 300 \
     --knowledge_anchor_candidates 1000 \
     --knowledge_anchors 10 \

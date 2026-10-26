@@ -186,11 +186,15 @@ def init_config():
         default="centered_cosine",
         help="Similarity used for frozen vocabulary candidate retrieval")
     model_group.add_argument(
-        "--anchor_select", choices=["cosine", "api"], default="cosine",
+        "--anchor_select", choices=["cosine", "api", "api_mix"],
+        default="cosine",
         help="TimeLLMKnowledge: first-level anchor candidate source — "
-             "cosine retrieval over the frozen vocabulary (default) or "
+             "cosine retrieval over the frozen vocabulary (default), "
              "external DeepSeek API keyword list ('api', cached to "
-             "api_anchor_keywords.json; delete the file to regenerate)")
+             "api_anchor_keywords.json; delete the file to regenerate), or "
+             "'api_mix' (API keyword phrase rows concatenated with frozen-"
+             "vocabulary cosine top-(anchor_candidates-gen_num_keywords) "
+             "rows into a mixed pool)")
     model_group.add_argument(
         "--gen_num_keywords", default=100, type=int,
         help="TimeLLMKnowledge: number of keywords requested from the "

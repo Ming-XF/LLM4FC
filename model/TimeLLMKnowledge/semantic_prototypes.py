@@ -7,7 +7,9 @@ external DeepSeek API keyword lists (--anchor_select api, cached to
 api_anchor_keywords.json; the cache file is authoritative — if it exists the
 API is not called again), where each keyword phrase is mean-pooled over its
 subword tokens into one phrase-level row (one row per keyword, no
-cross-keyword token dedup). A first candidate pool is linearly fused into
+cross-keyword token dedup). --anchor_select api_mix concatenates the API
+phrase rows with frozen-vocabulary cosine top-(anchor_candidates-K_api)
+rows into a mixed pool. A first candidate pool is linearly fused into
 several aspect-specific anchors; each anchor then owns a second description
 pool which is compressed into the prototypes consumed by reprogramming.
 """
@@ -326,7 +328,8 @@ class SemanticPrototypeBank(nn.Module):
             first_embeddings = emb[first_ids]
             self.register_buffer("anchor_candidate_ids", first_ids.long())
         else:
-            # ── 第一级（generate）：LLM 续写生成 token 的词嵌入，跳过余弦检索 ──
+            # ── 第一级（generate）：外部 API 关键词短语均值行；混合模式下
+            # 再拼接冻结词表余弦 top-(anchor_candidates-K_api) 行 ──
             first_embeddings = anchor_candidate_embeddings.detach().float()
             if (first_embeddings.shape[0] != num_aspects
                     or first_embeddings.shape[2] != d_llm):
@@ -334,7 +337,29 @@ class SemanticPrototypeBank(nn.Module):
                     "anchor_candidate_embeddings 形状须为 "
                     f"({num_aspects}, K, {d_llm})，got "
                     f"{tuple(first_embeddings.shape)}")
-            anchor_candidates = first_embeddings.shape[1]
+            k_api = first_embeddings.shape[1]
+            if anchor_candidates > k_api:
+                # 混合池：API 短语行在前 + 余弦行在后（与主路径同一检索，
+                # 冻结词表确定性函数，训练/评估双侧逐位一致）
+                n_cosine = anchor_candidates - k_api
+                if n_cosine > valid_count:
+                    raise ValueError(
+                        f"混合池余弦部分 {n_cosine} 超过可用词表 Token 数 "
+                        f"{valid_count}")
+                first_scores = phrase_n @ emb_n.T
+                if special.numel():
+                    first_scores[:, special] = -float("inf")
+                cosine_ids = first_scores.topk(n_cosine, dim=-1).indices
+                cosine_emb = emb[cosine_ids]
+                first_embeddings = torch.cat(
+                    [first_embeddings, cosine_emb], dim=1)
+                # 混合池不注册 anchor_candidate_ids（API 行无对应词表 id）
+            elif anchor_candidates < k_api:
+                raise ValueError(
+                    f"anchor_candidates={anchor_candidates} 小于生成候选数 "
+                    f"{k_api}，无法构造池")
+            else:
+                anchor_candidates = k_api
             if num_anchors <= 0 or num_anchors > anchor_candidates:
                 raise ValueError(
                     f"num_anchors={num_anchors} 须满足 0 < num_anchors ≤ "

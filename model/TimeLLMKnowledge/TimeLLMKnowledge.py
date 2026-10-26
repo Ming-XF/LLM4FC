@@ -18,7 +18,8 @@
   refined knowledge；每个 refined knowledge 再预选 M 个描述，经共享
   Linear(M→P) 得到自己的描述原型库。--anchor_select api 时第一级候选
   改为外部 DeepSeek API 生成的关键词（缓存文件优先），每个关键词短语
-  以 subword token 平均池化为一行（一短语一知识行）。
+  以 subword token 平均池化为一行（一短语一知识行）；api_mix 再拼接
+  冻结词表余弦 top-(anchor_candidates−K_api) 行成混合池。
   --no-use_semantic_prototypes 回退旧路径。
 
 序列：[N_win×3N 滑动窗口知识][任务 prompt(末位 ":" 为读出位置)] → 冻结 LLM
@@ -284,24 +285,31 @@ class Model(nn.Module):
             llm_type=self.llm_type,
         )
 
-        # ── 第一级候选来源：余弦检索（默认）或外部 API 关键词（缓存优先） ──
+        # ── 第一级候选来源：余弦检索（默认）、外部 API 关键词（缓存优先）、
+        # 或两者混合池 api_mix（API 短语行 + 余弦 top-(K-K_api) 行）──
         anchor_embeds = None
         anchor_candidates = config.anchor_candidates
-        if config.anchor_select == 'api':
+        if config.anchor_select in ('api', 'api_mix'):
+            mix_cosine = (config.anchor_select == 'api_mix')
             if config.generate_at_init:
-                anchor_embeds, anchor_candidates = api_keyword_candidate_embeddings(
+                anchor_embeds, k_api = api_keyword_candidate_embeddings(
                     self._word_embeddings, self.tokenizer, _PHRASES,
                     num_keywords=config.gen_num_keywords,
                     gen_log_path=config.gen_log_path)
+                if not mix_cosine:
+                    anchor_candidates = k_api
             else:
-                # 评估端跳过生成：K = 每方面关键词数（只读缓存不调 API），
-                # 占位嵌入只保证形状，内容由 load_model 用 checkpoint 中的
+                # 评估端跳过生成：K_api = 每方面关键词数（只读缓存不调 API），
+                # 占位嵌入只保证形状（混合模式由 bank 补余弦行，最终 K 仍为
+                # anchor_candidates），内容由 load_model 用 checkpoint 中的
                 # anchor_candidate_embeddings buffer 覆盖
                 d_llm = self._word_embeddings.weight.shape[1]
-                anchor_candidates = api_keyword_pool_size(
+                k_api = api_keyword_pool_size(
                     _PHRASES, config.gen_num_keywords)
+                if not mix_cosine:
+                    anchor_candidates = k_api
                 anchor_embeds = torch.zeros(
-                    config.num_aspects, anchor_candidates, d_llm,
+                    config.num_aspects, k_api, d_llm,
                     dtype=self._word_embeddings.weight.dtype)
 
         # ── raw 分支：三个方面各生成一个 d_model query ──

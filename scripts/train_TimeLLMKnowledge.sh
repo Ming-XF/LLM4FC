@@ -24,8 +24,8 @@ deepspeed --num_gpus=2 main.py \
     --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
-    --append "_apimean300" \
-    --model_dir output_dir/apimean300 \
+    --append "_apimix" \
+    --model_dir output_dir/apimix \
     --d_model 128 \
     --num_heads 8 \
     --dropout 0.1 \
@@ -37,7 +37,7 @@ deepspeed --num_gpus=2 main.py \
     --contrast_lambda 0.1 \
     --freeze_head_bias \
     --use_semantic_prototypes \
-    --anchor_select api \
+    --anchor_select api_mix \
     --gen_num_keywords 300 \
     --knowledge_anchor_candidates 1000 \
     --knowledge_anchors 10 \

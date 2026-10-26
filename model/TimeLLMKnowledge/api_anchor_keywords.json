@@ -1532,5 +1532,6 @@
   },
   "generator": "deepseek-chat",
   "prompt_template": "Output exactly {num_keywords} key domain terms (nouns or technical phrases) about {phrase}. One term per line. No full sentences, no stopwords, no conjunctions or articles (no 'and', 'if', 'the'), no numbering, no explanation. Only the terms.",
-  "num_keywords": 300
+  "num_keywords": 450,
+  "_note": "2026-10-25 apimean450: lists over-delivered by API (462-543 parsed); num_keywords raised to 450 to reuse existing lists without API regen, first 450 of each list used as-is"
 }
