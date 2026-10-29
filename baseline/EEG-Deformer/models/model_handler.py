@@ -10,6 +10,8 @@ from models.conformer import Conformer
 import os.path as osp
 from utils import get_channel_info
 import torchmetrics
+import numpy as np
+from sklearn.metrics import roc_auc_score
 
 
 def init_model(args):
@@ -76,6 +78,11 @@ class DLModel(pl.LightningModule):
         self.acc = torchmetrics.Accuracy(task='multiclass', num_classes=config.num_class)
         self.F1 = torchmetrics.F1Score(task="multiclass", num_classes=config.num_class, average='macro')
         self.config = config
+        # AUC 用 sklearn 逐 epoch 计算（torchmetrics AUROC 在本环境数值不可靠）
+        self._val_probs = []
+        self._val_labels = []
+        self._test_probs = []
+        self._test_labels = []
 
     def forward(self, x):
         return self.net(x)
@@ -105,7 +112,23 @@ class DLModel(pl.LightningModule):
             {"val_loss": loss, "val_acc": acc, "val_f1": f1},
             on_step=False, on_epoch=True, prog_bar=True, logger=True
         )
+        self._val_probs.append(F.softmax(y_hat, dim=1)[:, 1].detach())
+        self._val_labels.append(y.detach())
         return loss
+
+    def on_validation_epoch_end(self):
+        if not self._val_probs:
+            return
+        probs = torch.cat(self._val_probs).cpu().numpy()
+        labels = torch.cat(self._val_labels).cpu().numpy()
+        self._val_probs.clear()
+        self._val_labels.clear()
+        try:
+            auc = float(roc_auc_score(labels, probs))
+        except ValueError:
+            auc = float('nan')
+        self.log('val_auc', auc, on_step=False, on_epoch=True,
+                 prog_bar=True, logger=True)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -118,7 +141,23 @@ class DLModel(pl.LightningModule):
             {"test_loss": loss, "test_acc": acc, "test_f1": f1},
             on_epoch=True, prog_bar=True, logger=True
         )
+        self._test_probs.append(F.softmax(y_hat, dim=1)[:, 1].detach())
+        self._test_labels.append(y.detach())
         return {"test_loss": loss, "test_acc": acc, "test_f1": f1}
+
+    def on_test_epoch_end(self):
+        if not self._test_probs:
+            return
+        probs = torch.cat(self._test_probs).cpu().numpy()
+        labels = torch.cat(self._test_labels).cpu().numpy()
+        self._test_probs.clear()
+        self._test_labels.clear()
+        try:
+            auc = float(roc_auc_score(labels, probs))
+        except ValueError:
+            auc = float('nan')
+        self.log('test_auc', auc, on_epoch=True, prog_bar=True, logger=True)
+        print(f'=== TEST AUC (sklearn): {auc:.6f}')
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.config.lr, weight_decay=1e-5)

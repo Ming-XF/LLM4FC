@@ -274,6 +274,39 @@ def discover_ofa_experiments():
 
 
 # ---------------------------------------------------------------------------
+# 解析: EEG-Deformer 结果 (save_llm4fc/results/{SRC}__{TGT}.json, sklearn AUC)
+# ---------------------------------------------------------------------------
+
+DEFORMER_RESULTS_DIR = (REPO / "baseline" / "EEG-Deformer"
+                        / "save_llm4fc" / "results")
+DEFORMER_NAME_RE = re.compile(r"Disease(\w+)__(\w+)\.json")
+
+
+def discover_deformer_experiments():
+    exps = []
+    if not DEFORMER_RESULTS_DIR.is_dir():
+        print(f"[warn] 未找到 {DEFORMER_RESULTS_DIR}, 跳过 EEG-Deformer",
+              file=sys.stderr)
+        return exps
+    for p in sorted(DEFORMER_RESULTS_DIR.glob("*.json")):
+        m = DEFORMER_NAME_RE.match(p.name)
+        if not m:
+            continue
+        src, tgt = m.groups()
+        if src not in DOMAINS or tgt not in DOMAINS:
+            continue
+        data = json.loads(p.read_text(encoding="utf-8"))
+        exps.append({
+            "model": "EEG-Deformer", "source": src, "target": tgt,
+            "mode": "同域" if src == tgt else "零样本",
+            "metrics": {"auc": float(data["auc"]),
+                        "accuracy": float(data["accuracy"])},
+            "src": p, "checkpoint": data.get("ckpt"),
+        })
+    return exps
+
+
+# ---------------------------------------------------------------------------
 # HTML 渲染
 # ---------------------------------------------------------------------------
 
@@ -283,6 +316,7 @@ MODEL_COLORS = {
     "NeuroLM": "#059669",
     "LaBraM": "#b45309",
     "OFA": "#db2777",
+    "EEG-Deformer": "#0891b2",
 }
 
 
@@ -325,7 +359,8 @@ def _metric_td(exp, key, best_val):
             f'<span{style}>{_fmt(v)}</span></td>')
 
 
-MODELS = ["EEGNet", "TimeLLMKnowledge", "NeuroLM", "LaBraM", "OFA"]
+MODELS = ["EEGNet", "TimeLLMKnowledge", "NeuroLM", "LaBraM", "OFA",
+          "EEG-Deformer"]
 
 
 def _source_table(exps, source):
@@ -383,12 +418,17 @@ def build_html(exps):
 
     sources = sorted({str(e["src"]) for e in exps})
     notes = []
-    notes.append("· 口径: <b>TimeLLMKnowledge = 60s 窗输入</b>(win5 主方法: 5×20s/10s 滑动知识窗); "
-                 "<b>EEGNet / NeuroLM / LaBraM / OFA = 10s 段输入</b>"
-                 "(每 60s 窗取首个 10s 段, 受试者级划分一致)。")
-    notes.append("· EEGNet / TimeLLMKnowledge 指标来自 trainer 日志(测试集, best-epoch 模型, "
-                 "val-AUC 早停 patience 20); NeuroLM / LaBraM / OFA 指标为 window 级"
-                 "(测试集, lr 1e-4 / 200 epochs / patience 20 / val-AUC 选模型)。")
+    notes.append("· 输入口径: <b>TimeLLMKnowledge = 60s 窗</b>(win5 主方法: 5×20s/10s 滑动知识窗, "
+                 "模型内逐通道 z-score); <b>EEGNet / NeuroLM / LaBraM = 10s 段 raw µV</b>; "
+                 "<b>OFA / EEG-Deformer = 10s 段 per-sample z-score</b>。"
+                 "全部取每 60s 窗首个 10s 段, 受试者级划分一致。")
+    notes.append("· 统一裁定项(全模型): EPOCHS=200 / LR=1e-4 / PATIENCE=20 / seed 42 / "
+                 "val-AUC 选 best 模型。")
+    notes.append("· 各基线自有项(未统一): EEGNet/TLLM=Adam wd1e-4 + cos+warmup400步; "
+                 "LaBraM=AdamW wd0.05 + cos+warmup5ep+layer_decay0.65; "
+                 "NeuroLM=AdamW wd0.1 + warmup1ep+cos; "
+                 "OFA=RAdam 常数 lr; EEG-Deformer=Adam wd1e-5 + CosineAnnealing 无 warmup。"
+                 "batch: EEGNet 24 / TLLM 64 / LaBraM 64 / NeuroLM 64 / OFA 32 / Deformer 64。")
     notes.append("· <b>加粗</b> = 该测试域该指标的最佳值; 各格悬浮提示标注同域/零样本及完整指标。")
 
     src_items = "".join(f"<li><code>{escape(s)}</code></li>" for s in sources)
@@ -441,7 +481,8 @@ def main():
     args = parser.parse_args()
 
     exps = (discover_trainer_experiments() + discover_neurolm_experiments()
-            + discover_labram_experiments() + discover_ofa_experiments())
+            + discover_labram_experiments() + discover_ofa_experiments()
+            + discover_deformer_experiments())
     if not exps:
         print("未解析到任何实验结果, 请确认 log_dir 与 baseline/NeuroLM/out_* 文件存在。",
               file=sys.stderr)

@@ -25,7 +25,7 @@
 </head>
 <body>
 <h1>LLM4FC 实验结果对比 (EEGNet / TimeLLMKnowledge / NeuroLM / LaBraM / OFA)</h1>
-<div class="sub">疾病分类任务 · 按训练域分表 · 每个测试域两列 (AUC / Acc) · 生成于 2026-10-29 13:17:14</div>
+<div class="sub">疾病分类任务 · 按训练域分表 · 每个测试域两列 (AUC / Acc) · 生成于 2026-10-29 13:54:57</div>
 <h2>训练域 = CAUEEG</h2>
 <table>
   <thead>
@@ -149,7 +149,7 @@ window(val): AUC=0.5350  Acc=0.5199"><span>0.5135</span></td></tr>
 <tr><td class="model" style="--mc:#b45309">LaBraM</td><td class="cell" title="LaBraM | 训练域 CAUEEG → CAUEEG (同域)
 来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_caueeg__DiseaseCAUEEG.log
 Auc: 0.8326
-Accuracy: 0.7661"><span class="best">0.8326</span></td><td class="cell" title="LaBraM | 训练域 CAUEEG → CAUEEG (同域)
+Accuracy: 0.7661"><span>0.8326</span></td><td class="cell" title="LaBraM | 训练域 CAUEEG → CAUEEG (同域)
 来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_caueeg__DiseaseCAUEEG.log
 Auc: 0.8326
 Accuracy: 0.7661"><span class="best">0.7661</span></td><td class="cell" title="LaBraM | 训练域 CAUEEG → TUAB (零样本)
@@ -190,6 +190,31 @@ Accuracy: 0.4795"><span>0.4949</span></td><td class="cell" title="OFA | 训练�
 Loss: 4.1833
 Auc: 0.4949
 Accuracy: 0.4795"><span>0.4795</span></td></tr>
+<tr><td class="model" style="--mc:#0891b2">EEG-Deformer</td><td class="cell" title="EEG-Deformer | 训练域 CAUEEG → CAUEEG (同域)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseCAUEEG__CAUEEG.json
+checkpoint: best-epoch=39-val_auc=0.8624.ckpt
+Auc: 0.8396
+Accuracy: 0.4961"><span class="best">0.8396</span></td><td class="cell" title="EEG-Deformer | 训练域 CAUEEG → CAUEEG (同域)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseCAUEEG__CAUEEG.json
+checkpoint: best-epoch=39-val_auc=0.8624.ckpt
+Auc: 0.8396
+Accuracy: 0.4961"><span>0.4961</span></td><td class="cell" title="EEG-Deformer | 训练域 CAUEEG → TUAB (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseCAUEEG__TUAB.json
+checkpoint: best-epoch=39-val_auc=0.8624.ckpt
+Auc: 0.6513
+Accuracy: 0.5324"><span>0.6513</span></td><td class="cell" title="EEG-Deformer | 训练域 CAUEEG → TUAB (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseCAUEEG__TUAB.json
+checkpoint: best-epoch=39-val_auc=0.8624.ckpt
+Auc: 0.6513
+Accuracy: 0.5324"><span>0.5324</span></td><td class="cell" title="EEG-Deformer | 训练域 CAUEEG → TUEP (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseCAUEEG__TUEP.json
+checkpoint: best-epoch=39-val_auc=0.8624.ckpt
+Auc: 0.5015
+Accuracy: 0.5076"><span>0.5015</span></td><td class="cell" title="EEG-Deformer | 训练域 CAUEEG → TUEP (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseCAUEEG__TUEP.json
+checkpoint: best-epoch=39-val_auc=0.8624.ckpt
+Auc: 0.5015
+Accuracy: 0.5076"><span>0.5076</span></td></tr>
   </tbody>
 </table>
 <h2>训练域 = TUAB</h2>
@@ -356,6 +381,31 @@ Accuracy: 0.5193"><span>0.4495</span></td><td class="cell" title="OFA | 训练�
 Loss: 1.9419
 Auc: 0.4495
 Accuracy: 0.5193"><span>0.5193</span></td></tr>
+<tr><td class="model" style="--mc:#0891b2">EEG-Deformer</td><td class="cell" title="EEG-Deformer | 训练域 TUAB → CAUEEG (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUAB__CAUEEG.json
+checkpoint: best-epoch=25-val_auc=0.8401.ckpt
+Auc: 0.6315
+Accuracy: 0.4524"><span>0.6315</span></td><td class="cell" title="EEG-Deformer | 训练域 TUAB → CAUEEG (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUAB__CAUEEG.json
+checkpoint: best-epoch=25-val_auc=0.8401.ckpt
+Auc: 0.6315
+Accuracy: 0.4524"><span>0.4524</span></td><td class="cell" title="EEG-Deformer | 训练域 TUAB → TUAB (同域)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUAB__TUAB.json
+checkpoint: best-epoch=25-val_auc=0.8401.ckpt
+Auc: 0.8209
+Accuracy: 0.5771"><span>0.8209</span></td><td class="cell" title="EEG-Deformer | 训练域 TUAB → TUAB (同域)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUAB__TUAB.json
+checkpoint: best-epoch=25-val_auc=0.8401.ckpt
+Auc: 0.8209
+Accuracy: 0.5771"><span>0.5771</span></td><td class="cell" title="EEG-Deformer | 训练域 TUAB → TUEP (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUAB__TUEP.json
+checkpoint: best-epoch=25-val_auc=0.8401.ckpt
+Auc: 0.4565
+Accuracy: 0.5322"><span>0.4565</span></td><td class="cell" title="EEG-Deformer | 训练域 TUAB → TUEP (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUAB__TUEP.json
+checkpoint: best-epoch=25-val_auc=0.8401.ckpt
+Auc: 0.4565
+Accuracy: 0.5322"><span>0.5322</span></td></tr>
   </tbody>
 </table>
 <h2>训练域 = TUEP</h2>
@@ -522,9 +572,34 @@ Accuracy: 0.4924"><span>0.5047</span></td><td class="cell" title="OFA | 训练�
 Loss: 0.8636
 Auc: 0.5047
 Accuracy: 0.4924"><span>0.4924</span></td></tr>
+<tr><td class="model" style="--mc:#0891b2">EEG-Deformer</td><td class="cell" title="EEG-Deformer | 训练域 TUEP → CAUEEG (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUEP__CAUEEG.json
+checkpoint: best-epoch=35-val_auc=0.5607.ckpt
+Auc: 0.5085
+Accuracy: 0.5643"><span>0.5085</span></td><td class="cell" title="EEG-Deformer | 训练域 TUEP → CAUEEG (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUEP__CAUEEG.json
+checkpoint: best-epoch=35-val_auc=0.5607.ckpt
+Auc: 0.5085
+Accuracy: 0.5643"><span>0.5643</span></td><td class="cell" title="EEG-Deformer | 训练域 TUEP → TUAB (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUEP__TUAB.json
+checkpoint: best-epoch=35-val_auc=0.5607.ckpt
+Auc: 0.4720
+Accuracy: 0.4641"><span>0.4720</span></td><td class="cell" title="EEG-Deformer | 训练域 TUEP → TUAB (零样本)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUEP__TUAB.json
+checkpoint: best-epoch=35-val_auc=0.5607.ckpt
+Auc: 0.4720
+Accuracy: 0.4641"><span>0.4641</span></td><td class="cell" title="EEG-Deformer | 训练域 TUEP → TUEP (同域)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUEP__TUEP.json
+checkpoint: best-epoch=35-val_auc=0.5607.ckpt
+Auc: 0.6337
+Accuracy: 0.4924"><span>0.6337</span></td><td class="cell" title="EEG-Deformer | 训练域 TUEP → TUEP (同域)
+来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUEP__TUEP.json
+checkpoint: best-epoch=35-val_auc=0.5607.ckpt
+Auc: 0.6337
+Accuracy: 0.4924"><span>0.4924</span></td></tr>
   </tbody>
 </table>
-<div class="notes"><b>说明</b><ul><li>· 口径: <b>TimeLLMKnowledge = 60s 窗输入</b>(win5 主方法: 5×20s/10s 滑动知识窗); <b>EEGNet / NeuroLM / LaBraM / OFA = 10s 段输入</b>(每 60s 窗取首个 10s 段, 受试者级划分一致)。</li><li>· EEGNet / TimeLLMKnowledge 指标来自 trainer 日志(测试集, best-epoch 模型, val-AUC 早停 patience 20); NeuroLM / LaBraM / OFA 指标为 window 级(测试集, lr 1e-4 / 200 epochs / patience 20 / val-AUC 选模型)。</li><li>· <b>加粗</b> = 该测试域该指标的最佳值; 各格悬浮提示标注同域/零样本及完整指标。</li></ul></div>
-<div class="srcs"><b>数据来源</b><ul><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_caueeg__DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_caueeg__DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_caueeg__DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuep__DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuep__DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuep__DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc/test_results.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuab/test_results.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuep/test_results.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseCAUEEG_10s_2026-10-29_12-46-57_grE/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseTUAB_10s_2026-10-29_11-58-44_zFC/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseTUEP_10s_2026-10-29_12-20-19_M5W/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_CAUEEG_TUAB_2026-10-29_12-47-46_7uq/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_CAUEEG_TUEP_2026-10-29_12-48-15_K6Y/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_CAUEEG_2026-10-29_11-59-21_Xsl/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_TUEP_2026-10-29_11-59-46_Kh1/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_CAUEEG_2026-10-29_12-20-45_EVe/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_TUAB_2026-10-29_12-21-22_4WA/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_caueeg_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_caueeg_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuab_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuab_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuep_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuep_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuab_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuab_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuep_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuep_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_EEGNet_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_EEGNet_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_EEGNet_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseTUEP.log</code></li></ul></div>
+<div class="notes"><b>说明</b><ul><li>· 输入口径: <b>TimeLLMKnowledge = 60s 窗</b>(win5 主方法: 5×20s/10s 滑动知识窗, 模型内逐通道 z-score); <b>EEGNet / NeuroLM / LaBraM = 10s 段 raw µV</b>; <b>OFA / EEG-Deformer = 10s 段 per-sample z-score</b>。全部取每 60s 窗首个 10s 段, 受试者级划分一致。</li><li>· 统一裁定项(全模型): EPOCHS=200 / LR=1e-4 / PATIENCE=20 / seed 42 / val-AUC 选 best 模型。</li><li>· 各基线自有项(未统一): EEGNet/TLLM=Adam wd1e-4 + cos+warmup400步; LaBraM=AdamW wd0.05 + cos+warmup5ep+layer_decay0.65; NeuroLM=AdamW wd0.1 + warmup1ep+cos; OFA=RAdam 常数 lr; EEG-Deformer=Adam wd1e-5 + CosineAnnealing 无 warmup。batch: EEGNet 24 / TLLM 64 / LaBraM 64 / NeuroLM 64 / OFA 32 / Deformer 64。</li><li>· <b>加粗</b> = 该测试域该指标的最佳值; 各格悬浮提示标注同域/零样本及完整指标。</li></ul></div>
+<div class="srcs"><b>数据来源</b><ul><li><code>/root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseCAUEEG__CAUEEG.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseCAUEEG__TUAB.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseCAUEEG__TUEP.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUAB__CAUEEG.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUAB__TUAB.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUAB__TUEP.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUEP__CAUEEG.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUEP__TUAB.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUEP__TUEP.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_caueeg__DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_caueeg__DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_caueeg__DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuep__DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuep__DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuep__DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc/test_results.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuab/test_results.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuep/test_results.json</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseCAUEEG_10s_2026-10-29_12-46-57_grE/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseTUAB_10s_2026-10-29_11-58-44_zFC/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseTUEP_10s_2026-10-29_12-20-19_M5W/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_CAUEEG_TUAB_2026-10-29_12-47-46_7uq/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_CAUEEG_TUEP_2026-10-29_12-48-15_K6Y/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_CAUEEG_2026-10-29_11-59-21_Xsl/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_TUEP_2026-10-29_11-59-46_Kh1/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_CAUEEG_2026-10-29_12-20-45_EVe/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_TUAB_2026-10-29_12-21-22_4WA/output.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_caueeg_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_caueeg_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuab_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuab_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuep_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_tuep_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuab_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuab_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuep_zero-shot_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_tuep_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_zero-shot_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/test_TimeLLMKnowledge_zero-shot_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_EEGNet_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_EEGNet_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_EEGNet_DiseaseTUEP.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseCAUEEG.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseTUAB.log</code></li><li><code>/root/autodl-tmp/LLM4FC/log_dir/train_TimeLLMKnowledge_DiseaseTUEP.log</code></li></ul></div>
 </body>
 </html>
