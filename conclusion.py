@@ -68,10 +68,16 @@ def parse_pretrain_path(path):
 
 
 def discover_trainer_experiments():
-    """扫描 log_dir, 收集 EEGNet / TimeLLMKnowledge 的同域 + 零样本结果。"""
+    """扫描 log_dir, 收集 EEGNet / TimeLLMKnowledge 的同域 + 零样本结果。
+
+    口径: EEGNet = 10s 段(升格为官方结果, 主名日志);
+          TimeLLMKnowledge = 60s 窗(win5 主方法; *_10s 日志忽略)。
+    """
     exps = []
     # 同域: train_{MODEL}_Disease{DOMAIN}.log 的最后一个指标块
     for p in sorted(LOG_DIR.glob("train_*_Disease*.log")):
+        if "_10s" in p.name:  # TLLM 10s 实验日志, 不作为官方结果
+            continue
         m = re.match(r"train_(\w+)_Disease(\w+)\.log", p.name)
         if not m:
             continue
@@ -85,9 +91,12 @@ def discover_trainer_experiments():
             "mode": "同域", "metrics": metrics, "src": p,
             "checkpoint": None,
         })
-    # 零样本: test_{MODEL}[_tuab|_tuep]_zero-shot_Disease{TARGET}.log
+    # 零样本: test_{MODEL}[_caueeg|_tuab|_tuep]_zero-shot_Disease{TARGET}.log
+    # (60s 时代的 CAUEEG 源日志无后缀; 10s 升格日志用 _caueeg 后缀)
     for p in sorted(LOG_DIR.glob("test_*zero-shot_Disease*.log")):
-        m = re.match(r"test_(\w+?)(_tuab|_tuep)?_zero-shot_Disease(\w+)\.log",
+        if "_10s" in p.name:  # TLLM 10s 零样本日志, 不作为官方结果
+            continue
+        m = re.match(r"test_(\w+?)(_caueeg|_tuab|_tuep)?_zero-shot_Disease(\w+)\.log",
                      p.name)
         if not m:
             continue
@@ -98,7 +107,8 @@ def discover_trainer_experiments():
             continue
         exps.append({
             "model": model,
-            "source": {"_tuab": "TUAB", "_tuep": "TUEP"}.get(suffix, "CAUEEG"),
+            "source": {"_caueeg": "CAUEEG", "_tuab": "TUAB",
+                       "_tuep": "TUEP"}.get(suffix, "CAUEEG"),
             "target": target,
             "mode": "零样本",
             "metrics": metrics,
@@ -201,6 +211,69 @@ def discover_labram_experiments():
 
 
 # ---------------------------------------------------------------------------
+# 解析: OFA 结果 (baseline/OneFitsAll 实验目录 output.log 的 Test Summary)
+# ---------------------------------------------------------------------------
+
+OFA_DIR = (REPO / "baseline" / "OneFitsAll" / "Classification"
+           / "experiments_llm4fc")
+OFA_ZS_NAME_RE = re.compile(r"ZS_(\w+)_(\w+)_\d{4}-\d{2}-\d{2}")
+OFA_TEST_RE = re.compile(
+    r"Test Summary: loss: ([0-9.eE+-]+) \| accuracy: ([0-9.eE+-]+) \| "
+    r"precision: ([0-9.eE+-]+) \| AUROC: ([0-9.eE+-]+)")
+
+
+def _ofa_test_metrics(log_path):
+    """从 output.log 提取 Test Summary 行的 AUC/Acc/loss, 无则 None。"""
+    for line in log_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        m = OFA_TEST_RE.search(line)
+        if m:
+            return {"loss": float(m.group(1)), "accuracy": float(m.group(2)),
+                    "auc": float(m.group(4))}
+    return None
+
+
+def discover_ofa_experiments():
+    """从 OFA 统一配置(200/1e-4/20)实验目录提取 10s 段口径九格结果。"""
+    exps = []
+    if not OFA_DIR.is_dir():
+        print(f"[warn] 未找到 {OFA_DIR}, 跳过 OFA", file=sys.stderr)
+        return exps
+    # 同域: Disease{DOMAIN}_10s_* 目录中含 "Test Summary" 的为 test 评估目录
+    for dom in DOMAINS:
+        for d in sorted(OFA_DIR.glob(f"Disease{dom}_10s_*")):
+            log = d / "output.log"
+            if not log.exists() or "Test Summary" not in log.read_text(
+                    encoding="utf-8", errors="replace")[:200000]:
+                continue
+            metrics = _ofa_test_metrics(log)
+            if metrics is None:
+                continue
+            exps.append({
+                "model": "OFA", "source": dom, "target": dom,
+                "mode": "同域", "metrics": metrics, "src": log,
+                "checkpoint": None,
+            })
+    # 零样本: ZS_{SRC}_{TGT}_* 目录
+    for d in sorted(OFA_DIR.glob("ZS_*")):
+        m = OFA_ZS_NAME_RE.match(d.name)
+        if not m:
+            continue
+        src, tgt = m.groups()
+        if src not in DOMAINS or tgt not in DOMAINS:
+            continue
+        log = d / "output.log"
+        metrics = _ofa_test_metrics(log) if log.exists() else None
+        if metrics is None:
+            continue
+        exps.append({
+            "model": "OFA", "source": src, "target": tgt,
+            "mode": "零样本", "metrics": metrics, "src": log,
+            "checkpoint": None,
+        })
+    return exps
+
+
+# ---------------------------------------------------------------------------
 # HTML 渲染
 # ---------------------------------------------------------------------------
 
@@ -209,6 +282,7 @@ MODEL_COLORS = {
     "TimeLLMKnowledge": "#7c3aed",
     "NeuroLM": "#059669",
     "LaBraM": "#b45309",
+    "OFA": "#db2777",
 }
 
 
@@ -251,7 +325,7 @@ def _metric_td(exp, key, best_val):
             f'<span{style}>{_fmt(v)}</span></td>')
 
 
-MODELS = ["EEGNet", "TimeLLMKnowledge", "NeuroLM", "LaBraM"]
+MODELS = ["EEGNet", "TimeLLMKnowledge", "NeuroLM", "LaBraM", "OFA"]
 
 
 def _source_table(exps, source):
@@ -309,9 +383,12 @@ def build_html(exps):
 
     sources = sorted({str(e["src"]) for e in exps})
     notes = []
-    notes.append("· EEGNet / TimeLLMKnowledge 指标来自 trainer 日志(测试集, best-epoch 模型, 60s 窗输入); "
-                 "NeuroLM / LaBraM 指标为 window 级(测试集, 每 60s 窗取首个 10s 段输入, "
-                 "lr 1e-4 / 200 epochs / patience 20 / val-AUC 选模型), subject 级见悬浮提示。")
+    notes.append("· 口径: <b>TimeLLMKnowledge = 60s 窗输入</b>(win5 主方法: 5×20s/10s 滑动知识窗); "
+                 "<b>EEGNet / NeuroLM / LaBraM / OFA = 10s 段输入</b>"
+                 "(每 60s 窗取首个 10s 段, 受试者级划分一致)。")
+    notes.append("· EEGNet / TimeLLMKnowledge 指标来自 trainer 日志(测试集, best-epoch 模型, "
+                 "val-AUC 早停 patience 20); NeuroLM / LaBraM / OFA 指标为 window 级"
+                 "(测试集, lr 1e-4 / 200 epochs / patience 20 / val-AUC 选模型)。")
     notes.append("· <b>加粗</b> = 该测试域该指标的最佳值; 各格悬浮提示标注同域/零样本及完整指标。")
 
     src_items = "".join(f"<li><code>{escape(s)}</code></li>" for s in sources)
@@ -321,7 +398,7 @@ def build_html(exps):
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>LLM4FC 实验结果对比 (EEGNet / TimeLLMKnowledge / NeuroLM)</title>
+<title>LLM4FC 实验结果对比 (EEGNet / TimeLLMKnowledge / NeuroLM / LaBraM / OFA)</title>
 <style>
   body {{ font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
           margin: 24px; background: #fafafa; color: #222; }}
@@ -343,7 +420,7 @@ def build_html(exps):
 </style>
 </head>
 <body>
-<h1>LLM4FC 实验结果对比 (EEGNet / TimeLLMKnowledge / NeuroLM)</h1>
+<h1>LLM4FC 实验结果对比 (EEGNet / TimeLLMKnowledge / NeuroLM / LaBraM / OFA)</h1>
 <div class="sub">疾病分类任务 · 按训练域分表 · 每个测试域两列 (AUC / Acc) · 生成于 {now}</div>
 {tables}
 <div class="notes"><b>说明</b><ul>{note_items}</ul></div>
@@ -364,7 +441,7 @@ def main():
     args = parser.parse_args()
 
     exps = (discover_trainer_experiments() + discover_neurolm_experiments()
-            + discover_labram_experiments())
+            + discover_labram_experiments() + discover_ofa_experiments())
     if not exps:
         print("未解析到任何实验结果, 请确认 log_dir 与 baseline/NeuroLM/out_* 文件存在。",
               file=sys.stderr)

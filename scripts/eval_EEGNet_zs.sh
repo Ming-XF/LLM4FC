@@ -6,7 +6,10 @@
 #
 
 TARGET_DATASET="DiseaseTUAB"
-PRETRAIN_PATH="./output_dir/EEGNet_DiseaseTUEP_train"
+PRETRAIN_PATH="./output_dir/EEGNet_DiseaseCAUEEG_train"
+
+# 10s 段口径（当前 EEGNet 官方结果口径）
+export LLM4FC_DATA_10S=1
 
 python main.py \
     --model "EEGNet" \
@@ -20,5 +23,5 @@ python main.py \
     --p1 4 \
     --p2 8 \
     --dropout 0.5 \
-    --append "_tuep" \
+    --append "_caueeg" \
     --do_test

@@ -120,7 +120,7 @@ class PatchStem(nn.Module):
     无 BatchNorm（跨域稳健，LayerNorm 系归一化）。
     """
 
-    def __init__(self, in_channels, d_feat=256, kernel=25):
+    def __init__(self, in_channels, d_feat=256, kernel=10):
         super().__init__()
         self.conv = nn.Conv1d(in_channels, 32, kernel_size=kernel,
                               stride=kernel)

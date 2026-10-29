@@ -31,7 +31,8 @@ class DiseaseCAUEEGDataset(BaseDataset):
                                                     episode_seed=episode_seed)
 
     def load_data(self, one_hot=True):
-        raw_path = "../data/CAUEEG/caueeg_disease.npz"
+        _suffix = "_10s" if os.environ.get("LLM4FC_DATA_10S") == "1" else ""
+        raw_path = f"../data/CAUEEG/caueeg_disease{_suffix}.npz"
         raw = np.load(raw_path, allow_pickle=True)
         data = dict(raw) if hasattr(raw, 'files') else raw.item()  # 兼容 .npz / .npy
         time_series = data["timeseries"]

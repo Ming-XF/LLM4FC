@@ -35,6 +35,10 @@ QUERY_GROUPS = {
         'EEG LLM classification fine tuning',
         'EEG modality reprogramming frozen LLM classification',
         'EEG-GPT classification interpretation',
+        'EEG-LLaVA low-cost wearable SSVEP glaucoma screening LLM',
+        'LLM clinical graph structure refiner EEG seizure diagnosis',
+        'EEG seizure diagnosis large language model graph refinement',
+        'frozen LLM modality reprogramming multi-channel EEG classification',
         'Tokenized EEG signals large language models epilepsy detection Information Fusion',
         'EEG Agent unified framework automated EEG analysis AAAI',
         'Time-LLM time series classification reprogramming',
@@ -53,6 +57,19 @@ QUERY_GROUPS = {
         'Gram large general EEG model raw data classification restoration',
         'EEGMamba EEG foundation model Mamba',
         'Neuro-GPT foundation model EEG',
+    ],
+    "ccf_a_2026_brain_signal": [
+        'EEG classification AAAI 2026',
+        'EEG seizure detection IJCAI 2026 large language model',
+        'EEG agent automated EEG analysis AAAI 2026',
+        'EEG brain signals ACL 2026 language model',
+        'electrocorticography brain tuning speech language models ACL 2026',
+        'EEG seizure vision text knowledge distillation 2026',
+        'multimodal vision language model multi-task EEG decoding 2026',
+        'EEG foundation model benchmark 2026 code',
+        'EEG classification NeurIPS 2026',
+        'EEG classification ICML ICLR 2026',
+        'EEG CCF A journal 2026 large language model',
     ],
 }
 
@@ -108,6 +125,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--per-query", type=int, default=25)
     parser.add_argument("--sleep", type=float, default=0.2)
+    parser.add_argument(
+        "--group",
+        action="append",
+        choices=sorted(QUERY_GROUPS),
+        help="query only selected group(s); repeat to select multiple groups",
+    )
     parser.add_argument("--output-dir", default=str(Path(__file__).resolve().parent))
     args = parser.parse_args()
     if args.per_query < 1:
@@ -120,7 +143,9 @@ def main() -> int:
     works_by_id: dict[str, dict[str, Any]] = {}
     groups_by_id: defaultdict[str, set[str]] = defaultdict(set)
 
-    for group, queries in QUERY_GROUPS.items():
+    groups = args.group or list(QUERY_GROUPS)
+    for group in groups:
+        queries = QUERY_GROUPS[group]
         for query in queries:
             print(f"Querying {group}: {query}")
             try:

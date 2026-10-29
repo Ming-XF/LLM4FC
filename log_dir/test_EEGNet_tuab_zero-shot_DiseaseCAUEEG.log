@@ -1,6 +1,6 @@
-10/15/2026 21:50:57 - INFO - __main__ -   ==================== Explicit args ====================
+10/29/2026 01:23:31 - INFO - __main__ -   ==================== Explicit args ====================
   D: 2
-  append: _tuab
+  append: _10s_tuab
   batch_size: 16
   dataset: DiseaseCAUEEG
   do_test: True
@@ -11,20 +11,21 @@
   num_kernels: 8
   p1: 4
   p2: 8
-  pretrain_path: ./output_dir/EEGNet_DiseaseTUAB_train
+  pretrain_path: ./output_dir_eegnet10s/EEGNet_DiseaseTUAB_train
   [effective] batch_size: 16, learning_rate: 0.0001
-10/15/2026 21:50:57 - INFO - __main__ -   ==================== Full args (resolved) ====================
+10/29/2026 01:23:31 - INFO - __main__ -   ==================== Full args (resolved) ====================
   D: 2
   F1: 8
   abla_channel: -1
   abla_vae: n
   activation: gelu
   alpha: 1.0
-  append: _tuab
+  append: _10s_tuab
   batch_size: 16
   beta: 1.0
   beta1: 0.9
   beta2: 0.98
+  contrast_lambda: 0.1
   d_ff: 128
   d_model: 4
   data_processors: 0
@@ -48,9 +49,15 @@
   few_shot_seed: 42
   freeze_head_bias: True
   frequency: 128
-  fusion_alpha_max: 0.5
   initializer: None
   k: 5
+  knowledge_anchor_candidates: 1000
+  knowledge_anchor_fusion: 0.1
+  knowledge_anchors: 10
+  knowledge_aspect_mix: 0.6
+  knowledge_description_candidates: 1000
+  knowledge_description_prototypes: 100
+  knowledge_similarity: centered_cosine
   learning_rate: 0.0001
   llm_init: pretrained
   llm_path: ./model/chatglm-6b
@@ -73,19 +80,14 @@
   optimizer: Adam
   p1: 4
   p2: 8
-  pretrain_path: ./output_dir/EEGNet_DiseaseTUAB_train
+  pretrain_path: ./output_dir_eegnet10s/EEGNet_DiseaseTUAB_train
   project: 
-  proto_per_phrase: 100
-  proto_preselect: 1000
-  readout_layers: 4
   save_steps: 200
   schedule: cos
   sparsity: 0.7
   standard_split: False
   target_learning_rate: 1e-05
   train_set: 0.6
-  use_knowledge_fusion: True
-  use_local_knowledge: True
   use_patch_embeds: True
   use_semantic_prototypes: True
   use_task_prompt: False
@@ -94,11 +96,11 @@
   wandb_entity: cwg
   warmup_steps: 400
   weight_decay: 0.0001
-10/15/2026 21:50:57 - INFO - utils.trainer -   Model loaded from ./output_dir/EEGNet_DiseaseTUAB_train/EEGNet-0.bin (20/20 keys)
-10/15/2026 21:50:57 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
-10/15/2026 21:50:58 - INFO - utils.trainer -   Loss: 0.83139
-10/15/2026 21:50:58 - INFO - utils.trainer -   AUC: 0.65686
-10/15/2026 21:50:58 - INFO - utils.trainer -   Accuracy: 0.57841
-10/15/2026 21:50:58 - INFO - utils.trainer -   Precision: 0.59322
-10/15/2026 21:50:58 - INFO - utils.trainer -   Specificity: 0.94533
-10/15/2026 21:50:58 - INFO - utils.trainer -   Sensitivity: 0.10324
+10/29/2026 01:23:31 - INFO - utils.trainer -   Model loaded from ./output_dir_eegnet10s/EEGNet_DiseaseTUAB_train/EEGNet-0.bin (20/20 keys)
+10/29/2026 01:23:31 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
+10/29/2026 01:23:32 - INFO - utils.trainer -   Loss: 0.73112
+10/29/2026 01:23:32 - INFO - utils.trainer -   AUC: 0.51822
+10/29/2026 01:23:32 - INFO - utils.trainer -   Accuracy: 0.55527
+10/29/2026 01:23:32 - INFO - utils.trainer -   Precision: 0.45205
+10/29/2026 01:23:32 - INFO - utils.trainer -   Specificity: 0.90888
+10/29/2026 01:23:32 - INFO - utils.trainer -   Sensitivity: 0.09735

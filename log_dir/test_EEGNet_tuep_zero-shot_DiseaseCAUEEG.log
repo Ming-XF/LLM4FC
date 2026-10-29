@@ -1,6 +1,6 @@
-10/26/2026 22:44:26 - INFO - __main__ -   ==================== Explicit args ====================
+10/29/2026 01:21:42 - INFO - __main__ -   ==================== Explicit args ====================
   D: 2
-  append: _tuep
+  append: _10s_tuep
   batch_size: 16
   dataset: DiseaseCAUEEG
   do_test: True
@@ -11,16 +11,16 @@
   num_kernels: 8
   p1: 4
   p2: 8
-  pretrain_path: ./output_dir/EEGNet_DiseaseTUEP_train
+  pretrain_path: ./output_dir_eegnet10s/EEGNet_DiseaseTUEP_train
   [effective] batch_size: 16, learning_rate: 0.0001
-10/26/2026 22:44:26 - INFO - __main__ -   ==================== Full args (resolved) ====================
+10/29/2026 01:21:42 - INFO - __main__ -   ==================== Full args (resolved) ====================
   D: 2
   F1: 8
   abla_channel: -1
   abla_vae: n
   activation: gelu
   alpha: 1.0
-  append: _tuep
+  append: _10s_tuep
   batch_size: 16
   beta: 1.0
   beta1: 0.9
@@ -80,7 +80,7 @@
   optimizer: Adam
   p1: 4
   p2: 8
-  pretrain_path: ./output_dir/EEGNet_DiseaseTUEP_train
+  pretrain_path: ./output_dir_eegnet10s/EEGNet_DiseaseTUEP_train
   project: 
   save_steps: 200
   schedule: cos
@@ -96,11 +96,11 @@
   wandb_entity: cwg
   warmup_steps: 400
   weight_decay: 0.0001
-10/26/2026 22:44:26 - INFO - utils.trainer -   Model loaded from ./output_dir/EEGNet_DiseaseTUEP_train/EEGNet-0.bin (20/20 keys)
-10/26/2026 22:44:26 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
-10/26/2026 22:44:28 - INFO - utils.trainer -   Loss: 0.70590
-10/26/2026 22:44:28 - INFO - utils.trainer -   AUC: 0.47370
-10/26/2026 22:44:28 - INFO - utils.trainer -   Accuracy: 0.54113
-10/26/2026 22:44:28 - INFO - utils.trainer -   Precision: 0.28571
-10/26/2026 22:44:28 - INFO - utils.trainer -   Specificity: 0.93166
-10/26/2026 22:44:28 - INFO - utils.trainer -   Sensitivity: 0.03540
+10/29/2026 01:21:42 - INFO - utils.trainer -   Model loaded from ./output_dir_eegnet10s/EEGNet_DiseaseTUEP_train/EEGNet-0.bin (20/20 keys)
+10/29/2026 01:21:42 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
+10/29/2026 01:21:43 - INFO - utils.trainer -   Loss: 0.68788
+10/29/2026 01:21:43 - INFO - utils.trainer -   AUC: 0.49573
+10/29/2026 01:21:43 - INFO - utils.trainer -   Accuracy: 0.55913
+10/29/2026 01:21:43 - INFO - utils.trainer -   Precision: 0.37500
+10/29/2026 01:21:43 - INFO - utils.trainer -   Specificity: 0.97722
+10/29/2026 01:21:43 - INFO - utils.trainer -   Sensitivity: 0.01770
