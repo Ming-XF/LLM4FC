@@ -41,9 +41,13 @@ def timer(func):
 
 def save_model(path, epoch, model, optimizer=None):
     if isinstance(model, torch.nn.DataParallel):
-        state_dict = model.module.state_dict()
-    else:
-        state_dict = model.state_dict()
+        model = model.module
+    # LLM4FC: 只存可训练参数（冻结 8B 权重不落盘，ckpt 从 ~3.6GB 降到 ~15MB；
+    # load_model 的 strict=False + 从预训练重新加载冻结部分保证兼容）
+    trainable = {name for name, p in model.named_parameters()
+                 if p.requires_grad}
+    state_dict = {k: v for k, v in model.state_dict().items()
+                  if k in trainable}
     data = {'epoch': epoch,
             'state_dict': state_dict}
     if not (optimizer is None):

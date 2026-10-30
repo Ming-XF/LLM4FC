@@ -6,7 +6,7 @@
 #
 
 TARGET_DATASET="DiseaseTUAB"
-PRETRAIN_PATH="./output_dir/EEGNet_DiseaseCAUEEG_train"
+PRETRAIN_PATH="./output_dir/output_dir_eegnet_s42/EEGNet_DiseaseCAUEEG_train"
 
 # 10s 段口径（当前 EEGNet 官方结果口径）
 export LLM4FC_DATA_10S=1

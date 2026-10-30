@@ -5,7 +5,6 @@
 # Run: sh scripts/train_llama4ts_caueeg_10s.sh
 #
 
-export CUDA_VISIBLE_DEVICES=1
 
 cd "$(dirname "$0")/../Classification" || exit 1
 mkdir -p experiments_llm4fc
@@ -34,4 +33,5 @@ python src/main.py \
     --val_interval 1 \
     --batch_size 32 \
     --num_workers 4 \
-    --seed 42
+    --seed 44 \
+    --gpu 1 \

@@ -5,7 +5,6 @@
 # Run: sh scripts/train_deformer_tuab.sh
 #
 
-export CUDA_VISIBLE_DEVICES=1
 
 cd "$(dirname "$0")/.." || exit 1
 
@@ -17,5 +16,5 @@ python main_LLM4FC.py \
     --lr 1e-4 \
     --batch-size 64 \
     --patience 20 \
-    --seed 42 \
-    --save-path ./save_llm4fc
+    --seed 44 \
+    --save-path ./save_llm4fc_s44

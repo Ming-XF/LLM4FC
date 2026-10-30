@@ -1,0 +1,55 @@
+Running:
+src/main.py --output_dir experiments_llm4fc --comment OFA 8B CAUEEG zero-shot --name ZS_CAUEEG_TUAB --records_file ofa_records_zs.xls --data_dir ../llm4fc_data_10s_tuab --data_class npz --pattern _train --val_pattern _val --test_pattern _test --epochs 50 --lr 0.0005 --patch_size 16 --stride 16 --optimizer RAdam --d_model 4096 --llm_path /root/autodl-tmp/LLM4FC/model/deepseek-r1-distill-llama-8B --pos_encoding learnable --task classification --key_metric AUROC --batch_size 32 --num_workers 4 --seed 42 --gpu 1 --test_only testset --load_model experiments_llm4fc/DiseaseCAUEEG_10s_2026-10-30_01-55-14_d6U/checkpoints/model_best.pth
+
+Using device: cuda:1
+Loading and preprocessing data ...
+3921 samples may be used for training
+832 samples will be used for validation
+849 samples will be used for testing
+Creating model ...
+Model:
+llama4ts(
+  (padding_patch_layer): ReplicationPad1d((0, 16))
+  (enc_embedding): DataEmbedding(
+    (value_embedding): TokenEmbedding(
+      (tokenConv): Conv1d(304, 4096, kernel_size=(3,), stride=(1,), padding=(1,), bias=False, padding_mode=circular)
+    )
+    (position_embedding): PositionalEmbedding()
+    (temporal_embedding): TemporalEmbedding(
+      (hour_embed): Embedding(24, 4096)
+      (weekday_embed): Embedding(7, 4096)
+      (day_embed): Embedding(32, 4096)
+      (month_embed): Embedding(13, 4096)
+    )
+    (dropout): Dropout(p=0.1, inplace=False)
+  )
+  (llm): LlamaModel(
+    (embed_tokens): Embedding(128256, 4096)
+    (layers): ModuleList(
+      (0-5): 6 x LlamaDecoderLayer(
+        (self_attn): LlamaAttention(
+          (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+          (k_proj): Linear(in_features=4096, out_features=1024, bias=False)
+          (v_proj): Linear(in_features=4096, out_features=1024, bias=False)
+          (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+        )
+        (mlp): LlamaMLP(
+          (gate_proj): Linear(in_features=4096, out_features=14336, bias=False)
+          (up_proj): Linear(in_features=4096, out_features=14336, bias=False)
+          (down_proj): Linear(in_features=14336, out_features=4096, bias=False)
+          (act_fn): SiLUActivation()
+        )
+        (input_layernorm): LlamaRMSNorm((4096,), eps=1e-05)
+        (post_attention_layernorm): LlamaRMSNorm((4096,), eps=1e-05)
+      )
+    )
+    (norm): LlamaRMSNorm((4096,), eps=1e-05)
+    (rotary_emb): LlamaRotaryEmbedding()
+  )
+  (dropout): Dropout(p=0.1, inplace=False)
+  (ln_proj): LayerNorm((4096,), eps=1e-05, elementwise_affine=True)
+  (out_layer): Linear(in_features=4096, out_features=2, bias=True)
+)
+Total number of parameters: 1838075906
+Trainable parameters: 4112386
+Test Summary: loss: 1.456192 | accuracy: 0.595995 | precision: 0.601009 | AUROC: 0.681955 | AUPRC: 0.741093 | 

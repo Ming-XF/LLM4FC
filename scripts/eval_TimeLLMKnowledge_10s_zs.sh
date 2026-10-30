@@ -5,12 +5,13 @@
 # Run: sh scripts/eval_TimeLLMKnowledge_10s_zs.sh
 #
 
+cd /root/autodl-tmp/LLM4FC || exit 1
 export LLM4FC_DATA_10S=1
 export CUDA_VISIBLE_DEVICES=1
 
-TARGET_DATASET="DiseaseTUAB"
-PRETRAIN_PATH="./output_dir_tllm10s/TimeLLMKnowledge_DiseaseTUEP_train"
-APPEND="_10s_tuep"
+TARGET_DATASET="DiseaseTUEP"
+PRETRAIN_PATH="./output_dir_tllm10s_s42_tuab/TimeLLMKnowledge_DiseaseTUAB_train"
+APPEND="_s42_tuab"
 
 python main.py \
     --model "TimeLLMKnowledge" \

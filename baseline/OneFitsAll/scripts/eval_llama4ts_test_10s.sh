@@ -5,14 +5,13 @@
 # Run: sh scripts/eval_llama4ts_test_10s.sh
 #
 
-export CUDA_VISIBLE_DEVICES=0
 
 cd "$(dirname "$0")/../Classification" || exit 1
 mkdir -p experiments_llm4fc
 
 TARGET_DIR="../llm4fc_data_10s"
 EXP_NAME="DiseaseCAUEEG_10s"
-LOAD_MODEL="experiments_llm4fc/DiseaseCAUEEG_10s_2026-10-29_11-16-31_ADc/checkpoints/model_best.pth"
+LOAD_MODEL="experiments_llm4fc/DiseaseCAUEEG_10s_2026-10-30_02-33-55_D7y/checkpoints/model_best.pth"
 
 python src/main.py \
     --output_dir experiments_llm4fc \
@@ -38,5 +37,6 @@ python src/main.py \
     --batch_size 32 \
     --num_workers 4 \
     --seed 42 \
+    --gpu 1 \
     --test_only testset \
     --load_model "$LOAD_MODEL"

@@ -8,7 +8,7 @@
 TARGET_DATASET="DiseaseTUEP"
 RESUME_DIR="out_llm4fc_tuep/checkpoint-best.pth"
 
-cd baseline/LaBraM && python run_class_finetuning.py \
+cd /root/autodl-tmp/LLM4FC/baseline/LaBraM && python run_class_finetuning.py \
     --dataset "$TARGET_DATASET" \
     --model labram_base_patch200_200 \
     --resume "$RESUME_DIR" \

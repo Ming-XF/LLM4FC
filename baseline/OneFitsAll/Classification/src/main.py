@@ -64,7 +64,9 @@ def main(config):
         torch.backends.cuda.enable_flash_sdp(False)
         torch.backends.cuda.enable_mem_efficient_sdp(False)
 
-    device = torch.device('cuda' if (torch.cuda.is_available() and config['gpu'] != '-1') else 'cpu')
+    device = torch.device(
+        f"cuda:{config['gpu']}" if (torch.cuda.is_available()
+                                    and config['gpu'] != '-1') else 'cpu')
     logger.info("Using device: {}".format(device))
     if device == 'cuda':
         logger.info("Device index: {}".format(torch.cuda.current_device()))

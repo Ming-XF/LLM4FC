@@ -12,7 +12,7 @@ EPOCHS=200
 BATCH_SIZE=64
 LR=1e-4
 PATIENCE=20
-OUT_DIR="baseline/NeuroLM/out_llm4fc"
+OUT_DIR="baseline/NeuroLM/out_llm4fc_s44"
 
 python baseline/NeuroLM/train_instruction_llm4fc.py \
     --train_dataset "$TRAIN_DATASET" \
@@ -26,4 +26,5 @@ python baseline/NeuroLM/train_instruction_llm4fc.py \
     --warmup_epochs 1 \
     --patience "$PATIENCE" \
     --text_max_len 80 \
-    --seed 42
+    --seed 44 \
+    --gpu 0

@@ -7,10 +7,10 @@
 #
 
 TRAIN_DATASET="DiseaseTUAB"
-OUT_DIR="out_llm4fc_tuab"
+OUT_DIR="out_llm4fc_s44_tuab"
 export CUDA_VISIBLE_DEVICES=1
 
-cd baseline/LaBraM && python run_class_finetuning.py \
+cd /root/autodl-tmp/LLM4FC/baseline/LaBraM && python run_class_finetuning.py \
     --dataset "$TRAIN_DATASET" \
     --model labram_base_patch200_200 \
     --finetune checkpoints/labram-base.pth \
@@ -24,9 +24,9 @@ cd baseline/LaBraM && python run_class_finetuning.py \
     --layer_decay 0.65 \
     --weight_decay 0.05 \
     --drop_path 0.1 \
-    --save_ckpt_freq 5 \
+    --save_ckpt_freq 1000 \
     --disable_rel_pos_bias \
     --abs_pos_emb \
     --disable_qkv_bias \
-    --seed 42 \
+    --seed 44 \
     --num_workers 8

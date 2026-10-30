@@ -9,6 +9,7 @@
 DATASET="DiseaseTUEP"
 EARLY_STOP_METRIC="AUC"
 
+cd /root/autodl-tmp/LLM4FC || exit 1
 export LLM4FC_DATA_10S=1
 export NCCL_P2P_DISABLE=1
 export OMP_NUM_THREADS=16
@@ -24,8 +25,8 @@ deepspeed --num_gpus=2 main.py \
     --early_stop_patience 20 \
     --early_stop_metric "$EARLY_STOP_METRIC" \
     --dataset "$DATASET" \
-    --model_dir output_dir_tllm10s \
-    --append "_10s" \
+    --model_dir output_dir_tllm10s_s42_tuep \
+    --append "_s42_tuep" \
     --d_model 128 \
     --num_heads 8 \
     --dropout 0.1 \

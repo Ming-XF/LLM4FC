@@ -1,0 +1,19 @@
+config: !!python/object:argparse.Namespace
+  AT: 16
+  T: 64
+  batch_size: 64
+  data_dir: llm4fc_data_10s_tuep
+  dataset: DiseaseTUEP
+  dropout: 0.5
+  gpu: 0
+  kernel_length: 21
+  lr: 0.0001
+  max_epoch: 200
+  model: Deformer
+  num_chan: 19
+  num_class: 2
+  num_layers: 6
+  num_time: 2000
+  patience: 20
+  save_path: ./save_llm4fc_s43
+  seed: 43

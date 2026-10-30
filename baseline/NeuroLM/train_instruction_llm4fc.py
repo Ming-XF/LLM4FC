@@ -323,6 +323,8 @@ def main():
     parser.add_argument('--patience', default=3, type=int,
                         help='early stopping patience on val window roc_auc')
     parser.add_argument('--seed', default=1337, type=int)
+    parser.add_argument('--gpu', default='0', type=str,
+                        help='LLM4FC: physical GPU index (device = cuda:gpu)')
     parser.add_argument('--eeg_max_len', default=-1, type=int,
                         help='pad EEG tokens to this length (-1 = no padding)')
     parser.add_argument('--text_max_len', default=80, type=int)
@@ -330,7 +332,7 @@ def main():
                         help='max files per split (smoke test; -1 = all)')
     args = parser.parse_args()
 
-    device = 'cuda'
+    device = f'cuda:{args.gpu}'
     dtype = torch.bfloat16
     # ── LLM4FC 口径：全链路可复现（对齐 main.py 的确定性设置）──
     import random
