@@ -4,14 +4,7 @@ import numpy as np
 from scipy.linalg import sqrtm
 
 
-# ── 年龄回归的固定先验归一化边界 ──
-# 不从数据拟合 min/max（避免 test 泄漏），且所有域统一量纲，
-# 便于 few-shot / 跨域迁移时 head 输出量纲一致。
-AGE_LABEL_MIN = 0.0
-AGE_LABEL_MAX = 100.0
-
 EEG_PREPROCESSING_VERSION = "eeg_v2_common19_avgref_200hz"
-AGE_EEG_PREPROCESSING_VERSION = "age_eeg_v2_common19_avgref_200hz_fixedage"
 EEG_19_CHANNEL_ORDER = (
     'Fp1', 'F3', 'C3', 'P3', 'O1',
     'Fp2', 'F4', 'C4', 'P4', 'O2',
@@ -91,74 +84,6 @@ def save_npz_atomic(output_path, **arrays):
     finally:
         if os.path.exists(temporary_path):
             os.unlink(temporary_path)
-
-
-def prepare_age_labels(data, source="age dataset"):
-    """Return age labels in the repository-wide fixed ``[0, 100]`` scale.
-
-    Some existing NPZ files were generated before fixed age normalization was
-    introduced.  Their ``labels`` arrays use dataset-specific min/max bounds,
-    even though current training and transfer code assumes that every age head
-    predicts ``age / 100``.  ``labels_raw`` is therefore the source of truth.
-
-    Legacy files without ``labels_raw`` can still be read when their original
-    bounds are present, because the age in years can be reconstructed exactly.
-    In all cases the returned metric bounds are the fixed prior bounds.
-    """
-    if "labels" not in data:
-        raise KeyError(f"{source} is missing the required 'labels' field")
-
-    stored_labels = np.asarray(data["labels"], dtype=np.float32)
-    source_min = (float(np.asarray(data["label_min"]).item())
-                  if "label_min" in data else None)
-    source_max = (float(np.asarray(data["label_max"]).item())
-                  if "label_max" in data else None)
-
-    if "labels_raw" in data:
-        labels_raw = np.asarray(data["labels_raw"], dtype=np.float32)
-    else:
-        if (source_min is None or source_max is None
-                or not np.isfinite(source_min) or not np.isfinite(source_max)
-                or source_max <= source_min):
-            raise ValueError(
-                f"{source} has no labels_raw and no valid label_min/label_max; "
-                "the age coordinate cannot be recovered safely")
-        labels_raw = (
-            stored_labels * (source_max - source_min) + source_min
-        ).astype(np.float32)
-
-    if labels_raw.shape != stored_labels.shape:
-        raise ValueError(
-            f"{source} labels_raw shape {labels_raw.shape} does not match "
-            f"labels shape {stored_labels.shape}")
-    if not np.all(np.isfinite(labels_raw)):
-        raise ValueError(f"{source} contains non-finite raw age labels")
-    if np.any(labels_raw < AGE_LABEL_MIN) or np.any(labels_raw > AGE_LABEL_MAX):
-        raise ValueError(
-            f"{source} contains ages outside the supported "
-            f"[{AGE_LABEL_MIN:g}, {AGE_LABEL_MAX:g}] year range: "
-            f"min={labels_raw.min():g}, max={labels_raw.max():g}")
-
-    # If the file records its old coordinate, make sure labels_raw really is
-    # consistent with it before overriding that coordinate for current runs.
-    if source_min is not None or source_max is not None:
-        if (source_min is None or source_max is None
-                or not np.isfinite(source_min) or not np.isfinite(source_max)
-                or source_max <= source_min):
-            raise ValueError(
-                f"{source} has invalid label bounds: "
-                f"label_min={source_min}, label_max={source_max}")
-        expected_stored = (labels_raw - source_min) / (source_max - source_min)
-        if not np.allclose(
-                stored_labels, expected_stored, rtol=1e-5, atol=1e-6):
-            max_error = float(np.max(np.abs(stored_labels - expected_stored)))
-            raise ValueError(
-                f"{source} labels_raw is inconsistent with labels and the "
-                f"recorded bounds (max normalized error={max_error:g})")
-
-    span = AGE_LABEL_MAX - AGE_LABEL_MIN
-    labels = ((labels_raw - AGE_LABEL_MIN) / span).astype(np.float32)
-    return labels, labels_raw, float(AGE_LABEL_MIN), float(AGE_LABEL_MAX)
 
 
 def data_norm(data):

@@ -26,14 +26,9 @@ DEFAULT_FMIN = 0.5
 DEFAULT_FMAX = 45.0
 
 SUPPORTED_RAW_FILES = (
-    "../data/CAUEEG/caueeg_age.npz",
     "../data/CAUEEG/caueeg_disease.npz",
-    "../data/TUAB/tuab_age.npz",
     "../data/TUAB/tuab_disease.npz",
-    "../data/TUAB/tuab_gender.npz",
-    "../data/TUEP/tuep_age.npz",
     "../data/TUEP/tuep_disease.npz",
-    "../data/TUEP/tuep_gender.npz",
 )
 
 

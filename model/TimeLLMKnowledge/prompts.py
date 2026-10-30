@@ -24,16 +24,6 @@ _PROMPT_TASK_DISEASE = (
     "whether the subject has the target condition:"
 )
 
-_PROMPT_TASK_AGE = (
-    "Analyze the EEG feature description above and estimate "
-    "the subject's age:"
-)
-
-_PROMPT_TASK_GENDER = (
-    "Analyze the EEG feature description above and determine "
-    "the subject's gender:"
-)
-
 _PROMPT_TASK_FUTURE_FC = (
     "Analyze the historical dynamic functional connectivity matrices "
     "above and predict the next matrix:"
@@ -53,10 +43,6 @@ def get_prompt_config(dataset_name: str) -> PromptConfig:
         prompt = _PROMPT_TASK_TUAB
     elif dataset_name.startswith('DiseaseTUEP'):
         prompt = _PROMPT_TASK_TUEP
-    elif dataset_name.startswith('Age'):
-        prompt = _PROMPT_TASK_AGE
-    elif dataset_name.startswith('Gender'):
-        prompt = _PROMPT_TASK_GENDER
     elif dataset_name.startswith('FutureFC'):
         prompt = _PROMPT_TASK_FUTURE_FC
     else:
