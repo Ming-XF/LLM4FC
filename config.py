@@ -60,7 +60,6 @@ def init_model_config(args, data_config: DataConfig):
             n_heads=args.num_heads,
             num_fusion_tokens=args.knowledge_fusion_tokens,
             dropout=args.dropout,
-            encoder_dim=args.knowledge_encoder_dim,
             sample_rate=data_config.hz or 200,
             eeg_seconds=10,
             raw_patch_size=args.knowledge_raw_patch,
@@ -234,8 +233,6 @@ def init_config():
                              help="Temperature for knowledge-bank logit weights")
     model_group.add_argument("--knowledge_fusion_tokens", default=8, type=int,
                              help="Number of learned fusion tokens per aspect")
-    model_group.add_argument("--knowledge_encoder_dim", default=None, type=int,
-                             help="OFA feature dimension (defaults to d_model)")
     model_group.add_argument("--knowledge_raw_patch", default=200, type=int,
                              help="Raw EEG patch length in samples for 10-second input")
     model_group.add_argument("--knowledge_raw_stride", default=200, type=int,

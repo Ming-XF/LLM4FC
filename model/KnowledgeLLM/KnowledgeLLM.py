@@ -175,7 +175,7 @@ class SupervisedContrastiveLoss(nn.Module):
 class KnowledgeLLMConfig(BaseConfig):
     def __init__(self, node_size, time_series_size=2000, d_model=128,
                  n_heads=8, num_fusion_tokens=8, dropout=0.1,
-                 encoder_dim=None, sample_rate=200, eeg_seconds=10,
+                 sample_rate=200, eeg_seconds=10,
                  raw_patch_size=200, raw_stride=200, psd_patch_size=8,
                  psd_stride=4, fc_patch_size=1, fc_stride=1,
                  contrast_lambda=0.1, contrast_temperature=0.1,
@@ -192,7 +192,6 @@ class KnowledgeLLMConfig(BaseConfig):
         self.d_model = d_model
         self.n_heads = n_heads
         self.num_fusion_tokens = num_fusion_tokens
-        self.encoder_dim = encoder_dim or d_model
         self.dropout = dropout
         self.sample_rate = sample_rate
         self.eeg_seconds = eeg_seconds
@@ -230,7 +229,7 @@ class Model(nn.Module):
         triu = torch.triu_indices(channels, channels, offset=1)
         self.register_buffer("fc_triu_indices", triu, persistent=False)
 
-        d_encoder = config.encoder_dim
+        d_encoder = config.d_model
         self.raw_encoder = OFAPatchEncoder(
             channels, config.raw_patch_size, config.raw_stride, d_encoder,
             config.dropout)
@@ -241,7 +240,7 @@ class Model(nn.Module):
             edge_count, config.fc_patch_size, config.fc_stride, d_encoder,
             config.dropout)
         self.query_projections = nn.ModuleList(
-            [nn.Linear(d_encoder, config.d_model) for _ in ASPECTS])
+            [nn.Linear(config.d_model, config.d_model) for _ in ASPECTS])
 
         banks = self._load_or_extract_knowledge(config)
         # DeepSpeed fp32 配置会把可训练 RMSNorm 提升为 fp32，与冻结的 bf16
@@ -265,8 +264,11 @@ class Model(nn.Module):
             "knowledge_fusion_tokens",
             torch.zeros(len(ASPECTS), config.num_fusion_tokens, self.d_llm))
         self.use_captured_fusion = False
+        # mapping 全连接层之后的 dropout：只作用于训练路径的融合 token；
+        # 保存时的快照走干净计算（推理语义 + checkpoint 确定性）。
+        self.mapper_dropout = nn.Dropout(config.dropout)
 
-        self.contrast_projection = nn.Linear(d_encoder, 128)
+        self.contrast_projection = nn.Linear(config.d_model, config.d_model)
         self.contrastive_loss = SupervisedContrastiveLoss(
             config.contrast_temperature)
         self.output_norm = nn.LayerNorm(self.d_llm)
@@ -432,7 +434,7 @@ class Model(nn.Module):
                 # 与实时 mapper 计算数学等价（同一权重、同一冻结词表）。
                 source = self.knowledge_fusion_tokens[i]
             else:
-                source = mapper(self.word_embeddings)
+                source = self.mapper_dropout(mapper(self.word_embeddings))
             tokens.append(reprogrammer(query, source, source))
         return tokens
 
