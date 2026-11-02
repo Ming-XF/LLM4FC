@@ -854,6 +854,8 @@ class Trainer(object):
             trainable = [p for p in model.parameters() if p.requires_grad]
             with deepspeed.zero.GatheredParameters(trainable, modifier_rank=0):
                 if torch.distributed.get_rank() == 0:
+                    if hasattr(model, 'capture_knowledge_state'):
+                        model.capture_knowledge_state()
                     trainable_names = {n for n, p in model.named_parameters()
                                       if p.requires_grad}
                     buffer_names = {n for n, _ in model.named_buffers()}
@@ -864,6 +866,8 @@ class Trainer(object):
                     torch.save(state_dict,
                                os.path.join(path, f'{self.args.model}-{self.task_id}.bin'))
         else:
+            if hasattr(model, 'capture_knowledge_state'):
+                model.capture_knowledge_state()
             trainable_names = {n for n, p in model.named_parameters()
                               if p.requires_grad}
             buffer_names = {n for n, _ in model.named_buffers()}
@@ -909,6 +913,7 @@ class Trainer(object):
                                 weights_only=False)
 
         n_skipped_prompt = 0
+        n_skipped_mismatch = 0
 
         if self.args.deepspeed:
             import deepspeed
@@ -924,6 +929,7 @@ class Trainer(object):
                         if current_state[k].shape == v.shape:
                             current_state[k].copy_(v)
                         else:
+                            n_skipped_mismatch += 1
                             logger.warning("  Shape mismatch for %s: saved %s vs current %s — skipped",
                                            k, tuple(v.shape), tuple(current_state[k].shape))
                     else:
@@ -942,6 +948,7 @@ class Trainer(object):
                     if current_state[k].shape == v.shape:
                         current_state[k].copy_(v)
                     else:
+                        n_skipped_mismatch += 1
                         logger.warning("  Shape mismatch for %s: saved %s vs current %s — skipped",
                                        k, tuple(v.shape), tuple(current_state[k].shape))
                 else:
@@ -952,11 +959,17 @@ class Trainer(object):
 
         if n_skipped_prompt:
             logger.info("  %d prompt-buffer key(s) skipped (kept target-task prompt)", n_skipped_prompt)
-        n_loaded = len(saved_state) - len(unexpected) - n_skipped_prompt
+        if n_skipped_mismatch:
+            logger.warning("  %d key(s) skipped due to shape mismatch", n_skipped_mismatch)
+        n_loaded = len(saved_state) - len(unexpected) - n_skipped_prompt - n_skipped_mismatch
         if missing:
             logger.info("  %d keys not in checkpoint (kept from init)", len(missing))
         if unexpected:
             logger.warning("  %d keys in checkpoint but not in model — skipped", len(unexpected))
+        if hasattr(model, 'on_state_loaded'):
+            # 训练续跑（--do_train）时 mapper 仍需收梯度，不冻结融合 token；
+            # 纯评估路径直接使用 checkpoint 中的融合 token 快照。
+            model.on_state_loaded(use_frozen_fusion=not self.args.do_train)
         logger.info("Model loaded from %s (%d/%d keys)", bin_path, n_loaded, len(saved_state))
 
     def visualize(self):

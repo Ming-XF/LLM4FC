@@ -70,7 +70,7 @@ class BaseDataset(Dataset):
     @property
     def uses_timellmknowledge_features(self):
         """Whether this dataset must load the offline knowledge sidecar."""
-        return self.data_config.model == 'TimeLLMKnowledge'
+        return self.data_config.model in {'TimeLLMKnowledge', 'KnowledgeLLM'}
 
     def _load_timellmknowledge_features(self, raw_npz_path, raw_data):
         """Load and validate the sidecar that is aligned to the raw NPZ."""

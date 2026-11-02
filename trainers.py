@@ -66,3 +66,15 @@ class TimeLLMKnowledgeTrainer(Trainer):
             "labels": labels.to(self.device),
         }
         return kwargs
+
+
+class KnowledgeLLMTrainer(TimeLLMKnowledgeTrainer):
+    """Input adapter for the 10-second KnowledgeLLM architecture."""
+
+    def prepare_inputs_kwargs(self, inputs):
+        kwargs = super().prepare_inputs_kwargs(inputs)
+        if kwargs["x"].shape[-1] != 10 * int(self.data_config.hz):
+            raise ValueError(
+                "KnowledgeLLMTrainer expects a 10-second EEG segment, got "
+                f"{kwargs['x'].shape[-1]} samples at {self.data_config.hz} Hz")
+        return kwargs

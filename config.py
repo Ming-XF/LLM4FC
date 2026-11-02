@@ -52,6 +52,37 @@ def init_model_config(args, data_config: DataConfig):
             use_patch_embeds=args.use_patch_embeds,
         )
         model = TimeLLMKnowledgeModel(model_config)
+    elif args.model == 'KnowledgeLLM':
+        model_config = KnowledgeLLMConfig(
+            node_size=data_config.node_size,
+            time_series_size=data_config.time_series_size,
+            d_model=args.d_model,
+            n_heads=args.num_heads,
+            num_fusion_tokens=args.knowledge_fusion_tokens,
+            dropout=args.dropout,
+            encoder_dim=args.knowledge_encoder_dim,
+            sample_rate=data_config.hz or 200,
+            eeg_seconds=10,
+            raw_patch_size=args.knowledge_raw_patch,
+            raw_stride=args.knowledge_raw_stride,
+            psd_patch_size=args.knowledge_psd_patch,
+            psd_stride=args.knowledge_psd_stride,
+            fc_patch_size=args.knowledge_fc_patch,
+            fc_stride=args.knowledge_fc_stride,
+            task_type=data_config.task_type,
+            output_dim=data_config.output_dim,
+            contrast_lambda=args.contrast_lambda,
+            contrast_temperature=args.knowledge_contrast_temperature,
+            knowledge_bank_path=args.knowledge_bank,
+            knowledge_top_k=args.knowledge_top_k,
+            knowledge_top_m=args.knowledge_top_m,
+            knowledge_temperature=args.knowledge_temperature,
+            llm_layers=args.knowledge_llm_layers,
+            llm_type=args.llm_type,
+            llm_path=args.llm_path,
+            llm_init=args.llm_init,
+        )
+        model = KnowledgeLLMModel(model_config)
     else:
         model = None
         model_config = None
@@ -191,7 +222,36 @@ def init_config():
                              action=argparse.BooleanOptionalAction, default=True,
                              help="TimeLLMKnowledge: per-group patch embeddings "
                                   "(FC graph 2D CNN, relative PSD 2D CNN) replace "
-                                  "the shared PatchStem raw branch")
+                             "the shared PatchStem raw branch")
+    model_group.add_argument(
+        "--knowledge_bank", default="", type=str,
+        help="KnowledgeLLM bank (.npz/.json/.pt); empty extracts from the frozen LLM")
+    model_group.add_argument("--knowledge_top_k", default=8, type=int,
+                             help="KnowledgeLLM last hidden positions used for extraction")
+    model_group.add_argument("--knowledge_top_m", default=32, type=int,
+                             help="KnowledgeLLM top vocabulary tokens per position")
+    model_group.add_argument("--knowledge_temperature", default=1.0, type=float,
+                             help="Temperature for knowledge-bank logit weights")
+    model_group.add_argument("--knowledge_fusion_tokens", default=8, type=int,
+                             help="Number of learned fusion tokens per aspect")
+    model_group.add_argument("--knowledge_encoder_dim", default=None, type=int,
+                             help="OFA feature dimension (defaults to d_model)")
+    model_group.add_argument("--knowledge_raw_patch", default=200, type=int,
+                             help="Raw EEG patch length in samples for 10-second input")
+    model_group.add_argument("--knowledge_raw_stride", default=200, type=int,
+                             help="Raw EEG patch stride in samples")
+    model_group.add_argument("--knowledge_psd_patch", default=8, type=int,
+                             help="PSD frequency patch length")
+    model_group.add_argument("--knowledge_psd_stride", default=4, type=int,
+                             help="PSD frequency patch stride")
+    model_group.add_argument("--knowledge_fc_patch", default=1, type=int,
+                             help="Dynamic-FC window patch length")
+    model_group.add_argument("--knowledge_fc_stride", default=1, type=int,
+                             help="Dynamic-FC window patch stride")
+    model_group.add_argument("--knowledge_contrast_temperature", default=0.1,
+                             type=float, help="KnowledgeLLM supervised InfoNCE temperature")
+    model_group.add_argument("--knowledge_llm_layers", default=6, type=int,
+                             help="Number of Llama layers retained by KnowledgeLLM")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")

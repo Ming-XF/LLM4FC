@@ -26,9 +26,14 @@ class DataConfig:
         self.abla_vae = args.abla_vae
         self.hz = None
         # 统一滑动知识窗口参数：由 sidecar 元数据覆盖（单源为数据）
-        self.num_knowledge_windows = 7
-        self.window_seconds = 30
-        self.stride_seconds = 5
+        if self.model == "KnowledgeLLM":
+            self.num_knowledge_windows = 1
+            self.window_seconds = 10
+            self.stride_seconds = 10
+        else:
+            self.num_knowledge_windows = 7
+            self.window_seconds = 30
+            self.stride_seconds = 5
 
         # 任务类型：由各数据集 load_data 显式设置；
         # 未设置时根据 output_dim 推断（向后兼容旧数据集）
@@ -58,4 +63,3 @@ class DataConfig:
     @property
     def is_regression(self):
         return self.task_type == self.TASK_REGRESSION
-
