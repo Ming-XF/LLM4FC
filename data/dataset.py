@@ -150,11 +150,29 @@ class BaseDataset(Dataset):
             num_windows = int(np.asarray(features['num_windows']).item())
             window_seconds = int(np.asarray(features['window_seconds']).item())
             stride_seconds = int(np.asarray(features['stride_seconds']).item())
-            expected = {
-                'window_fc': (num_samples, num_windows, num_channels, num_channels),
-                'window_psd': (num_samples, num_windows, num_channels, None),
-                'window_mask': (num_samples, num_windows),
-            }
+            # KnowledgeLLM 使用滑窗 FC（nilearn 预计算）替代单窗 window_fc
+            if self.data_config.model == 'KnowledgeLLM':
+                if 'window_fc_slide' not in features.files:
+                    raise ValueError(
+                        f"Feature file {feature_path} is missing window_fc_slide "
+                        f"(regenerate with --fc-window/--fc-stride)")
+                fc_windows = int(np.asarray(
+                    features['window_fc_slide']).shape[1])
+                expected = {
+                    'window_fc_slide': (num_samples, fc_windows,
+                                        num_channels, num_channels),
+                    'window_psd': (num_samples, num_windows,
+                                   num_channels, None),
+                    'window_mask': (num_samples, num_windows),
+                }
+            else:
+                expected = {
+                    'window_fc': (num_samples, num_windows,
+                                  num_channels, num_channels),
+                    'window_psd': (num_samples, num_windows,
+                                   num_channels, None),
+                    'window_mask': (num_samples, num_windows),
+                }
             arrays = {}
             for name, shape in expected.items():
                 array = np.asarray(features[name])
@@ -165,6 +183,9 @@ class BaseDataset(Dataset):
                         f"Feature {name} has shape {array.shape}, expected {shape}")
                 arrays[name] = array
 
+            # KnowledgeLLM 模式下把滑窗 FC 作为 window_fc 提供给模型
+            if 'window_fc_slide' in arrays:
+                arrays['window_fc'] = arrays.pop('window_fc_slide')
             self.all_data.update(arrays)
             self.data_config.hz = hz
             self.data_config.num_knowledge_windows = num_windows

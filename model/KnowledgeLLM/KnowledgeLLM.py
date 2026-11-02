@@ -25,6 +25,7 @@ from .knowledge_bank import (
 _EPS = 1e-8
 
 
+
 class OFAPatchEncoder(nn.Module):
     """Patch and value embedding used by the OFA baseline.
 
@@ -390,8 +391,8 @@ class Model(nn.Module):
         if window_psd.shape[2] != x.shape[1]:
             raise ValueError("window_psd channel dimension does not match x")
 
-        # Dynamic FC: each window is a point on the edge sequence.  The
-        # upper-triangular vector avoids duplicating symmetric correlations.
+        # 滑窗 FC 来自预处理 sidecar（nilearn 相关，窗 3s/步长 1s → 8 窗）。
+        # 上三角向量避免对称重复；每个窗口经现有编码器编码为一个 token。
         fc_edges = window_fc[:, :, self.fc_triu_indices[0],
                              self.fc_triu_indices[1]]
         fc_edges = fc_edges.transpose(1, 2).contiguous()  # (B,E,W)
@@ -453,9 +454,11 @@ class Model(nn.Module):
             if window_mask.dim() != 2:
                 raise ValueError(
                     f"window_mask must have shape (B,W), got {tuple(window_mask.shape)}")
-            if window_fc.dim() >= 4 and window_mask.shape != window_fc.shape[:2]:
+            if window_fc.dim() >= 4 and window_mask.shape[0] != window_fc.shape[0]:
                 raise ValueError(
-                    "window_mask shape must match the FC batch/window dimensions")
+                    "window_mask batch size must match the FC batch size")
+            # 注意：滑窗 FC 的窗口数（8）与 sidecar window_mask 的窗口数（1）
+            # 不同——mask 只表达样本有效性，不做 FC 窗口级对齐。
             if not bool(window_mask.bool().all()):
                 raise ValueError("KnowledgeLLM requires valid FC/PSD windows")
         features = self._encode_modalities(x, window_fc, window_psd)

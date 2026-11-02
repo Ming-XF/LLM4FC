@@ -92,7 +92,9 @@ def preprocess_timellmknowledge_features(
         fmax=DEFAULT_FMAX,
         batch_size=16,
         device="cpu",
-        overwrite=False):
+        overwrite=False,
+        fc_window_seconds=3.0,
+        fc_stride_seconds=1.0):
     """Generate the TimeLLMKnowledge feature sidecar for one raw task NPZ."""
     input_path = Path(input_npz).expanduser().resolve()
     output_path = (Path(output_npz).expanduser().resolve()
@@ -133,6 +135,14 @@ def preprocess_timellmknowledge_features(
                 f"{window_seconds}s windows (stride {stride_seconds}s), "
                 f"got {num_timepoints}")
 
+        fc_win = int(round(fc_window_seconds * hz))
+        fc_step = int(round(fc_stride_seconds * hz))
+        if fc_win <= 0 or fc_step <= 0 or fc_win > num_timepoints:
+            raise ValueError(
+                f"Invalid sliding-FC window {fc_window_seconds}s / stride "
+                f"{fc_stride_seconds}s for {num_timepoints} samples")
+        fc_windows = (num_timepoints - fc_win) // fc_step + 1
+
         probe = torch.as_tensor(
             np.asarray(time_series[0:1], dtype=np.float32), device=device)
         probe_psd, retained_freqs = _relative_psd(
@@ -149,6 +159,9 @@ def preprocess_timellmknowledge_features(
             window_psd = np.memmap(
                 temp_dir / "window_psd.dat", mode="w+", dtype=np.float32,
                 shape=(num_samples, num_windows, num_channels, num_freqs))
+            window_fc_slide = np.memmap(
+                temp_dir / "window_fc_slide.dat", mode="w+", dtype=np.float32,
+                shape=(num_samples, fc_windows, num_channels, num_channels))
 
             with torch.no_grad():
                 for start in range(0, num_samples, batch_size):
@@ -166,9 +179,18 @@ def preprocess_timellmknowledge_features(
                             fmin, fmax)
                         window_fc[start:stop, k] = w_fc.cpu().numpy()
                         window_psd[start:stop, k] = w_psd.cpu().numpy()
+                    # 滑窗 FC：与主方法 window_fc 完全同口径
+                    # （torch _correlation_matrix，含 eps=1e-5 z-score 行为）
+                    xs = x.unfold(dimension=-1, size=fc_win, step=fc_step)
+                    xs = xs.permute(0, 2, 1, 3).reshape(
+                        -1, num_channels, fc_win)              # (B*W,C,T)
+                    slide = _correlation_matrix(xs).reshape(
+                        stop - start, fc_windows,
+                        num_channels, num_channels)
+                    window_fc_slide[start:stop] = slide.cpu().numpy()
                     print(f"  processed {stop}/{num_samples}", flush=True)
 
-            for array in (window_fc, window_psd):
+            for array in (window_fc, window_psd, window_fc_slide):
                 array.flush()
 
             stat = input_path.stat()
@@ -202,6 +224,11 @@ def preprocess_timellmknowledge_features(
                     subject_id=subject_id.astype(str),
                     window_fc=window_fc,
                     window_psd=window_psd,
+                    window_fc_slide=window_fc_slide,
+                    fc_window_seconds=np.asarray(
+                        fc_window_seconds, dtype=np.float32),
+                    fc_stride_seconds=np.asarray(
+                        fc_stride_seconds, dtype=np.float32),
                     window_mask=np.ones(
                         (num_samples, num_windows), dtype=np.bool_),
                     **source_metadata,
@@ -231,6 +258,18 @@ def _parse_args():
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--fc-window", type=float, default=3.0,
+        help="Sliding-FC window length in seconds (nilearn correlation)")
+    parser.add_argument(
+        "--fc-stride", type=float, default=1.0,
+        help="Sliding-FC window stride in seconds")
+    parser.add_argument(
+        "--psd-window", type=float, default=DEFAULT_PSD_WINDOW_SECONDS,
+        help="Welch window length in seconds for the relative PSD")
+    parser.add_argument(
+        "--psd-overlap", type=float, default=DEFAULT_PSD_OVERLAP,
+        help="Welch overlap fraction for the relative PSD")
     return parser.parse_args()
 
 
@@ -248,7 +287,11 @@ def main():
                 window_seconds=args.window_seconds,
                 stride_seconds=args.stride_seconds,
                 batch_size=args.batch_size, device=args.device,
-                overwrite=args.overwrite)
+                overwrite=args.overwrite,
+                fc_window_seconds=args.fc_window,
+                fc_stride_seconds=args.fc_stride,
+                psd_window_seconds=args.psd_window,
+                psd_overlap=args.psd_overlap)
         return
     if not args.input:
         raise ValueError("Specify --input or --all-supported")
@@ -257,7 +300,11 @@ def main():
         window_seconds=args.window_seconds,
         stride_seconds=args.stride_seconds,
         batch_size=args.batch_size, device=args.device,
-        overwrite=args.overwrite)
+        overwrite=args.overwrite,
+        fc_window_seconds=args.fc_window,
+        fc_stride_seconds=args.fc_stride,
+        psd_window_seconds=args.psd_window,
+        psd_overlap=args.psd_overlap)
 
 
 if __name__ == "__main__":
