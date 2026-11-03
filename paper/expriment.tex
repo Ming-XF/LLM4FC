@@ -1,0 +1,217 @@
+% expriment.tex -- experimental part.
+% Sections 1-3 written; 4-7 (analysis experiments) intentionally left as TODO.
+
+%-------------------------------------------------------------------------
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Datasets}
+\label{sec:exp-datasets}
+
+We evaluate on three EEG datasets covering two diseases and one
+electrophysiological abnormality, following the same preprocessing pipeline:
+all recordings are resampled to $200$~Hz, selected to the standard
+$19$-channel 10--20 montage, and re-referenced to the common average. Each
+recording is then cut into non-overlapping one-minute windows, and all models
+consume \emph{10-second segments} of these windows (the first $10$~s of each
+window), which is the protocol shared by the baselines below; the
+TimeLLMKnowledge baseline additionally follows its original 60-second-window
+protocol.
+
+\begin{table}[t]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{lll}
+    \toprule
+    Dataset & Task (classes) & \#Subj. / \#Seg. \\
+    \midrule
+    CAUEEG & AD vs.~normal & \TODO{counts} \\
+    TUAB & abnormal vs.~normal & \TODO{counts} \\
+    TUEP & epilepsy / non-epilepsy & \TODO{counts} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Summary of the three datasets used for disease classification.
+  \TODO{fill subject and segment counts}.}
+  \label{tab:datasets}
+\end{table}
+
+\paragraph{CAUEEG.} \TODO{\cite{caueeg}} A resting-state EEG dataset of
+Alzheimer's disease (AD) patients and normal controls. To balance the
+recording length per subject, AD subjects are limited to at most 11
+one-minute windows, while controls are kept uncapped.
+
+\paragraph{TUAB.} \TODO{\cite{tuab}} The Temple University Abnormal EEG
+Corpus, with clinically labeled normal and abnormal recordings. Per-subject
+window caps of 3 (abnormal) and 2 (normal) are applied.
+
+\paragraph{TUEP.} \TODO{\cite{tuep}} The Temple University Events Corpus,
+with epilepsy and non-epilepsy subjects (AR-montage sessions). Seizure
+segments are excluded from the continuous signal using the provided
+annotations before windowing, and subjects are capped at 30 (epilepsy) and
+60 (non-epilepsy) windows.
+
+For every dataset, the official train/validation/test split is stratified by
+subject with ratio $70/15/15$ (fixed seed 42), so no subject appears in more
+than one split, and all metrics are computed at the window level on the test
+split.
+
+\subsection{Experimental Setup}
+\label{sec:exp-setup}
+
+\paragraph{Protocol and metrics.} All models are trained from scratch (no
+external pretraining except the model-specific initializations noted below)
+with 200 epochs, the Adam optimizer with learning rate $10^{-4}$ and weight
+decay $10^{-4}$, a cosine learning-rate schedule, and early stopping on the
+validation window AUC with patience 20; the checkpoint with the best
+validation AUC is selected. Main-harness models are trained with DeepSpeed
+ZeRO-2 on 2 GPUs with a total batch size of 64; standalone baselines follow
+their official repositories with the same epochs, learning rate, and patience.
+We report window-level AUC and accuracy. Baselines are evaluated over three
+random seeds (42/43/44, mean $\pm$ std); TimeLLMKnowledge and \modelname
+follow the single-seed (42) archive protocol.
+
+\paragraph{Evaluation modes.} We consider two evaluation modes.
+\emph{Same-domain}: train and test on the same dataset. \emph{Zero-shot
+cross-domain}: the model trained on a source dataset is applied directly---with
+no fine-tuning---to the test split of a target dataset, which probes the
+domain-transferability of each architecture. For \modelname, zero-shot
+evaluation reuses the knowledge-fusion-token snapshot stored in the
+checkpoint, so no re-extraction on the target domain is needed.
+
+\paragraph{Baselines.} We compare against five methods plus our previous
+reprogramming baseline:
+(i)~\textbf{EEGNet} \TODO{\cite{eegnet}}, a compact convolutional network
+designed for EEG decoding;
+(ii)~\textbf{TimeLLMKnowledge}, our earlier reprogramming baseline that
+encodes sliding-window dynamic functional connectivity with a GCN and feeds
+it into the same frozen LLM backbone (60-second windows, single seed);
+(iii)~\textbf{NeuroLM} \TODO{\cite{neurolm}}, a language model pretrained on
+large-scale EEG;
+(iv)~\textbf{LaBraM} \TODO{\cite{labram}}, an EEG foundation model with a
+neural tokenizer and vector-quantized pretraining;
+(v)~\textbf{OFA} \TODO{\cite{ofa}}, a one-fits-all frozen transformer adapted
+to EEG via input embedding patches;
+and (vi)~\textbf{EEG-Deformer} \TODO{\cite{eeg-deformer}}, a transformer
+variant for EEG with attention scaling.
+
+\subsection{Main Results}
+\label{sec:exp-main}
+
+Table~\ref{tab:main} reports same-domain and zero-shot cross-domain
+classification results, grouped by the training domain. All baseline cells
+are the mean $\pm$ standard deviation over three seeds; TimeLLMKnowledge is a
+single-seed archive. The \modelname row is reserved for the finalized runs
+and filled with placeholders (TODO: complete experiments and fill).
+
+% TODO: bold the best mean per (target, metric) after KnowledgeLLM numbers land.
+
+\begin{table*}[t]
+  \centering
+  \small
+  \setlength{\tabcolsep}{5pt}
+  \caption{Same-domain and zero-shot cross-domain disease classification
+  (window-level AUC / Acc). Each panel groups a training domain; columns are
+  evaluation domains. Baselines: mean $\pm$ std over seeds 42/43/44 (10-second
+  segments); TimeLLMKnowledge: single seed 42, 60-second windows.}
+  \label{tab:main}
+
+  \begin{tabular}{l r r r r r r}
+    \toprule
+    & \multicolumn{2}{c}{\textbf{CAUEEG}} & \multicolumn{2}{c}{\textbf{TUAB}}
+    & \multicolumn{2}{c}{\textbf{TUEP}} \\
+    \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+    \multicolumn{1}{l}{\textbf{(a) Trained on CAUEEG}} & AUC & Acc & AUC & Acc
+    & AUC & Acc \\
+    \midrule
+    \modelname{} (ours)      & \multicolumn{6}{c}{\TODO{finalized runs pending}} \\
+    TimeLLMKnowledge (ours) & 0.8141 & 0.7224 & 0.7624 & 0.6537 & 0.5701 & 0.5626 \\
+    EEGNet     & 0.8001${\pm}$0.015 & 0.7408${\pm}$0.009 & 0.6808${\pm}$0.010 & 0.6333${\pm}$0.016 & 0.4765${\pm}$0.022 & 0.4717${\pm}$0.038 \\
+    NeuroLM    & 0.7606${\pm}$0.017 & 0.6872${\pm}$0.031 & 0.7124${\pm}$0.009 & 0.6392${\pm}$0.012 & 0.5153${\pm}$0.013 & 0.5111${\pm}$0.012 \\
+    LaBraM     & 0.8244${\pm}$0.006 & 0.7549${\pm}$0.004 & 0.6388${\pm}$0.015 & 0.5453${\pm}$0.020 & 0.5737${\pm}$0.022 & 0.4795${\pm}$0.007 \\
+    OFA        & 0.7929${\pm}$0.004 & 0.7172${\pm}$0.011 & 0.6825${\pm}$0.008 & 0.6090${\pm}$0.011 & 0.4988${\pm}$0.006 & 0.4780${\pm}$0.002 \\
+    EEG-Deformer & 0.8145${\pm}$0.044 & 0.4619${\pm}$0.031 & 0.6568${\pm}$0.028 & 0.5347${\pm}$0.002 & 0.4796${\pm}$0.039 & 0.5072${\pm}$0.001 \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{8pt}
+
+  \begin{tabular}{l r r r r r r}
+    \toprule
+    & \multicolumn{2}{c}{\textbf{CAUEEG}} & \multicolumn{2}{c}{\textbf{TUAB}}
+    & \multicolumn{2}{c}{\textbf{TUEP}} \\
+    \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+    \multicolumn{1}{l}{\textbf{(b) Trained on TUAB}} & AUC & Acc & AUC & Acc
+    & AUC & Acc \\
+    \midrule
+    \modelname{} (ours)      & \multicolumn{6}{c}{\TODO{finalized runs pending}} \\
+    TimeLLMKnowledge (ours) & 0.6299 & 0.6170 & 0.8531 & 0.7812 & 0.4869 & 0.5088 \\
+    EEGNet     & 0.5340${\pm}$0.014 & 0.5613${\pm}$0.019 & 0.7496${\pm}$0.011 & 0.6101${\pm}$0.047 & 0.5637${\pm}$0.022 & 0.5310${\pm}$0.018 \\
+    NeuroLM    & 0.5542${\pm}$0.020 & 0.5261${\pm}$0.066 & 0.8422${\pm}$0.009 & 0.7055${\pm}$0.048 & 0.5543${\pm}$0.034 & 0.5357${\pm}$0.035 \\
+    LaBraM     & 0.6519${\pm}$0.009 & 0.6255${\pm}$0.012 & 0.8332${\pm}$0.005 & 0.7609${\pm}$0.002 & 0.5244${\pm}$0.007 & 0.5361${\pm}$0.012 \\
+    OFA        & 0.6160${\pm}$0.011 & 0.5746${\pm}$0.029 & 0.8145${\pm}$0.007 & 0.7248${\pm}$0.024 & 0.4516${\pm}$0.002 & 0.5099${\pm}$0.009 \\
+    EEG-Deformer & 0.5951${\pm}$0.032 & 0.4966${\pm}$0.091 & 0.8124${\pm}$0.007 & 0.5803${\pm}$0.044 & 0.4586${\pm}$0.002 & 0.5006${\pm}$0.036 \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{8pt}
+
+  \begin{tabular}{l r r r r r r}
+    \toprule
+    & \multicolumn{2}{c}{\textbf{CAUEEG}} & \multicolumn{2}{c}{\textbf{TUAB}}
+    & \multicolumn{2}{c}{\textbf{TUEP}} \\
+    \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+    \multicolumn{1}{l}{\textbf{(c) Trained on TUEP}} & AUC & Acc & AUC & Acc
+    & AUC & Acc \\
+    \midrule
+    \modelname{} (ours)      & \multicolumn{6}{c}{\TODO{finalized runs pending}} \\
+    TimeLLMKnowledge (ours) & 0.5055 & 0.5051 & 0.5756 & 0.5560 & 0.6887 & 0.6203 \\
+    EEGNet     & 0.5125${\pm}$0.021 & 0.5587${\pm}$0.001 & 0.4942${\pm}$0.011 & 0.4605${\pm}$0.008 & 0.5262${\pm}$0.054 & 0.4994${\pm}$0.010 \\
+    NeuroLM    & 0.4579${\pm}$0.036 & 0.5416${\pm}$0.030 & 0.4700${\pm}$0.036 & 0.4806${\pm}$0.030 & 0.6331${\pm}$0.017 & 0.5595${\pm}$0.016 \\
+    LaBraM     & 0.5122${\pm}$0.012 & 0.5343${\pm}$0.052 & 0.5028${\pm}$0.035 & 0.4723${\pm}$0.014 & 0.6349${\pm}$0.013 & 0.5942${\pm}$0.015 \\
+    OFA        & 0.5347${\pm}$0.007 & 0.5518${\pm}$0.022 & 0.4825${\pm}$0.035 & 0.4814${\pm}$0.031 & 0.4855${\pm}$0.138 & 0.5166${\pm}$0.042 \\
+    EEG-Deformer & 0.5012${\pm}$0.011 & 0.5154${\pm}$0.070 & 0.4680${\pm}$0.014 & 0.4892${\pm}$0.041 & 0.6329${\pm}$0.003 & 0.5127${\pm}$0.019 \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\paragraph{Same-domain results.} \TODO{Discussion to be finalized after the
+KnowledgeLLM numbers land. Observations from the table: LaBraM and
+TimeLLMKnowledge are the strongest same-domain models, with
+TimeLLMKnowledge reaching 0.8531 AUC on TUAB; EEGNet and OFA follow closely
+on CAUEEG.}
+
+\paragraph{Zero-shot cross-domain results.} \TODO{Discussion to be finalized.
+Observations: transfer out of CAUEEG and TUAB is substantially better than
+out of TUEP, where most models drop to near-chance levels; TimeLLMKnowledge
+achieves the strongest CAUEEG$\to$TUAB transfer (0.7624 AUC).}
+
+%-------------------------------------------------------------------------
+% Analysis experiments (4-7): not yet conducted. Keep placeholders.
+
+\subsection{Ablation Study}
+\label{sec:exp-ablation}
+
+\TODO{Planned: contribution of each core component (knowledge bank,
+multimodal reprogramming, scaled-cosine attention, segmented-average
+initialization, supervised contrastive loss).}
+
+\subsection{Knowledge-Bank Analysis}
+\label{sec:exp-bank-analysis}
+
+\TODO{Planned: effect of the knowledge texts, extraction parameters
+($K$, $M$, temperature), bank size, and replacement of the bank with
+random or general-domain tokens.}
+
+\subsection{Reprogramming Analysis}
+\label{sec:exp-reprogramming-analysis}
+
+\TODO{Planned: effect of the number of fusion tokens $P$, the number of
+retained LLM layers $N$, per-aspect reprogramming vs.~shared, and analysis
+of the attention patterns over fusion tokens.}
+
+\subsection{Qualitative Analysis}
+\label{sec:exp-qualitative}
+
+\TODO{Planned: visualization of the learned fusion tokens, cross-domain
+representations, and error cases.}

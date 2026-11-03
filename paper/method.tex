@@ -1,0 +1,215 @@
+% method.tex -- the proposed (finalized) method: KnowledgeLLM.
+% Describes the model architecture only (no datasets / experimental protocol).
+% Organization follows the two core contributions:
+%   (1) knowledge-bank extraction, (2) multimodal knowledge reprogramming.
+
+%-------------------------------------------------------------------------
+\section{Method}
+\label{sec:method}
+
+% TODO: pipeline figure (figures/framework.pdf). Suggested layout: input segment
+% -> [raw / PSD / sliding-FC sidecars] -> patch encoders -> reprogramming
+% cross-attention -> knowledge bank + mapper -> frozen LLM stack -> head.
+% \begin{figure*}[t]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/framework.pdf}
+%   \caption{Overview of \modelname.}
+%   \label{fig:framework}
+% \end{figure*}
+
+\subsection{Overview}
+\label{sec:method-overview}
+
+\modelname adapts a frozen large language model (LLM) to EEG-based
+classification and regression with only a small set of trainable parameters.
+It rests on two components. First, \emph{knowledge-bank extraction}: the
+parametric knowledge of the frozen LLM is read out as compact, aspect-specific
+sets of vocabulary tokens that characterize the EEG views the model consumes.
+Second, \emph{multimodal knowledge reprogramming}: three complementary EEG
+views are encoded into the LLM's token space by cross-attention over learnable
+fusion tokens derived from the bank
+\TODO{\cite{time-llm}}, so the frozen LLM can consume EEG tokens with its
+standard inference procedure, without fine-tuning any of its weights.
+
+As illustrated in Fig.~\ref{fig:framework} (TODO: add figure), the pipeline
+consists of five stages: multi-view input representation, patch encoding,
+knowledge-bank extraction, knowledge reprogramming, and a frozen LLM backbone
+with a lightweight prediction head. Only the patch encoders, the knowledge
+mappers, the reprogramming layers, and the final head are trained; the LLM
+backbone remains frozen throughout.
+
+\subsection{Knowledge-Bank Extraction}
+\label{sec:method-bank}
+
+The knowledge source of \modelname is the frozen LLM itself. For each EEG
+view---equivalently, each \emph{aspect} $a \in \{\mathrm{fc}, \mathrm{psd},
+\mathrm{raw}\}$---we prepare a short statement $\mathcal{T}_a$ describing
+clinically established EEG knowledge of that aspect, and pass it through the
+\emph{complete} frozen LLM (before layer truncation) in plain text form. From
+the logits of the final layer, we take the last $K$ non-special positions;
+per position, special tokens are masked to $-\infty$ and the top-$M$ tokens
+are retained and re-normalized with temperature $\tau_k$. Tokens are then
+aggregated across positions by their probability mass and sorted, yielding
+the aspect bank
+
+\begin{equation}
+  \mathcal{B}_a = \big\{ (v_i, w_i) \big\}_{i=1}^{|\mathcal{B}_a|},
+\end{equation}
+i.e., a set of vocabulary token ids $v_i$ with normalized weights $w_i$.
+Intuitively, this activation-based extraction reads out which vocabulary
+tokens the LLM most strongly associates with each EEG aspect, condensing the
+LLM's parametric knowledge into a compact, reusable token set. The bank
+embeddings
+$\mathbf{E}_a = [\mathbf{e}_{v_1}; \dots; \mathbf{e}_{v_{|\mathcal{B}_a|}}]
+\in \mathbb{R}^{|\mathcal{B}_a| \times D}$
+are looked up from the frozen input embedding matrix of the LLM ($D$ is the
+LLM hidden size), so the bank is a projection of the LLM's knowledge onto its
+own token space. The extraction runs offline once and is reused throughout
+training; only afterwards are the first $N$ layers of the LLM retained for
+the backbone, keeping the trainable pipeline light.
+
+\subsection{Multimodal Knowledge Encoding}
+\label{sec:method-encoding}
+
+The second component couples the bank to the EEG signal through three
+complementary views, each tokenized by a patch encoder and then
+\emph{reprogrammed} against the bank into the LLM's hidden space.
+
+\paragraph{Multi-view input representation.}
+Given one EEG segment $\mathbf{x} \in \mathbb{R}^{C \times T}$ with $C$
+channels and $T$ time samples, each channel is first z-scored over time to
+stabilize the input scale before convolution. We then build three views
+covering the temporal, spectral, and connectivity aspects of the signal: the
+normalized \emph{raw waveform} itself; a \emph{relative power spectral
+density (PSD)} per channel, estimated Welch-like with a Hann window and
+overlapping segments, band-limited and normalized to unit total power,
+$\mathbf{S} \in \mathbb{R}^{C \times F}$ with $F$ frequency bins; and
+\emph{sliding-window dynamic functional connectivity (FC)}, where the segment
+is split into $W$ sliding windows, the Pearson correlation matrix
+$\mathbf{R}^{(w)} \in \mathbb{R}^{C \times C}$ is computed per window, and
+only the upper-triangular part is kept, giving an edge vector
+$\mathbf{e}^{(w)} \in \mathbb{R}^{E}$ with $E = C(C-1)/2$. Each view carries
+its own natural ``sequence'' axis: time, frequency, and windows.
+
+\paragraph{Patch encoding.}
+Each view is tokenized by a lightweight patch encoder with shared design
+\TODO{\cite{ofa}}. For a view with sequence length $T_m$ and $D_m$ input
+rows, the encoder unfolds the sequence into patches of size $p_m$ with stride
+$s_m$; replication padding is applied so that a final partial patch is
+preserved. The flattened patches are mapped to $d$-dimensional tokens by a
+convolutional value embedding with kernel size 3 and circular padding,
+followed by LayerNorm and dropout:
+
+\begin{equation}
+  \mathbf{H}_m = g_m(\mathbf{v}_m) \in \mathbb{R}^{L_m \times d},
+  \qquad L_m = \left\lfloor \frac{T_m + s_m - p_m}{s_m} \right\rfloor + 1 ,
+\end{equation}
+where $\mathbf{v}_m$ denotes the view input. We deliberately add
+\emph{no} positional embedding at this stage: the frozen LLM applies its own
+rotary positional encoding downstream, and a fixed positional term here
+dominates the convolutional output at initialization, which we found leads
+to degenerate (collapsed) representations. The three encoders share the
+design but use view-specific patch geometry and are not weight-shared,
+producing feature tokens $\mathbf{H}_{\mathrm{raw}}$,
+$\mathbf{H}_{\mathrm{psd}}$, and $\mathbf{H}_{\mathrm{fc}}$ of lengths
+$L_{\mathrm{raw}}$, $L_{\mathrm{psd}}$, and $L_{\mathrm{fc}} = W$,
+respectively.
+
+\paragraph{Knowledge reprogramming.}
+For each aspect, the bank is compressed into $P$ learnable \emph{fusion
+tokens} by a bias-free linear mapper over the bank-token axis:
+
+\begin{equation}
+  \mathbf{f}_a = \mathbf{W}_a \mathbf{E}_a \in \mathbb{R}^{P \times D},
+  \qquad \mathbf{W}_a \in \mathbb{R}^{P \times |\mathcal{B}_a|}.
+\end{equation}
+The mapper is initialized by \emph{segmented averaging}: the $i$-th output
+row averages the $i$-th contiguous group of bank tokens with uniform
+weights, so the $P$ fusion tokens are distinct from the very start. We found
+this essential---a collinear initialization lets all fusion tokens collapse
+to the same vector early in training. Dropout is applied to the fusion
+tokens on the training path.
+
+The view features are then \emph{reprogrammed} into the LLM space by a
+multi-head cross-attention layer per aspect, where the feature tokens act as
+queries and the fusion tokens act as both keys and values. With $H$ heads and
+head dimension $d_h = d / H$,
+
+\begin{equation}
+  \mathbf{q} = \mathbf{Q}_a \mathbf{H}_a, \qquad
+  \hat{\mathbf{k}} = \mathrm{normalize}\big(\mathbf{K}_a \mathbf{f}_a\big),
+\end{equation}
+\begin{equation}
+  \alpha_{l,p}^{(h)} = \mathrm{softmax}_p\!\left(
+    \frac{\langle \mathbf{q}_{l,h}, \hat{\mathbf{k}}_{p,h} \rangle}
+         {\sqrt{d_h}} \right),
+\end{equation}
+\begin{equation}
+  \mathbf{z}_a = \frac{1}{H} \sum_{h=1}^{H} \sum_{p=1}^{P}
+    \alpha_{l,p}^{(h)} \mathbf{f}_{a,p} \;\in \mathbb{R}^{L_a \times D}.
+\end{equation}
+The key side is unit-normalized (\emph{scaled-cosine attention}): the frozen
+word-embedding scale is far smaller than the query scale, and without
+normalization the inter-key differences shrink to $\sim\!10^{-4}$ in score
+space, degenerating the attention into a uniform average. Each output token
+$\mathbf{z}_a$ is thus a query-specific mixture of the $P$ knowledge fusion
+tokens, expressed directly in the LLM's hidden space. The three aspects are
+concatenated into the final token sequence
+$\mathbf{z} \in \mathbb{R}^{L \times D}$ with total length
+$L = \sum_a L_a$:
+
+\begin{equation}
+  \mathbf{z} = [\,\mathbf{z}_{\mathrm{fc}};\; \mathbf{z}_{\mathrm{psd}};\;
+                 \mathbf{z}_{\mathrm{raw}}\,].
+\end{equation}
+
+\subsection{Frozen LLM Backbone and Training Objectives}
+\label{sec:method-objectives}
+
+\paragraph{Frozen LLM backbone and prediction head.}
+The token sequence $\mathbf{z}$ is consumed by the first $N$ layers of the
+frozen LLM backbone (in our instantiation, an 8B-parameter Llama-style model
+\TODO{\cite{deepseek-r1}}), using rotary positions $0, \dots, L-1$ and the
+LLM's standard causal attention. All backbone weights are frozen; only the
+RMSNorm parameters of the retained layers remain trainable, following
+\TODO{\cite{ofa}}, so that the norms can absorb the scale of the injected EEG
+tokens and match the LLM's internal statistics:
+
+\begin{equation}
+  \mathbf{h} = \mathrm{LLM}_{1:N}(\mathbf{z}) \in \mathbb{R}^{L \times D}.
+\end{equation}
+The representation is mean-pooled over tokens and fed into a small
+prediction head:
+
+\begin{equation}
+  \hat{\mathbf{y}} = \mathrm{Head}\Big(
+    \mathrm{GELU}\big(\mathrm{LayerNorm}(\bar{\mathbf{h}})\big)\Big),
+  \qquad \bar{\mathbf{h}} = \frac{1}{L} \sum_{l=1}^{L} \mathbf{h}_l ,
+\end{equation}
+with dropout before the final linear projection.
+
+\paragraph{Training objectives.}
+For classification, the primary objective is the cross-entropy loss
+$\mathcal{L}_{\mathrm{CE}}(\hat{\mathbf{y}}, y)$. We add a supervised
+contrastive regularizer \TODO{\cite{supcon}} that aligns the multi-view
+representations of samples sharing a label: for each aspect, the encoder
+tokens are mean-pooled and projected,
+$\mathbf{u}_a = \mathrm{proj}(\frac{1}{L_a}\sum_l \mathbf{H}_{a,l})$, and an
+InfoNCE loss is computed over the batch with same-label pairs as positives
+(self-pairs excluded), with temperature $\tau_c$:
+
+\begin{equation}
+  \mathcal{L} = \mathcal{L}_{\mathrm{CE}} + \lambda \,\mathcal{L}_{\mathrm{contrast}},
+\end{equation}
+\begin{equation}
+  \mathcal{L}_{\mathrm{contrast}} =
+    - \frac{1}{|\mathcal{V}|} \sum_{i \in \mathcal{V}}
+      \log \frac{\sum_{p \in \mathcal{P}(i)} e^{s_{i,p}/\tau_c}}
+                 {\sum_{j \neq i} e^{s_{i,j}/\tau_c}},
+\end{equation}
+where $s_{i,j}$ is the similarity between the projected view features of
+samples $i$ and $j$, $\mathcal{P}(i)$ the positive set of $i$, and
+$\mathcal{V}$ the set of samples with a valid positive pair. This term
+encourages the three views to agree on the task semantics before the LLM
+consumes them. For regression tasks, the head is trained with the Huber loss
+($\delta = 1$).

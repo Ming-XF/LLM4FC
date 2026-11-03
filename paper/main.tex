@@ -1,0 +1,60 @@
+% CVPR 2027 Paper Template; see https://github.com/cvpr-org/author-kit
+%
+% LLM4FC paper root file. The paper body is split into four files:
+%   intro.tex      -- abstract + Introduction (paper opening)
+%   method.tex     -- the proposed (finalized) method
+%   expriment.tex  -- experiments
+%   Appendix.tex   -- supplementary / appendix
+% NOTE: \title and \author must be defined in the LaTeX preamble, hence they
+%       live here in main.tex -- update the TODO placeholders below.
+
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+%%%%%%%%% PAPER TYPE  - PLEASE UPDATE FOR FINAL VERSION
+% \usepackage{cvpr}              % To produce the CAMERA-READY version
+\usepackage[review]{cvpr}      % To produce the REVIEW version
+% \usepackage[pagenumbers]{cvpr} % To force page numbers, e.g. for an arXiv version
+
+% Import additional packages in the preamble file, before hyperref
+\input{preamble}
+
+% It is strongly recommended to use hyperref, especially for the review version.
+% hyperref with option pagebackref eases the reviewers' job.
+% Please disable hyperref *only* if you encounter grave issues,
+% e.g. with the file validation for the camera-ready version.
+%
+% If you comment hyperref and then uncomment it, you should delete *.aux before re-running LaTeX.
+% (Or just hit 'q' on the first LaTeX run, let it finish, and you should be clear).
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+
+\def\confName{CVPR}
+\def\confYear{2027}
+
+%%%%%%%%% TITLE - PLEASE UPDATE
+\title{\TODO{Paper Title}}
+
+%%%%%%%%% AUTHORS - PLEASE UPDATE
+\author{\TODO{Author(s)}\\
+\TODO{Institution}\\
+\TODO{Institution address}\\
+{\tt\small \TODO{email}}
+}
+
+\begin{document}
+\maketitle
+
+\input{intro}
+\input{method}
+\input{expriment}
+
+{
+    \small
+    \bibliographystyle{ieeenat_fullname}
+    \bibliography{main}
+}
+
+% WARNING: do not forget to delete the supplementary pages from your submission
+\input{Appendix}
+
+\end{document}
