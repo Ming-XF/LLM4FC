@@ -6,8 +6,9 @@ conclusion.py
 汇总六模型实验结果, 渲染 HTML 对比表格 (默认 conclusion.html)。
 
 口径:
-  - TimeLLMKnowledge: win5 主方法 (60s 窗, 5x20s/10s 滑动知识窗), 单 seed 42,
-    数值为存档记录 (原始日志已按用户指令清理)。
+  - KnowledgeLLM: 主方法 (10s 三模态 + 知识银行 + 冻结 6 层 Llama),
+    CAUEEG 训练域, 3 个 seed (42/43/44), 每格报告 mean ± std;
+    TUAB/TUEP 训练域未运行 (表格留空)。
   - EEGNet / EEG-Deformer / LaBraM / NeuroLM / OFA: 10s 段输入
     (每 60s 窗取首个 10s 段), 3 个 seed (42/43/44), 每格报告 mean ± std。
 
@@ -29,32 +30,50 @@ DOMAINS = ["CAUEEG", "TUAB", "TUEP"]
 SEEDS = ["42", "43", "44"]
 
 # ─────────────────────────────────────────────────────────────────────────
-# 存档: TimeLLMKnowledge win5 主方法 (60s, seed 42) 九格
-# 数值来源: 原始 trainer 日志 (10-23 win5 定稿运行), 日志已按用户指令清理,
-# 此处为逐格存档 (window 级 test AUC / Acc)。
+# 解析: KnowledgeLLM (CAUEEG 训练域, 3 seeds 42/43/44)
+#   同域: train_KnowledgeLLM_s{seed}_caueeg_DiseaseCAUEEG.log 末尾 test 块
+#   零样本: test_KnowledgeLLM_s{seed}_caueeg_to_{tuab,tuep}_zero-shot_*.log
+#   (TUAB/TUEP 作训练域未运行, 对应表格格为空)
 # ─────────────────────────────────────────────────────────────────────────
-WIN5_TLLM = {
-    ("CAUEEG", "CAUEEG"): {"auc": 0.8141, "accuracy": 0.7224},
-    ("CAUEEG", "TUAB"):   {"auc": 0.7624, "accuracy": 0.6537},
-    ("CAUEEG", "TUEP"):   {"auc": 0.5701, "accuracy": 0.5626},
-    ("TUAB", "CAUEEG"):   {"auc": 0.6299, "accuracy": 0.6170},
-    ("TUAB", "TUAB"):     {"auc": 0.8531, "accuracy": 0.7812},
-    ("TUAB", "TUEP"):     {"auc": 0.4869, "accuracy": 0.5088},
-    ("TUEP", "CAUEEG"):   {"auc": 0.5055, "accuracy": 0.5051},
-    ("TUEP", "TUAB"):     {"auc": 0.5756, "accuracy": 0.5560},
-    ("TUEP", "TUEP"):     {"auc": 0.6887, "accuracy": 0.6203},
-}
+
+KNOWLEDGELLM_TRAIN_RE = re.compile(
+    r"train_KnowledgeLLM_s(\d+)_(\w+)_Disease(\w+)\.log")
+KNOWLEDGELLM_ZS_RE = re.compile(
+    r"test_KnowledgeLLM_s(\d+)_(\w+)_to_(\w+)_zero-shot_Disease(\w+)\.log")
 
 
-def _tllm_win5_experiments():
+def discover_knowledgellm():
     exps = []
-    for (src, tgt), m in WIN5_TLLM.items():
-        exps.append({
-            "model": "TimeLLMKnowledge", "seed": "win5", "source": src,
-            "target": tgt, "mode": "同域" if src == tgt else "零样本",
-            "metrics": dict(m),
-            "src": "archive: win5 主方法 (60s, seed 42) 存档记录",
-        })
+    for p in sorted(LOG_DIR.glob("train_KnowledgeLLM_s*_Disease*.log")):
+        m = KNOWLEDGELLM_TRAIN_RE.match(p.name)
+        if not m:
+            continue
+        seed, srctag, dom = m.groups()
+        src = SRC_TAGS.get(srctag, srctag.upper())
+        if seed not in SEEDS or src not in DOMAINS or dom not in DOMAINS:
+            continue
+        met = parse_trainer_log(p)
+        if met:
+            exps.append({
+                "model": "KnowledgeLLM", "seed": seed, "source": src,
+                "target": dom, "mode": "同域", "metrics": met, "src": p,
+            })
+    for p in sorted(LOG_DIR.glob("test_KnowledgeLLM_s*_zero-shot_Disease*.log")):
+        m = KNOWLEDGELLM_ZS_RE.match(p.name)
+        if not m:
+            continue
+        seed, srctag, tgttag, dom = m.groups()
+        src = SRC_TAGS.get(srctag, srctag.upper())
+        tgt = SRC_TAGS.get(tgttag, tgttag.upper())
+        if (seed not in SEEDS or src not in DOMAINS or tgt not in DOMAINS
+                or dom not in DOMAINS):
+            continue
+        met = parse_trainer_log(p)
+        if met:
+            exps.append({
+                "model": "KnowledgeLLM", "seed": seed, "source": src,
+                "target": tgt, "mode": "零样本", "metrics": met, "src": p,
+            })
     return exps
 
 
@@ -357,10 +376,10 @@ def discover_ofa():
 # 聚合 + 渲染
 # ─────────────────────────────────────────────────────────────────────────
 
-MODELS = ["EEGNet", "TimeLLMKnowledge", "NeuroLM", "LaBraM", "OFA",
+MODELS = ["EEGNet", "KnowledgeLLM", "NeuroLM", "LaBraM", "OFA",
           "EEG-Deformer"]
 MODEL_COLORS = {
-    "EEGNet": "#2563eb", "TimeLLMKnowledge": "#7c3aed", "NeuroLM": "#059669",
+    "EEGNet": "#2563eb", "KnowledgeLLM": "#7c3aed", "NeuroLM": "#059669",
     "LaBraM": "#b45309", "OFA": "#db2777", "EEG-Deformer": "#0891b2",
 }
 
@@ -397,7 +416,7 @@ def _cell_tooltip(model, source, target, cell, key):
 
 def build_html():
     # 收集
-    exps = (_tllm_win5_experiments() + discover_eegnet()
+    exps = (discover_knowledgellm() + discover_eegnet()
             + discover_deformer() + discover_labram() + discover_neurolm()
             + discover_ofa())
 
@@ -470,12 +489,13 @@ def build_html():
 
     n_baseline_cells = 0
     for (model, _, _), c in cells.items():
-        if model != "TimeLLMKnowledge" and len(c["seeds"]) > 0:
+        if model != "KnowledgeLLM" and len(c["seeds"]) > 0:
             n_baseline_cells += 1
 
     notes = []
-    notes.append("· 口径: <b>TimeLLMKnowledge = win5 主方法</b>"
-                 "(60s 窗, 5×20s/10s 滑动知识窗, seed 42, 存档数值); "
+    notes.append("· 口径: <b>KnowledgeLLM = 主方法</b>"
+                 "(10s 三模态 + 知识银行 + 冻结 6 层 Llama; CAUEEG 训练域, "
+                 "<b>3 seeds (42/43/44), 每格 mean ± std</b>; TUAB/TUEP 训练域未运行); "
                  "<b>EEGNet / EEG-Deformer / LaBraM / NeuroLM / OFA = 10s 段</b>"
                  "(每 60s 窗取首个 10s 段), <b>3 seeds (42/43/44), 每格 mean ± std</b>。")
     notes.append("· 训练设置: EPOCHS=200 / LR=1e-4 / PATIENCE=20 / val-AUC 选模型; "
@@ -538,7 +558,7 @@ def build_html():
 </head>
 <body>
 <h1>LLM4FC 实验结果对比 (六模型, 3-seed)</h1>
-<div class="sub">疾病分类任务 · 按训练域分表 · 每格 AUC / Acc (baseline: mean ± std; TLLM: win5 单 seed) · 生成于 {now}</div>
+<div class="sub">疾病分类任务 · 按训练域分表 · 每格 AUC / Acc (全部模型 3-seed mean ± std) · 生成于 {now}</div>
 {tables}
 <div class="notes"><b>说明</b><ul>{note_items}</ul></div>
 <div class="srcs"><h2>各模型数值来源文件</h2>{src_section}</div>
@@ -559,10 +579,10 @@ def main():
     print(f"HTML 已写入: {out.resolve()}")
 
     # 终端摘要
-    exps = (_tllm_win5_experiments() + discover_eegnet()
+    exps = (discover_knowledgellm() + discover_eegnet()
             + discover_deformer() + discover_labram() + discover_neurolm()
             + discover_ofa())
-    print(f"共解析 {len(exps)} 条 (含 {len(_tllm_win5_experiments())} 条 TLLM 存档)")
+    print(f"共解析 {len(exps)} 条 (含 {len(discover_knowledgellm())} 条 KnowledgeLLM)")
 
 
 if __name__ == "__main__":

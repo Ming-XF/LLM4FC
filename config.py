@@ -128,6 +128,8 @@ def init_config():
     global_group.add_argument("--num_repeat", default=1, type=int, help="")
     global_group.add_argument("--visualize", action="store_true", help="")
     global_group.add_argument("--append", default="", type=str, help="")
+    global_group.add_argument("--seed", default=42, type=int,
+                              help="Global random seed (default 42 = finalized)")
 
     data_group = parser.add_argument_group(title="data", description="")
     data_group.add_argument("--dataset", default='DiseaseBeirut', type=str, help="")

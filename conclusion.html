@@ -28,7 +28,7 @@
 </head>
 <body>
 <h1>LLM4FC 实验结果对比 (六模型, 3-seed)</h1>
-<div class="sub">疾病分类任务 · 按训练域分表 · 每格 AUC / Acc (baseline: mean ± std; TLLM: win5 单 seed) · 生成于 2026-11-03 14:45:06</div>
+<div class="sub">疾病分类任务 · 按训练域分表 · 每格 AUC / Acc (全部模型 3-seed mean ± std) · 生成于 2026-11-04 01:18:28</div>
 <h2>训练域 = CAUEEG</h2>
 <table>
   <thead>
@@ -79,19 +79,49 @@ seed 43: accuracy=0.4912
 seed 44: accuracy=0.4959
   来源: /root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_s44_caueeg_zero-shot_DiseaseTUEP.log
 mean ± std: 0.4717 ± 0.038"><span>0.4717 ± 0.038</span></td></tr>
-<tr><td class="model" style="--mc:#7c3aed">TimeLLMKnowledge</td><td class="cell" title="TimeLLMKnowledge | CAUEEG → CAUEEG (同域)
-seed win5: auc=0.8141
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span>0.8141</span></td><td class="cell" title="TimeLLMKnowledge | CAUEEG → CAUEEG (同域)
-seed win5: accuracy=0.7224
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span>0.7224</span></td><td class="cell" title="TimeLLMKnowledge | CAUEEG → TUAB (零样本)
-seed win5: auc=0.7624
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span class="best">0.7624</span></td><td class="cell" title="TimeLLMKnowledge | CAUEEG → TUAB (零样本)
-seed win5: accuracy=0.6537
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span class="best">0.6537</span></td><td class="cell" title="TimeLLMKnowledge | CAUEEG → TUEP (零样本)
-seed win5: auc=0.5701
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span>0.5701</span></td><td class="cell" title="TimeLLMKnowledge | CAUEEG → TUEP (零样本)
-seed win5: accuracy=0.5626
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span class="best">0.5626</span></td></tr>
+<tr><td class="model" style="--mc:#7c3aed">KnowledgeLLM</td><td class="cell" title="KnowledgeLLM | CAUEEG → CAUEEG (同域)
+seed 42: auc=0.8266
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s42_caueeg_DiseaseCAUEEG.log
+seed 43: auc=0.7799
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s43_caueeg_DiseaseCAUEEG.log
+seed 44: auc=0.7924
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s44_caueeg_DiseaseCAUEEG.log
+mean ± std: 0.7996 ± 0.024"><span>0.7996 ± 0.024</span></td><td class="cell" title="KnowledgeLLM | CAUEEG → CAUEEG (同域)
+seed 42: accuracy=0.7031
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s42_caueeg_DiseaseCAUEEG.log
+seed 43: accuracy=0.7134
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s43_caueeg_DiseaseCAUEEG.log
+seed 44: accuracy=0.7224
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s44_caueeg_DiseaseCAUEEG.log
+mean ± std: 0.7129 ± 0.010"><span>0.7129 ± 0.010</span></td><td class="cell" title="KnowledgeLLM | CAUEEG → TUAB (零样本)
+seed 42: auc=0.7349
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s42_caueeg_to_tuab_zero-shot_DiseaseTUAB.log
+seed 43: auc=0.6836
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s43_caueeg_to_tuab_zero-shot_DiseaseTUAB.log
+seed 44: auc=0.7202
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s44_caueeg_to_tuab_zero-shot_DiseaseTUAB.log
+mean ± std: 0.7129 ± 0.026"><span class="best">0.7129 ± 0.026</span></td><td class="cell" title="KnowledgeLLM | CAUEEG → TUAB (零样本)
+seed 42: accuracy=0.6396
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s42_caueeg_to_tuab_zero-shot_DiseaseTUAB.log
+seed 43: accuracy=0.6419
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s43_caueeg_to_tuab_zero-shot_DiseaseTUAB.log
+seed 44: accuracy=0.6572
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s44_caueeg_to_tuab_zero-shot_DiseaseTUAB.log
+mean ± std: 0.6463 ± 0.010"><span class="best">0.6463 ± 0.010</span></td><td class="cell" title="KnowledgeLLM | CAUEEG → TUEP (零样本)
+seed 42: auc=0.4873
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s42_caueeg_to_tuep_zero-shot_DiseaseTUEP.log
+seed 43: auc=0.5074
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s43_caueeg_to_tuep_zero-shot_DiseaseTUEP.log
+seed 44: auc=0.4443
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s44_caueeg_to_tuep_zero-shot_DiseaseTUEP.log
+mean ± std: 0.4797 ± 0.032"><span>0.4797 ± 0.032</span></td><td class="cell" title="KnowledgeLLM | CAUEEG → TUEP (零样本)
+seed 42: accuracy=0.5134
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s42_caueeg_to_tuep_zero-shot_DiseaseTUEP.log
+seed 43: accuracy=0.5018
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s43_caueeg_to_tuep_zero-shot_DiseaseTUEP.log
+seed 44: accuracy=0.5041
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s44_caueeg_to_tuep_zero-shot_DiseaseTUEP.log
+mean ± std: 0.5064 ± 0.006"><span>0.5064 ± 0.006</span></td></tr>
 <tr><td class="model" style="--mc:#059669">NeuroLM</td><td class="cell" title="NeuroLM | CAUEEG → CAUEEG (同域)
 seed 42: auc=0.7711
   来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc/test_results.json
@@ -134,7 +164,7 @@ seed 43: accuracy=0.4982
   来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_s43/test_results.json
 seed 44: accuracy=0.5216
   来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_s44/test_results.json
-mean ± std: 0.5111 ± 0.012"><span>0.5111 ± 0.012</span></td></tr>
+mean ± std: 0.5111 ± 0.012"><span class="best">0.5111 ± 0.012</span></td></tr>
 <tr><td class="model" style="--mc:#b45309">LaBraM</td><td class="cell" title="LaBraM | CAUEEG → CAUEEG (同域)
 seed 42: auc=0.8287
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/out_llm4fc_caueeg/log.txt
@@ -316,19 +346,49 @@ seed 43: accuracy=0.5450
 seed 44: accuracy=0.5111
   来源: /root/autodl-tmp/LLM4FC/log_dir/test_EEGNet_s44_tuab_zero-shot_DiseaseTUEP.log
 mean ± std: 0.5310 ± 0.018"><span>0.5310 ± 0.018</span></td></tr>
-<tr><td class="model" style="--mc:#7c3aed">TimeLLMKnowledge</td><td class="cell" title="TimeLLMKnowledge | TUAB → CAUEEG (零样本)
-seed win5: auc=0.6299
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span>0.6299</span></td><td class="cell" title="TimeLLMKnowledge | TUAB → CAUEEG (零样本)
-seed win5: accuracy=0.6170
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span>0.6170</span></td><td class="cell" title="TimeLLMKnowledge | TUAB → TUAB (同域)
-seed win5: auc=0.8531
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span class="best">0.8531</span></td><td class="cell" title="TimeLLMKnowledge | TUAB → TUAB (同域)
-seed win5: accuracy=0.7812
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span class="best">0.7812</span></td><td class="cell" title="TimeLLMKnowledge | TUAB → TUEP (零样本)
-seed win5: auc=0.4869
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span>0.4869</span></td><td class="cell" title="TimeLLMKnowledge | TUAB → TUEP (零样本)
-seed win5: accuracy=0.5088
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span>0.5088</span></td></tr>
+<tr><td class="model" style="--mc:#7c3aed">KnowledgeLLM</td><td class="cell" title="KnowledgeLLM | TUAB → CAUEEG (零样本)
+seed 42: auc=0.6728
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s42_tuab_to_caueeg_zero-shot_DiseaseCAUEEG.log
+seed 43: auc=0.6588
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s43_tuab_to_caueeg_zero-shot_DiseaseCAUEEG.log
+seed 44: auc=0.6350
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s44_tuab_to_caueeg_zero-shot_DiseaseCAUEEG.log
+mean ± std: 0.6555 ± 0.019"><span class="best">0.6555 ± 0.019</span></td><td class="cell" title="KnowledgeLLM | TUAB → CAUEEG (零样本)
+seed 42: accuracy=0.6517
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s42_tuab_to_caueeg_zero-shot_DiseaseCAUEEG.log
+seed 43: accuracy=0.6350
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s43_tuab_to_caueeg_zero-shot_DiseaseCAUEEG.log
+seed 44: accuracy=0.6272
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s44_tuab_to_caueeg_zero-shot_DiseaseCAUEEG.log
+mean ± std: 0.6380 ± 0.012"><span class="best">0.6380 ± 0.012</span></td><td class="cell" title="KnowledgeLLM | TUAB → TUAB (同域)
+seed 42: auc=0.8056
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s42_tuab_DiseaseTUAB.log
+seed 43: auc=0.8188
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s43_tuab_DiseaseTUAB.log
+seed 44: auc=0.8145
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s44_tuab_DiseaseTUAB.log
+mean ± std: 0.8130 ± 0.007"><span>0.8130 ± 0.007</span></td><td class="cell" title="KnowledgeLLM | TUAB → TUAB (同域)
+seed 42: accuracy=0.7177
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s42_tuab_DiseaseTUAB.log
+seed 43: accuracy=0.7341
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s43_tuab_DiseaseTUAB.log
+seed 44: accuracy=0.7412
+  来源: /root/autodl-tmp/LLM4FC/log_dir/train_KnowledgeLLM_s44_tuab_DiseaseTUAB.log
+mean ± std: 0.7310 ± 0.012"><span>0.7310 ± 0.012</span></td><td class="cell" title="KnowledgeLLM | TUAB → TUEP (零样本)
+seed 42: auc=0.5217
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s42_tuab_to_tuep_zero-shot_DiseaseTUEP.log
+seed 43: auc=0.5312
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s43_tuab_to_tuep_zero-shot_DiseaseTUEP.log
+seed 44: auc=0.4800
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s44_tuab_to_tuep_zero-shot_DiseaseTUEP.log
+mean ± std: 0.5110 ± 0.027"><span>0.5110 ± 0.027</span></td><td class="cell" title="KnowledgeLLM | TUAB → TUEP (零样本)
+seed 42: accuracy=0.5474
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s42_tuab_to_tuep_zero-shot_DiseaseTUEP.log
+seed 43: accuracy=0.5509
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s43_tuab_to_tuep_zero-shot_DiseaseTUEP.log
+seed 44: accuracy=0.5614
+  来源: /root/autodl-tmp/LLM4FC/log_dir/test_KnowledgeLLM_s44_tuab_to_tuep_zero-shot_DiseaseTUEP.log
+mean ± std: 0.5532 ± 0.007"><span class="best">0.5532 ± 0.007</span></td></tr>
 <tr><td class="model" style="--mc:#059669">NeuroLM</td><td class="cell" title="NeuroLM | TUAB → CAUEEG (零样本)
 seed 42: auc=0.5310
   来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuab/test_results.json
@@ -350,7 +410,7 @@ seed 43: auc=0.8520
   来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_s43_tuab/test_results.json
 seed 44: auc=0.8383
   来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_s44_tuab/test_results.json
-mean ± std: 0.8422 ± 0.009"><span>0.8422 ± 0.009</span></td><td class="cell" title="NeuroLM | TUAB → TUAB (同域)
+mean ± std: 0.8422 ± 0.009"><span class="best">0.8422 ± 0.009</span></td><td class="cell" title="NeuroLM | TUAB → TUAB (同域)
 seed 42: accuracy=0.7574
   来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuab/test_results.json
 seed 43: accuracy=0.6620
@@ -379,14 +439,14 @@ seed 44: auc=0.6571
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_s44_tuab__DiseaseCAUEEG.log
 seed 42: auc=0.6413
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseCAUEEG.log
-mean ± std: 0.6519 ± 0.009"><span class="best">0.6519 ± 0.009</span></td><td class="cell" title="LaBraM | TUAB → CAUEEG (零样本)
+mean ± std: 0.6519 ± 0.009"><span>0.6519 ± 0.009</span></td><td class="cell" title="LaBraM | TUAB → CAUEEG (零样本)
 seed 43: accuracy=0.6260
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_s43_tuab__DiseaseCAUEEG.log
 seed 44: accuracy=0.6375
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_s44_tuab__DiseaseCAUEEG.log
 seed 42: accuracy=0.6131
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseCAUEEG.log
-mean ± std: 0.6255 ± 0.012"><span class="best">0.6255 ± 0.012</span></td><td class="cell" title="LaBraM | TUAB → TUAB (同域)
+mean ± std: 0.6255 ± 0.012"><span>0.6255 ± 0.012</span></td><td class="cell" title="LaBraM | TUAB → TUAB (同域)
 seed 42: auc=0.8358
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/out_llm4fc_tuab/log.txt
 seed 43: auc=0.8271
@@ -400,7 +460,7 @@ seed 43: accuracy=0.7597
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/out_llm4fc_s43_tuab/log.txt
 seed 44: accuracy=0.7633
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/out_llm4fc_s44_tuab/log.txt
-mean ± std: 0.7609 ± 0.002"><span>0.7609 ± 0.002</span></td><td class="cell" title="LaBraM | TUAB → TUEP (零样本)
+mean ± std: 0.7609 ± 0.002"><span class="best">0.7609 ± 0.002</span></td><td class="cell" title="LaBraM | TUAB → TUEP (零样本)
 seed 43: auc=0.5235
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_s43_tuab__DiseaseTUEP.log
 seed 44: auc=0.5182
@@ -414,7 +474,7 @@ seed 44: accuracy=0.5497
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_s44_tuab__DiseaseTUEP.log
 seed 42: accuracy=0.5298
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseTUEP.log
-mean ± std: 0.5361 ± 0.012"><span class="best">0.5361 ± 0.012</span></td></tr>
+mean ± std: 0.5361 ± 0.012"><span>0.5361 ± 0.012</span></td></tr>
 <tr><td class="model" style="--mc:#db2777">OFA</td><td class="cell" title="OFA | TUAB → CAUEEG (零样本)
 seed 42: auc=0.6099
   来源: /root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_CAUEEG_2026-10-29_11-59-21_Xsl/output.log
@@ -553,19 +613,7 @@ seed 43: accuracy=0.5076
 seed 44: accuracy=0.4889
   来源: /root/autodl-tmp/LLM4FC/log_dir/train_EEGNet_s44_DiseaseTUEP.log
 mean ± std: 0.4994 ± 0.010"><span>0.4994 ± 0.010</span></td></tr>
-<tr><td class="model" style="--mc:#7c3aed">TimeLLMKnowledge</td><td class="cell" title="TimeLLMKnowledge | TUEP → CAUEEG (零样本)
-seed win5: auc=0.5055
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span>0.5055</span></td><td class="cell" title="TimeLLMKnowledge | TUEP → CAUEEG (零样本)
-seed win5: accuracy=0.5051
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span>0.5051</span></td><td class="cell" title="TimeLLMKnowledge | TUEP → TUAB (零样本)
-seed win5: auc=0.5756
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span class="best">0.5756</span></td><td class="cell" title="TimeLLMKnowledge | TUEP → TUAB (零样本)
-seed win5: accuracy=0.5560
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span class="best">0.5560</span></td><td class="cell" title="TimeLLMKnowledge | TUEP → TUEP (同域)
-seed win5: auc=0.6887
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span class="best">0.6887</span></td><td class="cell" title="TimeLLMKnowledge | TUEP → TUEP (同域)
-seed win5: accuracy=0.6203
-  来源: archive: win5 主方法 (60s, seed 42) 存档记录"><span class="best">0.6203</span></td></tr>
+<tr><td class="model" style="--mc:#7c3aed">KnowledgeLLM</td><td class="empty" colspan="2">—</td><td class="empty" colspan="2">—</td><td class="empty" colspan="2">—</td></tr>
 <tr><td class="model" style="--mc:#059669">NeuroLM</td><td class="cell" title="NeuroLM | TUEP → CAUEEG (零样本)
 seed 42: auc=0.4947
   来源: /root/autodl-tmp/LLM4FC/baseline/NeuroLM/out_llm4fc_tuep/test_results.json
@@ -630,7 +678,7 @@ seed 44: auc=0.5363
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_s44_tuep__DiseaseTUAB.log
 seed 42: auc=0.5058
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_tuep__DiseaseTUAB.log
-mean ± std: 0.5028 ± 0.035"><span>0.5028 ± 0.035</span></td><td class="cell" title="LaBraM | TUEP → TUAB (零样本)
+mean ± std: 0.5028 ± 0.035"><span class="best">0.5028 ± 0.035</span></td><td class="cell" title="LaBraM | TUEP → TUAB (零样本)
 seed 43: accuracy=0.4888
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/log_llm4fc/out_llm4fc_s43_tuep__DiseaseTUAB.log
 seed 44: accuracy=0.4641
@@ -644,14 +692,14 @@ seed 43: auc=0.6355
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/out_llm4fc_s43_tuep/log.txt
 seed 44: auc=0.6480
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/out_llm4fc_s44_tuep/log.txt
-mean ± std: 0.6349 ± 0.013"><span>0.6349 ± 0.013</span></td><td class="cell" title="LaBraM | TUEP → TUEP (同域)
+mean ± std: 0.6349 ± 0.013"><span class="best">0.6349 ± 0.013</span></td><td class="cell" title="LaBraM | TUEP → TUEP (同域)
 seed 42: accuracy=0.6012
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/out_llm4fc_tuep/log.txt
 seed 43: accuracy=0.6047
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/out_llm4fc_s43_tuep/log.txt
 seed 44: accuracy=0.5766
   来源: /root/autodl-tmp/LLM4FC/baseline/LaBraM/out_llm4fc_s44_tuep/log.txt
-mean ± std: 0.5942 ± 0.015"><span>0.5942 ± 0.015</span></td></tr>
+mean ± std: 0.5942 ± 0.015"><span class="best">0.5942 ± 0.015</span></td></tr>
 <tr><td class="model" style="--mc:#db2777">OFA</td><td class="cell" title="OFA | TUEP → CAUEEG (零样本)
 seed 42: auc=0.5428
   来源: /root/autodl-tmp/LLM4FC/baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_CAUEEG_2026-10-29_12-20-45_EVe/output.log
@@ -723,7 +771,7 @@ seed 43: accuracy=0.5359
   来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc_s43/results/DiseaseTUEP__TUAB.json
 seed 44: accuracy=0.4676
   来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc_s44/results/DiseaseTUEP__TUAB.json
-mean ± std: 0.4892 ± 0.041"><span>0.4892 ± 0.041</span></td><td class="cell" title="EEG-Deformer | TUEP → TUEP (同域)
+mean ± std: 0.4892 ± 0.041"><span class="best">0.4892 ± 0.041</span></td><td class="cell" title="EEG-Deformer | TUEP → TUEP (同域)
 seed 42: auc=0.6337
   来源: /root/autodl-tmp/LLM4FC/baseline/EEG-Deformer/save_llm4fc/results/DiseaseTUEP__TUEP.json
 seed 43: auc=0.6356
@@ -740,9 +788,9 @@ seed 44: accuracy=0.5310
 mean ± std: 0.5127 ± 0.019"><span>0.5127 ± 0.019</span></td></tr>
   </tbody>
 </table>
-<div class="notes"><b>说明</b><ul><li>· 口径: <b>TimeLLMKnowledge = win5 主方法</b>(60s 窗, 5×20s/10s 滑动知识窗, seed 42, 存档数值); <b>EEGNet / EEG-Deformer / LaBraM / NeuroLM / OFA = 10s 段</b>(每 60s 窗取首个 10s 段), <b>3 seeds (42/43/44), 每格 mean ± std</b>。</li><li>· 训练设置: EPOCHS=200 / LR=1e-4 / PATIENCE=20 / val-AUC 选模型; 各基线优化器/调度按各自仓库默认。</li><li>· <b>加粗</b> = 该测试域该指标的最佳 mean; 悬浮提示列出各 seed 数值与来源。</li></ul></div>
+<div class="notes"><b>说明</b><ul><li>· 口径: <b>KnowledgeLLM = 主方法</b>(10s 三模态 + 知识银行 + 冻结 6 层 Llama; CAUEEG 训练域, <b>3 seeds (42/43/44), 每格 mean ± std</b>; TUAB/TUEP 训练域未运行); <b>EEGNet / EEG-Deformer / LaBraM / NeuroLM / OFA = 10s 段</b>(每 60s 窗取首个 10s 段), <b>3 seeds (42/43/44), 每格 mean ± std</b>。</li><li>· 训练设置: EPOCHS=200 / LR=1e-4 / PATIENCE=20 / val-AUC 选模型; 各基线优化器/调度按各自仓库默认。</li><li>· <b>加粗</b> = 该测试域该指标的最佳 mean; 悬浮提示列出各 seed 数值与来源。</li></ul></div>
 <div class="srcs"><h2>各模型数值来源文件</h2><h3>EEGNet</h3><ul><li><code>log_dir/test_EEGNet_caueeg_zero-shot_DiseaseTUAB.log</code></li><li><code>log_dir/test_EEGNet_caueeg_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_EEGNet_s43_caueeg_zero-shot_DiseaseTUAB.log</code></li><li><code>log_dir/test_EEGNet_s43_caueeg_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_EEGNet_s43_tuab_zero-shot_DiseaseCAUEEG.log</code></li><li><code>log_dir/test_EEGNet_s43_tuab_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_EEGNet_s43_tuep_zero-shot_DiseaseCAUEEG.log</code></li><li><code>log_dir/test_EEGNet_s43_tuep_zero-shot_DiseaseTUAB.log</code></li><li><code>log_dir/test_EEGNet_s44_caueeg_zero-shot_DiseaseTUAB.log</code></li><li><code>log_dir/test_EEGNet_s44_caueeg_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_EEGNet_s44_tuab_zero-shot_DiseaseCAUEEG.log</code></li><li><code>log_dir/test_EEGNet_s44_tuab_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_EEGNet_s44_tuep_zero-shot_DiseaseCAUEEG.log</code></li><li><code>log_dir/test_EEGNet_s44_tuep_zero-shot_DiseaseTUAB.log</code></li><li><code>log_dir/test_EEGNet_tuab_zero-shot_DiseaseCAUEEG.log</code></li><li><code>log_dir/test_EEGNet_tuab_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_EEGNet_tuep_zero-shot_DiseaseCAUEEG.log</code></li><li><code>log_dir/test_EEGNet_tuep_zero-shot_DiseaseTUAB.log</code></li><li><code>log_dir/train_EEGNet_DiseaseCAUEEG.log</code></li><li><code>log_dir/train_EEGNet_DiseaseTUAB.log</code></li><li><code>log_dir/train_EEGNet_DiseaseTUEP.log</code></li><li><code>log_dir/train_EEGNet_s43_DiseaseCAUEEG.log</code></li><li><code>log_dir/train_EEGNet_s43_DiseaseTUAB.log</code></li><li><code>log_dir/train_EEGNet_s43_DiseaseTUEP.log</code></li><li><code>log_dir/train_EEGNet_s44_DiseaseCAUEEG.log</code></li><li><code>log_dir/train_EEGNet_s44_DiseaseTUAB.log</code></li><li><code>log_dir/train_EEGNet_s44_DiseaseTUEP.log</code></li></ul>
-<h3>TimeLLMKnowledge</h3><ul><li><code>archive: win5 主方法 (60s, seed 42) 存档记录</code></li></ul>
+<h3>KnowledgeLLM</h3><ul><li><code>log_dir/test_KnowledgeLLM_s42_caueeg_to_tuab_zero-shot_DiseaseTUAB.log</code></li><li><code>log_dir/test_KnowledgeLLM_s42_caueeg_to_tuep_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_KnowledgeLLM_s42_tuab_to_caueeg_zero-shot_DiseaseCAUEEG.log</code></li><li><code>log_dir/test_KnowledgeLLM_s42_tuab_to_tuep_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_KnowledgeLLM_s43_caueeg_to_tuab_zero-shot_DiseaseTUAB.log</code></li><li><code>log_dir/test_KnowledgeLLM_s43_caueeg_to_tuep_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_KnowledgeLLM_s43_tuab_to_caueeg_zero-shot_DiseaseCAUEEG.log</code></li><li><code>log_dir/test_KnowledgeLLM_s43_tuab_to_tuep_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_KnowledgeLLM_s44_caueeg_to_tuab_zero-shot_DiseaseTUAB.log</code></li><li><code>log_dir/test_KnowledgeLLM_s44_caueeg_to_tuep_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/test_KnowledgeLLM_s44_tuab_to_caueeg_zero-shot_DiseaseCAUEEG.log</code></li><li><code>log_dir/test_KnowledgeLLM_s44_tuab_to_tuep_zero-shot_DiseaseTUEP.log</code></li><li><code>log_dir/train_KnowledgeLLM_s42_caueeg_DiseaseCAUEEG.log</code></li><li><code>log_dir/train_KnowledgeLLM_s42_tuab_DiseaseTUAB.log</code></li><li><code>log_dir/train_KnowledgeLLM_s43_caueeg_DiseaseCAUEEG.log</code></li><li><code>log_dir/train_KnowledgeLLM_s43_tuab_DiseaseTUAB.log</code></li><li><code>log_dir/train_KnowledgeLLM_s44_caueeg_DiseaseCAUEEG.log</code></li><li><code>log_dir/train_KnowledgeLLM_s44_tuab_DiseaseTUAB.log</code></li></ul>
 <h3>NeuroLM</h3><ul><li><code>baseline/NeuroLM/out_llm4fc/test_results.json</code></li><li><code>baseline/NeuroLM/out_llm4fc_s43/test_results.json</code></li><li><code>baseline/NeuroLM/out_llm4fc_s43_tuab/test_results.json</code></li><li><code>baseline/NeuroLM/out_llm4fc_s43_tuep/test_results.json</code></li><li><code>baseline/NeuroLM/out_llm4fc_s44/test_results.json</code></li><li><code>baseline/NeuroLM/out_llm4fc_s44_tuab/test_results.json</code></li><li><code>baseline/NeuroLM/out_llm4fc_s44_tuep/test_results.json</code></li><li><code>baseline/NeuroLM/out_llm4fc_tuab/test_results.json</code></li><li><code>baseline/NeuroLM/out_llm4fc_tuep/test_results.json</code></li></ul>
 <h3>LaBraM</h3><ul><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_caueeg__DiseaseTUAB.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_caueeg__DiseaseTUEP.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s43_caueeg__DiseaseTUAB.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s43_caueeg__DiseaseTUEP.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s43_tuab__DiseaseCAUEEG.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s43_tuab__DiseaseTUEP.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s43_tuep__DiseaseCAUEEG.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s43_tuep__DiseaseTUAB.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s44_caueeg__DiseaseTUAB.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s44_caueeg__DiseaseTUEP.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s44_tuab__DiseaseCAUEEG.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s44_tuab__DiseaseTUEP.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s44_tuep__DiseaseCAUEEG.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_s44_tuep__DiseaseTUAB.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseCAUEEG.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_tuab__DiseaseTUEP.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_tuep__DiseaseCAUEEG.log</code></li><li><code>baseline/LaBraM/log_llm4fc/out_llm4fc_tuep__DiseaseTUAB.log</code></li><li><code>baseline/LaBraM/out_llm4fc_caueeg/log.txt</code></li><li><code>baseline/LaBraM/out_llm4fc_s43_caueeg/log.txt</code></li><li><code>baseline/LaBraM/out_llm4fc_s43_tuab/log.txt</code></li><li><code>baseline/LaBraM/out_llm4fc_s43_tuep/log.txt</code></li><li><code>baseline/LaBraM/out_llm4fc_s44_caueeg/log.txt</code></li><li><code>baseline/LaBraM/out_llm4fc_s44_tuab/log.txt</code></li><li><code>baseline/LaBraM/out_llm4fc_s44_tuep/log.txt</code></li><li><code>baseline/LaBraM/out_llm4fc_tuab/log.txt</code></li><li><code>baseline/LaBraM/out_llm4fc_tuep/log.txt</code></li></ul>
 <h3>OFA</h3><ul><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseCAUEEG_10s_2026-10-29_12-46-57_grE/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseCAUEEG_10s_2026-10-30_02-33-09_suS/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseCAUEEG_10s_2026-10-30_03-21-23_PyW/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseTUAB_10s_2026-10-29_11-58-44_zFC/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseTUAB_10s_2026-10-30_01-17-59_HWS/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseTUAB_10s_2026-10-30_02-48-40_Rjo/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseTUEP_10s_2026-10-29_12-20-19_M5W/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseTUEP_10s_2026-10-30_01-22-18_Ly9/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/DiseaseTUEP_10s_2026-10-30_03-02-37_I2E/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_CAUEEG_TUAB_2026-10-29_12-47-46_7uq/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_CAUEEG_TUAB_2026-10-30_02-33-27_6TL/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_CAUEEG_TUAB_2026-10-30_03-21-32_XOs/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_CAUEEG_TUEP_2026-10-29_12-48-15_K6Y/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_CAUEEG_TUEP_2026-10-30_02-33-37_wRp/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_CAUEEG_TUEP_2026-10-30_03-21-43_ZkA/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_CAUEEG_2026-10-29_11-59-21_Xsl/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_CAUEEG_2026-10-30_01-18-50_ziI/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_CAUEEG_2026-10-30_02-49-02_Gvv/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_TUEP_2026-10-29_11-59-46_Kh1/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_TUEP_2026-10-30_01-19-02_Lgc/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUAB_TUEP_2026-10-30_02-49-16_Vh9/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_CAUEEG_2026-10-29_12-20-45_EVe/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_CAUEEG_2026-10-30_01-27-08_pRV/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_CAUEEG_2026-10-30_03-02-50_AVL/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_TUAB_2026-10-29_12-21-22_4WA/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_TUAB_2026-10-30_01-27-22_XJO/output.log</code></li><li><code>baseline/OneFitsAll/Classification/experiments_llm4fc/ZS_TUEP_TUAB_2026-10-30_03-03-01_fWs/output.log</code></li></ul>

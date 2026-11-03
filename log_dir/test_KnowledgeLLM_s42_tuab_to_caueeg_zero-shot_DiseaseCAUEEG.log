@@ -1,0 +1,142 @@
+11/04/2026 01:07:32 - INFO - __main__ -   ==================== Explicit args ====================
+  append: _s42_tuab_to_caueeg
+  batch_size: 16
+  contrast_lambda: 0.3
+  d_model: 128
+  dataset: DiseaseCAUEEG
+  do_test: True
+  dropout: 0.1
+  few_shot: 0
+  knowledge_bank: 
+  knowledge_contrast_temperature: 0.2
+  knowledge_fc_patch: 1
+  knowledge_fc_stride: 1
+  knowledge_fusion_tokens: 16
+  knowledge_llm_layers: 6
+  knowledge_psd_patch: 8
+  knowledge_psd_stride: 4
+  knowledge_raw_patch: 200
+  knowledge_raw_stride: 200
+  knowledge_temperature: 1.0
+  knowledge_top_k: 8
+  knowledge_top_m: 32
+  llm_init: pretrained
+  llm_path: ./model/deepseek-r1-distill-llama-8B
+  llm_type: llama
+  model: KnowledgeLLM
+  num_heads: 8
+  pretrain_path: ./output_dir/output_dir_knowledge_s42_tuab/KnowledgeLLM_DiseaseTUAB_train
+  [effective] batch_size: 16, learning_rate: 0.0001
+11/04/2026 01:07:32 - INFO - __main__ -   ==================== Full args (resolved) ====================
+  D: 2
+  F1: 8
+  abla_channel: -1
+  abla_vae: n
+  activation: gelu
+  alpha: 1.0
+  append: _s42_tuab_to_caueeg
+  batch_size: 16
+  beta: 1.0
+  beta1: 0.9
+  beta2: 0.98
+  contrast_lambda: 0.3
+  d_ff: 128
+  d_model: 128
+  data_processors: 0
+  dataset: DiseaseCAUEEG
+  deepspeed: False
+  deepspeed_config: ds_config_zero3.json
+  device: cuda
+  distill: False
+  do_evaluate: False
+  do_parallel: False
+  do_test: True
+  do_train: False
+  drop_last: False
+  dropout: 0.1
+  early_stop_metric: Loss
+  early_stop_patience: 20
+  eps: 1e-08
+  epsilon: 1e-09
+  except_rule: None
+  few_shot: 0
+  few_shot_seed: 42
+  freeze_head_bias: True
+  frequency: 500
+  initializer: None
+  k: 5
+  knowledge_anchor_candidates: 1000
+  knowledge_anchor_fusion: 0.1
+  knowledge_anchors: 10
+  knowledge_aspect_mix: 0.6
+  knowledge_bank: 
+  knowledge_contrast_temperature: 0.2
+  knowledge_description_candidates: 1000
+  knowledge_description_prototypes: 100
+  knowledge_fc_patch: 1
+  knowledge_fc_stride: 1
+  knowledge_fusion_tokens: 16
+  knowledge_llm_layers: 6
+  knowledge_psd_patch: 8
+  knowledge_psd_stride: 4
+  knowledge_raw_patch: 200
+  knowledge_raw_stride: 200
+  knowledge_similarity: centered_cosine
+  knowledge_temperature: 1.0
+  knowledge_top_k: 8
+  knowledge_top_m: 32
+  learning_rate: 0.0001
+  llm_init: pretrained
+  llm_path: ./model/deepseek-r1-distill-llama-8B
+  llm_type: llama
+  local_rank: 0
+  log_dir: ./log_dir
+  match_rule: None
+  max_learning_rate: 0.001
+  max_steps: -1
+  model: KnowledgeLLM
+  model_dir: output_dir
+  no_weight_decay: False
+  num_epochs: 200
+  num_heads: 8
+  num_kernels: 5
+  num_prototypes: 500
+  num_repeat: 1
+  num_windows: 10
+  num_workers: 5
+  optimizer: Adam
+  p1: 4
+  p2: 8
+  pretrain_path: ./output_dir/output_dir_knowledge_s42_tuab/KnowledgeLLM_DiseaseTUAB_train
+  project: 
+  save_steps: 200
+  schedule: cos
+  seed: 42
+  sparsity: 0.7
+  standard_split: False
+  target_learning_rate: 1e-05
+  train_set: 0.6
+  use_patch_embeds: True
+  use_semantic_prototypes: True
+  use_task_prompt: False
+  val_set: 0.2
+  visualize: False
+  wandb_entity: cwg
+  warmup_steps: 400
+  weight_decay: 0.0001
+11/04/2026 01:07:33 - WARNING - utils.trainer -     Shape mismatch for knowledge_mappers.0.token_ids: saved (171,) vs current (172,) — skipped
+11/04/2026 01:07:33 - WARNING - utils.trainer -     Shape mismatch for knowledge_mappers.0.mapping.weight: saved (16, 171) vs current (16, 172) — skipped
+11/04/2026 01:07:33 - WARNING - utils.trainer -     Shape mismatch for knowledge_mappers.1.token_ids: saved (171,) vs current (170,) — skipped
+11/04/2026 01:07:33 - WARNING - utils.trainer -     Shape mismatch for knowledge_mappers.1.mapping.weight: saved (16, 171) vs current (16, 170) — skipped
+11/04/2026 01:07:33 - WARNING - utils.trainer -     Shape mismatch for knowledge_mappers.2.token_ids: saved (207,) vs current (206,) — skipped
+11/04/2026 01:07:33 - WARNING - utils.trainer -     Shape mismatch for knowledge_mappers.2.mapping.weight: saved (16, 207) vs current (16, 206) — skipped
+11/04/2026 01:07:33 - WARNING - utils.trainer -     6 key(s) skipped due to shape mismatch
+11/04/2026 01:07:33 - INFO - utils.trainer -     43 keys not in checkpoint (kept from init)
+11/04/2026 01:07:33 - INFO - utils.trainer -   Model loaded from ./output_dir/output_dir_knowledge_s42_tuab/KnowledgeLLM_DiseaseTUAB_train/KnowledgeLLM-0.bin (47/53 keys)
+11/04/2026 01:07:33 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
+11/04/2026 01:07:35 - INFO - utils.trainer -   Loss: 0.73606
+11/04/2026 01:07:35 - INFO - utils.trainer -   AUC: 0.67280
+11/04/2026 01:07:35 - INFO - utils.trainer -   Accuracy: 0.65167
+11/04/2026 01:07:35 - INFO - utils.trainer -   Precision: 0.60494
+11/04/2026 01:07:35 - INFO - utils.trainer -   Specificity: 0.70843
+11/04/2026 01:07:35 - INFO - utils.trainer -   Sensitivity: 0.57817

@@ -295,6 +295,6 @@ def parameters(args):
 
 
 if __name__ == '__main__':
-    set_seed(42)
     Args = init_config()
+    set_seed(Args.seed)
     main(Args)

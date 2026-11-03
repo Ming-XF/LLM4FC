@@ -9,7 +9,7 @@
 #
 
 TARGET_DATASET="DiseaseTUEP"
-PRETRAIN_PATH="./output_dir_knowledge_s42_caueeg/KnowledgeLLM_DiseaseCAUEEG_train"
+PRETRAIN_PATH="./output_dir/output_dir_knowledge_s42/KnowledgeLLM_DiseaseCAUEEG_train"
 APPEND="_s42_caueeg_to_tuep"
 KNOWLEDGE_BANK=""
 
