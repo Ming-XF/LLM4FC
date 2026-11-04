@@ -8,7 +8,8 @@ import numpy as np
 from abc import abstractmethod
 from torch.nn import functional as F
 from tqdm import tqdm
-from sklearn.metrics import roc_auc_score, accuracy_score, r2_score
+from sklearn.metrics import (average_precision_score, roc_auc_score,
+                             accuracy_score, r2_score)
 from sklearn.metrics import precision_recall_fscore_support, classification_report
 
 from config import init_model_config
@@ -425,7 +426,29 @@ class Trainer(object):
             result = self.regression_evaluate(dataloader_key)
         else:
             result = {}
+        if dataloader_key == 'test':
+            self._save_metrics_json(result)
         return result
+
+    def _save_metrics_json(self, result):
+        """test 集指标落盘 JSON (供 conclusion.py 解析), rank 0 写。"""
+        if not result or result.get('AUC') is None:
+            return
+        if (torch.distributed.is_initialized()
+                and torch.distributed.get_rank() != 0):
+            return
+        import json as _json
+        path = os.path.join(self.args.log_dir,
+                            f"metrics_{self.args.model}{self.args.append}_"
+                            f"{self.args.dataset}.json")
+        payload = {"model": self.args.model,
+                   "dataset": self.args.dataset,
+                   "append": self.args.append,
+                   "mode": "test",
+                   "metrics": result}
+        with open(path, 'w', encoding='utf-8') as f:
+            _json.dump(payload, f, indent=2)
+        logger.info(f"Metrics saved to {path}")
 
     def binary_evaluate(self, dataloader_key='test'):
         import torch.distributed as dist
@@ -532,6 +555,11 @@ class Trainer(object):
             except Exception as e:
                 logger.warning(f"AUC computation failed: {e}")
                 result['AUC'] = 0.
+            try:
+                result['AUC_PR'] = average_precision_score(labels, preds)
+            except Exception as e:
+                logger.warning(f"AUC-PR computation failed: {e}")
+                result['AUC_PR'] = 0.
             preds_bin = (np.array(preds) > 0.5).astype(int)
             labels_arr = np.array(labels)
             result['Accuracy'] = (preds_bin == labels_arr).sum() / len(labels)
@@ -546,10 +574,14 @@ class Trainer(object):
                     recall[int(float(k))] = v['recall']
             result['Specificity'] = recall[0]
             result['Sensitivity'] = recall[1]
+            result['BalancedAccuracy'] = (
+                result['Sensitivity'] + result['Specificity']) / 2
 
             print()
             print(f'{dataloader_key}{self.task_id} : Loss:{result["Loss"]:.5f}, '
                   f'Accuracy:{result["Accuracy"]:.5f}, AUC:{result["AUC"]:.5f}, '
+                  f'AUC_PR:{result["AUC_PR"]:.5f}, '
+                  f'BalancedAccuracy:{result["BalancedAccuracy"]:.5f}, '
                   f'Precision:{result["Precision"]:.5f}, Sensitivity:{result["Sensitivity"]:.5f}, '
                   f'Specificity:{result["Specificity"]:.5f}')
             for k, v in result.items():
