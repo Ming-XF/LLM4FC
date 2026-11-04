@@ -6,11 +6,18 @@ conclusion.py
 汇总六模型实验结果, 渲染 HTML 对比表格 (默认 conclusion.html)。
 
 口径:
+  - 主表 = 双域 2×2 合并表 (CAUEEG/TUAB 训练域 × 目标域), TUEP 已移出
+    主表 (全方法接近随机, 作阴性对照单独讨论)。
   - KnowledgeLLM: 主方法 (10s 三模态 + 知识银行 + 冻结 6 层 Llama),
-    CAUEEG 训练域, 3 个 seed (42/43/44), 每格报告 mean ± std;
-    TUAB/TUEP 训练域未运行 (表格留空)。
+    CAUEEG/TUAB 双训练域, 3 个 seed (42/43/44), 每格报告 mean ± std。
   - EEGNet / EEG-Deformer / LaBraM / NeuroLM / OFA: 10s 段输入
     (每 60s 窗取首个 10s 段), 3 个 seed (42/43/44), 每格报告 mean ± std。
+  - 消融表 = 定稿方法 (CAUEEG 训练域) vs 各消融变体, 3 个 seed
+    (42/43/44), 同域 CAUEEG 与 →TUAB 零样本两格, window AUC
+    mean ± std; Δ = 与定稿方法 mean 之差。变体日志命名约定:
+    训练 train_KnowledgeLLM_s{seed}_caueeg_{variant}_DiseaseCAUEEG.log,
+    零样本 test_KnowledgeLLM_s{seed}_{variant}_caueeg_to_tuab_zero-shot_DiseaseTUAB.log;
+    新增变体在 ABLATION_VARIANTS 登记 (key, label) 即并入表格。
 
 用法:
   python conclusion.py [--out conclusion.html]
@@ -26,7 +33,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent
 LOG_DIR = REPO / "log_dir"
-DOMAINS = ["CAUEEG", "TUAB", "TUEP"]
+# 主表双域 (TUEP 全方法随机, 已移出主表作阴性对照)
+DOMAINS = ["CAUEEG", "TUAB"]
 SEEDS = ["42", "43", "44"]
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -78,6 +86,55 @@ def discover_knowledgellm():
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# 解析: KnowledgeLLM 消融变体 (CAUEEG 训练域)
+#   同域: train_KnowledgeLLM_s{seed}_caueeg_{variant}_DiseaseCAUEEG.log
+#   零样本: test_KnowledgeLLM_s{seed}_{variant}_caueeg_to_tuab_zero-shot_DiseaseTUAB.log
+#   定稿方法本身无 variant 标记, 其两格直接复用主表 cells
+#   [(KnowledgeLLM, CAUEEG, {CAUEEG,TUAB})], 保证与主表数字一致。
+# ─────────────────────────────────────────────────────────────────────────
+
+ABLATION_VARIANTS = [
+    ("a1", "A1 随机知识银行"),
+    ("a2a", "A2a LLM随机+预训练bank"),
+    ("a3a", "A3a 去掉raw (FC+PSD)"),
+]
+
+ABL_TRAIN_RE = re.compile(
+    r"train_KnowledgeLLM_s(\d+)_caueeg_([a-z0-9]+)_DiseaseCAUEEG\.log")
+ABL_ZS_RE = re.compile(
+    r"test_KnowledgeLLM_s(\d+)_([a-z0-9]+)_caueeg_to_tuab_zero-shot_DiseaseTUAB\.log")
+
+
+def discover_ablations():
+    """variant -> {seed -> {'same': (metrics, src), 'zs': (metrics, src)}}"""
+    exps = {}
+    for p in sorted(LOG_DIR.glob(
+            "train_KnowledgeLLM_s*_caueeg_*_DiseaseCAUEEG.log")):
+        m = ABL_TRAIN_RE.match(p.name)
+        if not m:
+            continue
+        seed, variant = m.groups()
+        if seed not in SEEDS:
+            continue
+        met = parse_trainer_log(p)
+        if met:
+            exps.setdefault(variant, {}).setdefault(
+                seed, {})["same"] = (met, p)
+    for p in sorted(LOG_DIR.glob(
+            "test_KnowledgeLLM_s*_*_caueeg_to_tuab_zero-shot_DiseaseTUAB.log")):
+        m = ABL_ZS_RE.match(p.name)
+        if not m:
+            continue
+        seed, variant = m.groups()
+        if seed not in SEEDS:
+            continue
+        met = parse_trainer_log(p)
+        if met:
+            exps.setdefault(variant, {}).setdefault(seed, {})["zs"] = (met, p)
+    return exps
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # 解析: EEGNet (主框架 trainer 日志)
 #   s42: train_EEGNet_Disease{D}.log / test_EEGNet_{src}_zero-shot_Disease{T}.log
 #   s43/s44: train_EEGNet_s{seed}_Disease{D}.log / test_EEGNet_s{seed}_{src}_...
@@ -113,6 +170,8 @@ def discover_eegnet():
             if not m:
                 continue
             dom = m.group(1)
+            if dom not in DOMAINS:
+                continue
             met = parse_trainer_log(p)
             if met:
                 exps.append({
@@ -226,6 +285,8 @@ def discover_labram():
     # 同域 (训练 log.txt 最后一行)
     for seed, dirs in LABRAM_TRAIN_DIRS.items():
         for dom, dname in dirs.items():
+            if dom not in DOMAINS:
+                continue
             logf = LABRAM_BASE / dname / "log.txt"
             if not logf.exists():
                 continue
@@ -355,6 +416,8 @@ def discover_ofa():
         m_same = OFA_SAME_RE.match(d.name)
         if m_same:
             dom = m_same.group(1)
+            if dom not in DOMAINS:
+                continue
             exps.append({
                 "model": "OFA", "seed": seed, "source": dom, "target": dom,
                 "mode": "同域", "metrics": met, "src": log,
@@ -376,16 +439,17 @@ def discover_ofa():
 # 聚合 + 渲染
 # ─────────────────────────────────────────────────────────────────────────
 
-MODELS = ["EEGNet", "KnowledgeLLM", "NeuroLM", "LaBraM", "OFA",
-          "EEG-Deformer"]
+MODELS = ["EEGNet", "NeuroLM", "LaBraM", "OFA", "EEG-Deformer",
+          "KnowledgeLLM"]
 MODEL_COLORS = {
     "EEGNet": "#2563eb", "KnowledgeLLM": "#7c3aed", "NeuroLM": "#059669",
     "LaBraM": "#b45309", "OFA": "#db2777", "EEG-Deformer": "#0891b2",
 }
 
 
-def _fmt(x, nd=4):
-    return f"{x:.{nd}f}" if x is not None else "—"
+def _fmt(x, nd=2):
+    """指标统一以百分数刻度显示 (原始 0-1 值 × 100, 不带 % 号)。"""
+    return f"{x * 100:.{nd}f}" if x is not None else "—"
 
 
 def _cell_text(vals):
@@ -394,7 +458,7 @@ def _cell_text(vals):
     mean = sum(vals) / len(vals)
     var = sum((v - mean) ** 2 for v in vals) / (len(vals) - 1)
     std = var ** 0.5
-    return f"{_fmt(mean)} ± {_fmt(std, 3)}"
+    return f"{_fmt(mean)} ± {_fmt(std)}"
 
 
 def _cell_tooltip(model, source, target, cell, key):
@@ -410,7 +474,7 @@ def _cell_tooltip(model, source, target, cell, key):
         if vals:
             mean = sum(vals) / len(vals)
             var = sum((v - mean) ** 2 for v in vals) / (len(vals) - 1)
-            lines.append(f"mean ± std: {_fmt(mean)} ± {_fmt(var ** 0.5, 3)}")
+            lines.append(f"mean ± std: {_fmt(mean)} ± {_fmt(var ** 0.5)}")
     return escape("\n".join(lines))
 
 
@@ -427,18 +491,22 @@ def build_html():
         c = cells.setdefault(key, {"mode": e["mode"], "seeds": []})
         c["seeds"].append((e["seed"], e["metrics"], e["src"]))
 
-    def _source_table(source):
+    pairs = []
+    for s in DOMAINS:
+        pairs.append((s, s))       # 同域在前
+        pairs += [(s, t) for t in DOMAINS if t != s]
+
+    def _merged_table():
         rows = []
         for model in MODELS:
             row = {}
-            for d in DOMAINS:
-                row[d] = cells.get((model, source, d))
+            for p in pairs:
+                row[p] = cells.get((model, p[0], p[1]))
             rows.append((model, row))
 
-        best = {d: {"auc": None, "accuracy": None} for d in DOMAINS}
+        best = {p: {"auc": None, "accuracy": None} for p in pairs}
         for _, row in rows:
-            for d in DOMAINS:
-                c = row[d]
+            for p, c in row.items():
                 if not c:
                     continue
                 for key in ("auc", "accuracy"):
@@ -446,22 +514,22 @@ def build_html():
                     vals = [v for v in vals if v is not None]
                     if vals:
                         mean = sum(vals) / len(vals)
-                        cur = best[d][key]
+                        cur = best[p][key]
                         if cur is None or mean > cur:
-                            best[d][key] = mean
+                            best[p][key] = mean
 
         thead1 = ['<th rowspan="2" class="left">模型</th>']
         thead2 = []
-        for d in DOMAINS:
-            thead1.append(f'<th colspan="2">{escape(d)}</th>')
+        for src, tgt in pairs:
+            thead1.append(f'<th colspan="2">{escape(src)} → {escape(tgt)}</th>')
             thead2.append("<th>AUC</th><th>Acc</th>")
 
         tbody = []
         for model, row in rows:
             color = MODEL_COLORS.get(model, "#666")
             tr = [f'<td class="model" style="--mc:{color}">{escape(model)}</td>']
-            for d in DOMAINS:
-                c = row[d]
+            for p in pairs:
+                c = row[p]
                 if c:
                     for key in ("auc", "accuracy"):
                         vals = [m.get(key) for _, m, _ in c["seeds"]]
@@ -471,21 +539,108 @@ def build_html():
                             continue
                         mean = sum(vals) / len(vals)
                         style = (' class="best"'
-                                 if best[d][key] is not None
-                                 and abs(mean - best[d][key]) < 1e-9 else "")
+                                 if best[p][key] is not None
+                                 and abs(mean - best[p][key]) < 1e-9 else "")
                         tr.append(
-                            f'<td class="cell" title="{_cell_tooltip(model, source, d, c, key)}">'
+                            f'<td class="cell" title="{_cell_tooltip(model, p[0], p[1], c, key)}">'
                             f'<span{style}>{_cell_text(vals)}</span></td>')
                 else:
                     tr.append('<td class="empty" colspan="2">—</td>')
             tbody.append("<tr>" + "".join(tr) + "</tr>")
 
-        return (f'<h2>训练域 = {escape(source)}</h2>\n'
+        return (f'<h2>双域 2×2 合并表</h2>\n'
                 f'<table>\n  <thead>\n    <tr>{"".join(thead1)}</tr>\n'
                 f'    <tr>{"".join(thead2)}</tr>\n  </thead>\n'
                 f'  <tbody>\n{chr(10).join(tbody)}\n  </tbody>\n</table>')
 
-    tables = "\n".join(_source_table(s) for s in DOMAINS)
+    def _ablation_table(cells):
+        base_same = cells.get(("KnowledgeLLM", "CAUEEG", "CAUEEG"))
+        base_zs = cells.get(("KnowledgeLLM", "CAUEEG", "TUAB"))
+        abl = discover_ablations()
+        registry = dict(ABLATION_VARIANTS)
+
+        def _auc_mean(cell):
+            if not cell:
+                return None
+            vals = [m.get("auc") for _, m, _ in cell["seeds"]]
+            vals = [v for v in vals if v is not None]
+            return sum(vals) / len(vals) if vals else None
+
+        base_mean = {"same": _auc_mean(base_same), "zs": _auc_mean(base_zs)}
+
+        # 定稿在前, 已登记变体按注册顺序, 未登记变体按键名排序兜底
+        keys = [""] + [k for k, _ in ABLATION_VARIANTS]
+        keys += sorted(k for k in abl if k not in keys)
+
+        def _rel(p):
+            try:
+                return str(Path(str(p)).relative_to(REPO))
+            except ValueError:
+                return str(p)
+
+        def _tooltip(label, cell):
+            lines = [f"{label} | {cell['mode']} (window AUC)"]
+            for seed, met, src in cell["seeds"]:
+                v = met.get("auc")
+                if v is not None:
+                    lines.append(f"seed {seed}: auc={_fmt(v)}")
+                lines.append(f"  来源: {_rel(src)}")
+            return escape("\n".join(lines))
+
+        rows = []
+        best = {"same": None, "zs": None}
+        for key in keys:
+            if key == "":
+                label = "定稿方法 (KnowledgeLLM)"
+                color = MODEL_COLORS["KnowledgeLLM"]
+                same_cell, zs_cell = base_same, base_zs
+            else:
+                label = registry.get(key, key.upper())
+                color = "#64748b"
+                rec = abl.get(key, {})
+                same_cell = {"mode": "同域", "seeds": [
+                    (s, v["same"][0], v["same"][1])
+                    for s, v in sorted(rec.items()) if "same" in v]}
+                zs_cell = {"mode": "零样本", "seeds": [
+                    (s, v["zs"][0], v["zs"][1])
+                    for s, v in sorted(rec.items()) if "zs" in v]}
+            rows.append((key, label, color, same_cell, zs_cell))
+            for kind, cell in (("same", same_cell), ("zs", zs_cell)):
+                m = _auc_mean(cell)
+                if m is not None and (best[kind] is None or m > best[kind]):
+                    best[kind] = m
+
+        thead = ('<th class="left">变体</th>'
+                 '<th>同域 CAUEEG AUC</th><th>Δ同域</th>'
+                 '<th>→TUAB AUC</th><th>Δ→TUAB</th>')
+        tbody = []
+        for key, label, color, same_cell, zs_cell in rows:
+            tr = [f'<td class="model" style="--mc:{color}">{escape(label)}</td>']
+            for kind, cell in (("same", same_cell), ("zs", zs_cell)):
+                vals = [m.get("auc") for _, m, _ in cell["seeds"]]
+                vals = [v for v in vals if v is not None]
+                if not vals:
+                    tr.append('<td class="empty" colspan="2">—</td>')
+                    continue
+                mean = sum(vals) / len(vals)
+                style = (' class="best"'
+                         if best[kind] is not None
+                         and abs(mean - best[kind]) < 1e-9 else "")
+                tr.append(
+                    f'<td class="cell" title="{_tooltip(label, cell)}">'
+                    f'<span{style}>{_cell_text(vals)}</span></td>')
+                if key == "" or base_mean[kind] is None:
+                    tr.append('<td class="empty">—</td>')
+                else:
+                    tr.append(
+                        f'<td class="cell">{(mean - base_mean[kind]) * 100:+.1f}</td>')
+            tbody.append("<tr>" + "".join(tr) + "</tr>")
+
+        return (f'<h2>定稿方法消融表 (CAUEEG 训练域, 3 seeds)</h2>\n'
+                f'<table>\n  <thead>\n    <tr>{thead}</tr>\n  </thead>\n'
+                f'  <tbody>\n{chr(10).join(tbody)}\n  </tbody>\n</table>')
+
+    tables = _merged_table() + "\n" + _ablation_table(cells)
 
     n_baseline_cells = 0
     for (model, _, _), c in cells.items():
@@ -494,13 +649,23 @@ def build_html():
 
     notes = []
     notes.append("· 口径: <b>KnowledgeLLM = 主方法</b>"
-                 "(10s 三模态 + 知识银行 + 冻结 6 层 Llama; CAUEEG 训练域, "
-                 "<b>3 seeds (42/43/44), 每格 mean ± std</b>; TUAB/TUEP 训练域未运行); "
+                 "(10s 三模态 + 知识银行 + 冻结 6 层 Llama; CAUEEG/TUAB 双训练域, "
+                 "<b>3 seeds (42/43/44), 每格 mean ± std</b>); "
                  "<b>EEGNet / EEG-Deformer / LaBraM / NeuroLM / OFA = 10s 段</b>"
                  "(每 60s 窗取首个 10s 段), <b>3 seeds (42/43/44), 每格 mean ± std</b>。")
     notes.append("· 训练设置: EPOCHS=200 / LR=1e-4 / PATIENCE=20 / val-AUC 选模型; "
                  "各基线优化器/调度按各自仓库默认。")
-    notes.append("· <b>加粗</b> = 该测试域该指标的最佳 mean; 悬浮提示列出各 seed 数值与来源。")
+    notes.append("· <b>加粗</b> = 该训练域→目标域该指标的最佳 mean; "
+                 "悬浮提示列出各 seed 数值与来源。")
+    notes.append("· <b>TUEP 已从主表移除</b>: 所有方法(含基线)在 TUEP 上同域/跨域"
+                 "均接近随机(发作间期 EEG 无判别特征), 作为阴性对照单独讨论。")
+    notes.append("· 消融表: 定稿方法 vs 各消融变体 (CAUEEG 训练域), "
+                 "<b>3 seeds, window AUC mean ± std</b>; <b>Δ = 变体 mean "
+                 "− 定稿 mean</b>; <b>加粗</b> = 该列最佳 mean; "
+                 "悬浮提示列出各 seed 数值与来源。")
+    notes.append("· 所有 AUC / Acc 均以百分数刻度显示 "
+                 "(原始 0-1 值 × 100, 不带 % 号); "
+                 "mean ± std 与 Δ 的单位均为百分点。")
 
     note_items = "".join(f"<li>{n}</li>" for n in notes)
 
@@ -558,7 +723,7 @@ def build_html():
 </head>
 <body>
 <h1>LLM4FC 实验结果对比 (六模型, 3-seed)</h1>
-<div class="sub">疾病分类任务 · 按训练域分表 · 每格 AUC / Acc (全部模型 3-seed mean ± std) · 生成于 {now}</div>
+<div class="sub">疾病分类任务 · 双域 2×2 合并表 · 每格 AUC / Acc (3-seed mean ± std) · 生成于 {now}</div>
 {tables}
 <div class="notes"><b>说明</b><ul>{note_items}</ul></div>
 <div class="srcs"><h2>各模型数值来源文件</h2>{src_section}</div>
@@ -583,6 +748,9 @@ def main():
             + discover_deformer() + discover_labram() + discover_neurolm()
             + discover_ofa())
     print(f"共解析 {len(exps)} 条 (含 {len(discover_knowledgellm())} 条 KnowledgeLLM)")
+    abl = discover_ablations()
+    print(f"消融变体 {len(abl)} 个: "
+          + ", ".join(sorted(abl)) if abl else "(无)")
 
 
 if __name__ == "__main__":

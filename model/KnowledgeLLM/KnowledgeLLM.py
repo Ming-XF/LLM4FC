@@ -24,6 +24,14 @@ from .knowledge_bank import (
 
 _EPS = 1e-8
 
+# A3 消融: 去掉单一模态的活跃集合 (默认 all = 定稿行为)
+_MODALITY_SETS = {
+    "all": ASPECTS,
+    "no_raw": ("fc", "psd"),
+    "no_fc": ("raw", "psd"),
+    "no_psd": ("raw", "fc"),
+}
+
 
 
 class OFAPatchEncoder(nn.Module):
@@ -182,7 +190,8 @@ class KnowledgeLLMConfig(BaseConfig):
                  contrast_lambda=0.1, contrast_temperature=0.1,
                  knowledge_bank_path="", knowledge_top_k=8,
                  knowledge_top_m=32, knowledge_temperature=1.0,
-                 llm_layers=6, task_type="classification", output_dim=2,
+                 llm_layers=6, modalities="all",
+                 task_type="classification", output_dim=2,
                  llm_type="llama", llm_path="./model/deepseek-r1-distill-llama-8B",
                  llm_init="pretrained"):
         super().__init__(node_size=node_size, output_dim=output_dim,
@@ -209,6 +218,9 @@ class KnowledgeLLMConfig(BaseConfig):
         self.knowledge_top_m = knowledge_top_m
         self.knowledge_temperature = knowledge_temperature
         self.llm_layers = llm_layers
+        if modalities not in _MODALITY_SETS:
+            raise ValueError(f"Unknown modality set: {modalities}")
+        self.modalities = _MODALITY_SETS[modalities]
         self.task_type = task_type
         self.output_dim = output_dim
         self.llm_type = llm_type
@@ -391,21 +403,28 @@ class Model(nn.Module):
         if window_psd.shape[2] != x.shape[1]:
             raise ValueError("window_psd channel dimension does not match x")
 
-        # 滑窗 FC 来自预处理 sidecar（nilearn 相关，窗 3s/步长 1s → 8 窗）。
-        # 上三角向量避免对称重复；每个窗口经现有编码器编码为一个 token。
-        fc_edges = window_fc[:, :, self.fc_triu_indices[0],
-                             self.fc_triu_indices[1]]
-        fc_edges = fc_edges.transpose(1, 2).contiguous()  # (B,E,W)
-        fc_tokens = self.fc_encoder(fc_edges)
+        # 按活跃模态集合编码 (A3 消融); 输入形状校验保持无条件,
+        # 数据侧照旧提供全部输入, 去掉的模态不参与前向。
+        active = self.config.modalities
+        features = {}
+        if "fc" in active:
+            # 滑窗 FC 来自预处理 sidecar（nilearn 相关，窗 3s/步长 1s → 8 窗）。
+            # 上三角向量避免对称重复；每个窗口经现有编码器编码为一个 token。
+            fc_edges = window_fc[:, :, self.fc_triu_indices[0],
+                                 self.fc_triu_indices[1]]
+            fc_edges = fc_edges.transpose(1, 2).contiguous()  # (B,E,W)
+            features["fc"] = self.fc_encoder(fc_edges)
 
-        b, windows, channels, frequencies = window_psd.shape
-        psd = window_psd.reshape(b * windows, channels, frequencies)
-        psd_tokens = self.psd_encoder(psd)
-        psd_tokens = psd_tokens.reshape(b, windows * psd_tokens.shape[1],
-                                        psd_tokens.shape[-1])
+        if "psd" in active:
+            b, windows, channels, frequencies = window_psd.shape
+            psd = window_psd.reshape(b * windows, channels, frequencies)
+            psd_tokens = self.psd_encoder(psd)
+            features["psd"] = psd_tokens.reshape(
+                b, windows * psd_tokens.shape[1], psd_tokens.shape[-1])
 
-        raw_tokens = self.raw_encoder(x)
-        return fc_tokens, psd_tokens, raw_tokens
+        if "raw" in active:
+            features["raw"] = self.raw_encoder(x)
+        return features
 
     def capture_knowledge_state(self):
         """Snapshot the current fusion tokens into the persistent buffer.
@@ -424,19 +443,19 @@ class Model(nn.Module):
             use_frozen_fusion
             and bool(self.knowledge_fusion_tokens.abs().sum() > 0))
 
-    def _knowledge_tokens(self, feature_sequences):
+    def _knowledge_tokens(self, features):
         tokens = []
-        for i, (features, query_projection, mapper, reprogrammer) in enumerate(
-                zip(feature_sequences, self.query_projections,
-                    self.knowledge_mappers, self.reprogrammers)):
-            query = query_projection(features)
+        for aspect in self.config.modalities:
+            i = ASPECTS.index(aspect)
+            query = self.query_projections[i](features[aspect])
             if self.use_captured_fusion:
                 # 评估模式：直接使用 checkpoint 里的融合 token 快照，
                 # 与实时 mapper 计算数学等价（同一权重、同一冻结词表）。
                 source = self.knowledge_fusion_tokens[i]
             else:
-                source = self.mapper_dropout(mapper(self.word_embeddings))
-            tokens.append(reprogrammer(query, source, source))
+                source = self.mapper_dropout(
+                    self.knowledge_mappers[i](self.word_embeddings))
+            tokens.append(self.reprogrammers[i](query, source, source))
         return tokens
 
     def _labels_for_loss(self, labels):
@@ -489,7 +508,8 @@ class Model(nn.Module):
                 loss = F.cross_entropy(logits.float(), loss_labels)
                 if self.config.contrast_lambda > 0:
                     modality_features = torch.stack(
-                        [feature.mean(dim=1) for feature in features], dim=1)
+                        [features[aspect].mean(dim=1)
+                         for aspect in self.config.modalities], dim=1)
                     projected = self.contrast_projection(modality_features)
                     contrast_loss = self.contrastive_loss(
                         projected, loss_labels)
@@ -499,9 +519,9 @@ class Model(nn.Module):
             logits=logits,
             loss=loss,
             hidden_state={
-                "fc_features": features[0],
-                "psd_features": features[1],
-                "raw_features": features[2],
+                "fc_features": features.get("fc"),
+                "psd_features": features.get("psd"),
+                "raw_features": features.get("raw"),
                 "knowledge_tokens": sequence,
                 "pooled": pooled,
                 "contrast_loss": contrast_loss,

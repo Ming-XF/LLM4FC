@@ -77,6 +77,7 @@ def init_model_config(args, data_config: DataConfig):
             knowledge_top_m=args.knowledge_top_m,
             knowledge_temperature=args.knowledge_temperature,
             llm_layers=args.knowledge_llm_layers,
+            modalities=args.knowledge_modalities,
             llm_type=args.llm_type,
             llm_path=args.llm_path,
             llm_init=args.llm_init,
@@ -251,6 +252,10 @@ def init_config():
                              type=float, help="KnowledgeLLM supervised InfoNCE temperature")
     model_group.add_argument("--knowledge_llm_layers", default=6, type=int,
                              help="Number of Llama layers retained by KnowledgeLLM")
+    model_group.add_argument(
+        "--knowledge_modalities", default="all", type=str,
+        choices=["all", "no_raw", "no_fc", "no_psd"],
+        help="KnowledgeLLM active modality set (A3 ablation; default all)")
 
     train_group = parser.add_argument_group(title="train", description="")
     train_group.add_argument("--max_steps", default=-1, type=int, help="Limit training steps per epoch (debug only, -1 = full)")
