@@ -6,17 +6,25 @@ conclusion.py
 汇总六模型实验结果, 渲染 HTML 对比表格 (默认 conclusion.html)。
 
 口径:
-  - 主表 = 双域 2×2 合并表 (CAUEEG/TUAB 训练域 × 目标域), TUEP 已移出
-    主表 (全方法接近随机, 作阴性对照单独讨论)。
+  - 主表拆为两张: 同域表 (训练域 → 同域测试) 与跨域零样本表
+    (CAUEEG/TUAB 互转); TUEP 已移出 (全方法接近随机, 作阴性对照)。
+  - 每格报告三项指标: Balanced Acc / AUC-ROC / AUC-PR
+    (百分数刻度, 3 seeds mean ± std); 各数值可溯源至对应文件
+    (metrics JSON / 结果 JSON / 评估日志, 见悬浮提示)。
   - KnowledgeLLM: 主方法 (10s FC+PSD 双模态 [no_raw] + 知识银行 +
-    冻结 6 层 Llama), CAUEEG/TUAB 双训练域, 3 个 seed (42/43/44),
-    每格报告 mean ± std; 日志以 _a3a 标记, 发现时归一化。
-  - EEGNet / EEG-Deformer / LaBraM / NeuroLM / OFA: 10s 段输入
-    (每 60s 窗取首个 10s 段), 3 个 seed (42/43/44), 每格报告 mean ± std。
+    冻结 6 层 Llama), CAUEEG/TUAB 双训练域, 3 个 seed (42/43/44);
+    指标取自 log_dir/metrics_KnowledgeLLM_*.json。
+  - EEGNet / OFA: 指标取自 log_dir/metrics_{EEGNet,OFA}_*.json
+    (重测落盘, AUC 与评估日志逐位一致); EEG-Deformer 取自
+    baseline/EEG-Deformer/save_llm4fc[_s43|_s44]/results/*.json;
+    NeuroLM 取自 test_results.json; LaBraM 取自评估日志 Global 行
+    与同域 log.txt。均为 10s 段输入 (每 60s 窗取首个 10s 段),
+    3 个 seed (42/43/44)。
   - 消融表 = 主方法 no_raw (CAUEEG 训练域) vs 各消融变体, 3 个 seed
-    (42/43/44), 同域 CAUEEG 与 →TUAB 零样本两格, window AUC
-    mean ± std; Δ = 与主方法 mean 之差。注意: A1/A2a/A3c/A3b/A4/A5
-    消融变体基于含 raw 的三模态设置运行 (设置差异后续说明)。
+    (42/43/44), 同域 CAUEEG 与 →TUAB 零样本两格, window AUC-ROC
+    mean ± std (变体未重测新指标); Δ = 与主方法 mean 之差。注意:
+    A1/A2a/A3c/A3b/A4/A5 消融变体基于含 raw 的三模态设置运行
+    (设置差异后续说明)。
     变体日志命名约定:
     训练 train_KnowledgeLLM_s{seed}_caueeg_{variant}_DiseaseCAUEEG.log,
     零样本 test_KnowledgeLLM_s{seed}_{variant}_caueeg_to_tuab_zero-shot_DiseaseTUAB.log;
@@ -41,52 +49,51 @@ DOMAINS = ["CAUEEG", "TUAB"]
 SEEDS = ["42", "43", "44"]
 
 # ─────────────────────────────────────────────────────────────────────────
-# 解析: KnowledgeLLM (CAUEEG 训练域, 3 seeds 42/43/44)
-#   同域: train_KnowledgeLLM_s{seed}_caueeg_DiseaseCAUEEG.log 末尾 test 块
-#   零样本: test_KnowledgeLLM_s{seed}_caueeg_to_{tuab,tuep}_zero-shot_*.log
-#   (TUAB/TUEP 作训练域未运行, 对应表格格为空)
+# 解析: 主方法 KnowledgeLLM / EEGNet / OFA —— 统一从 log_dir 的
+# metrics_{model}_s{seed}_{tag}_Disease{D}.json 读取 (BalancedAccuracy /
+# AUC / AUC_PR), 每个数值可溯源到对应 JSON 文件 (其 AUC/AUC_PR 与
+# 评估日志逐位一致)。
 # ─────────────────────────────────────────────────────────────────────────
 
-KNOWLEDGELLM_TRAIN_RE = re.compile(
-    r"train_KnowledgeLLM_s(\d+)_(\w+)_Disease(\w+)\.log")
-KNOWLEDGELLM_ZS_RE = re.compile(
-    r"test_KnowledgeLLM_s(\d+)_(\w+)_to_(\w+)_zero-shot_Disease(\w+)\.log")
+METRICS_JSON_TAG_MAP = {
+    "caueeg_test": ("CAUEEG", "CAUEEG"),
+    "tuab_test": ("TUAB", "TUAB"),
+    "caueeg_to_tuab": ("CAUEEG", "TUAB"),
+    "tuab_to_caueeg": ("TUAB", "CAUEEG"),
+}
+
+
+def _json_metrics(rec):
+    m = rec.get("metrics", rec)
+    return {"auc": float(m["AUC"]),
+            "auc_pr": float(m["AUC_PR"]),
+            "bal_acc": float(m["BalancedAccuracy"]),
+            "accuracy": float(m.get("Accuracy", 0.0))}
+
+
+def discover_from_metrics_jsons(model, prefix):
+    exps = []
+    for p in sorted(LOG_DIR.glob(f"metrics_{prefix}_s*_*.json")):
+        m = re.match(
+            rf"metrics_{prefix}_s(\d+)_(?:a3a_)?(caueeg_test|tuab_test|"
+            r"caueeg_to_tuab|tuab_to_caueeg)_Disease\w+\.json", p.name)
+        if not m:
+            continue
+        seed, tag = m.groups()
+        if seed not in SEEDS:
+            continue
+        src, tgt = METRICS_JSON_TAG_MAP[tag]
+        exps.append({
+            "model": model, "seed": seed, "source": src, "target": tgt,
+            "mode": "同域" if src == tgt else "零样本",
+            "metrics": _json_metrics(json.loads(p.read_text(encoding="utf-8"))),
+            "src": p,
+        })
+    return exps
 
 
 def discover_knowledgellm():
-    exps = []
-    for p in sorted(LOG_DIR.glob("train_KnowledgeLLM_s*_Disease*.log")):
-        # 主方法 = no_raw (FC+PSD), 其日志以 _a3a 标记, 先归一化再匹配
-        m = KNOWLEDGELLM_TRAIN_RE.match(p.name.replace("_a3a", ""))
-        if not m:
-            continue
-        seed, srctag, dom = m.groups()
-        src = SRC_TAGS.get(srctag, srctag.upper())
-        if seed not in SEEDS or src not in DOMAINS or dom not in DOMAINS:
-            continue
-        met = parse_trainer_log(p)
-        if met:
-            exps.append({
-                "model": "KnowledgeLLM", "seed": seed, "source": src,
-                "target": dom, "mode": "同域", "metrics": met, "src": p,
-            })
-    for p in sorted(LOG_DIR.glob("test_KnowledgeLLM_s*_zero-shot_Disease*.log")):
-        m = KNOWLEDGELLM_ZS_RE.match(p.name.replace("_a3a", ""))
-        if not m:
-            continue
-        seed, srctag, tgttag, dom = m.groups()
-        src = SRC_TAGS.get(srctag, srctag.upper())
-        tgt = SRC_TAGS.get(tgttag, tgttag.upper())
-        if (seed not in SEEDS or src not in DOMAINS or tgt not in DOMAINS
-                or dom not in DOMAINS):
-            continue
-        met = parse_trainer_log(p)
-        if met:
-            exps.append({
-                "model": "KnowledgeLLM", "seed": seed, "source": src,
-                "target": tgt, "mode": "零样本", "metrics": met, "src": p,
-            })
-    return exps
+    return discover_from_metrics_jsons("KnowledgeLLM", "KnowledgeLLM")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -172,40 +179,7 @@ def parse_trainer_log(path):
 
 
 def discover_eegnet():
-    exps = []
-    for seed in SEEDS:
-        prefix = "" if seed == "42" else f"_s{seed}"
-        # 同域
-        for p in sorted(LOG_DIR.glob(f"train_EEGNet{prefix}_Disease*.log")):
-            m = re.match(rf"train_EEGNet{prefix}_Disease(\w+)\.log", p.name)
-            if not m:
-                continue
-            dom = m.group(1)
-            if dom not in DOMAINS:
-                continue
-            met = parse_trainer_log(p)
-            if met:
-                exps.append({
-                    "model": "EEGNet", "seed": seed, "source": dom,
-                    "target": dom, "mode": "同域", "metrics": met, "src": p,
-                })
-        # 零样本
-        for p in sorted(LOG_DIR.glob(f"test_EEGNet{prefix}_*zero-shot_Disease*.log")):
-            m = re.match(rf"test_EEGNet{prefix}_(\w+)_zero-shot_Disease(\w+)\.log",
-                         p.name)
-            if not m:
-                continue
-            src = SRC_TAGS.get(m.group(1), m.group(1).upper())
-            tgt = m.group(2)
-            if src not in DOMAINS or tgt not in DOMAINS:
-                continue
-            met = parse_trainer_log(p)
-            if met:
-                exps.append({
-                    "model": "EEGNet", "seed": seed, "source": src,
-                    "target": tgt, "mode": "零样本", "metrics": met, "src": p,
-                })
-    return exps
+    return discover_from_metrics_jsons("EEGNet", "EEGNet")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -236,6 +210,8 @@ def discover_deformer():
                 "model": "EEG-Deformer", "seed": seed, "source": src,
                 "target": tgt, "mode": "同域" if src == tgt else "零样本",
                 "metrics": {"auc": float(data["auc"]),
+                            "auc_pr": float(data["pr_auc"]),
+                            "bal_acc": float(data["balanced_accuracy"]),
                             "accuracy": float(data["accuracy"])},
                 "src": p,
             })
@@ -277,13 +253,17 @@ def discover_labram():
             if src == tgt:
                 # 同域统一取训练 log.txt (与 s43/s44 口径一致, 避免双源重复)
                 continue
-            auc = acc = None
+            auc = pr_auc = bal_acc = acc = None
             for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
                 g = re.search(r"======Global: (\{.*\})", line)
                 if g:
                     d = json.loads(g.group(1))
                     if d.get("roc_auc") is not None:
                         auc = float(d["roc_auc"])
+                    if d.get("pr_auc") is not None:
+                        pr_auc = float(d["pr_auc"])
+                    if d.get("balanced_accuracy") is not None:
+                        bal_acc = float(d["balanced_accuracy"])
                     if d.get("accuracy") is not None:
                         acc = float(d["accuracy"])
             if auc is None:
@@ -291,7 +271,9 @@ def discover_labram():
             exps.append({
                 "model": "LaBraM", "seed": seed, "source": src, "target": tgt,
                 "mode": "同域" if src == tgt else "零样本",
-                "metrics": {"auc": auc, "accuracy": acc}, "src": p,
+                "metrics": {"auc": auc, "auc_pr": pr_auc,
+                            "bal_acc": bal_acc, "accuracy": acc},
+                "src": p,
             })
     # 同域 (训练 log.txt 最后一行)
     for seed, dirs in LABRAM_TRAIN_DIRS.items():
@@ -315,6 +297,9 @@ def discover_labram():
                         "model": "LaBraM", "seed": seed, "source": dom,
                         "target": dom, "mode": "同域",
                         "metrics": {"auc": float(d["test_roc_auc"]),
+                                    "auc_pr": float(d["test_pr_auc"]),
+                                    "bal_acc": float(
+                                        d["test_balanced_accuracy"]),
                                     "accuracy": float(d["test_accuracy"])},
                         "src": logf,
                     })
@@ -353,6 +338,8 @@ def discover_neurolm():
                     "model": "NeuroLM", "seed": seed, "source": src,
                     "target": dom, "mode": "同域" if dom == src else "零样本",
                     "metrics": {"auc": float(w["roc_auc"]),
+                                "auc_pr": float(w["pr_auc"]),
+                                "bal_acc": float(w["balanced_accuracy"]),
                                 "accuracy": float(w["accuracy"])},
                     "src": p,
                 })
@@ -365,85 +352,8 @@ def discover_neurolm():
 #       = 零样本)
 # ─────────────────────────────────────────────────────────────────────────
 
-OFA_BASE = (REPO / "baseline" / "OneFitsAll" / "Classification"
-            / "experiments_llm4fc")
-OFA_TEST_RE = re.compile(
-    r"Test Summary: loss: ([0-9.eE+-]+) \| accuracy: ([0-9.eE+-]+) \| "
-    r"precision: ([0-9.eE+-]+) \| AUROC: ([0-9.eE+-]+)")
-OFA_SAME_RE = re.compile(r"Disease(\w+)_10s_\d{4}-\d{2}-\d{2}")
-OFA_ZS_RE = re.compile(r"ZS_(\w+)_(\w+)_\d{4}-\d{2}-\d{2}")
-
-
-def _ofa_seed(d):
-    """评估目录的 configuration.json 中 --seed 恒为 42 (脚本未随种子更新),
-    故经 load_model 路径回溯到训练目录, 以训练目录的 seed 为准。"""
-    cfg = d / "configuration.json"
-    if not cfg.exists():
-        return None
-    try:
-        data = json.loads(cfg.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
-    lm = str(data.get("load_model", ""))
-    m = re.search(r"experiments_llm4fc/(Disease[^/]+)/checkpoints", lm)
-    if m:
-        train_cfg = (OFA_BASE / m.group(1) / "configuration.json")
-        if train_cfg.exists():
-            try:
-                tdata = json.loads(train_cfg.read_text(encoding="utf-8"))
-                return str(tdata.get("seed"))
-            except (json.JSONDecodeError, OSError):
-                pass
-    # 训练目录本身(无 load_model)直接用自身 seed
-    return str(data.get("seed"))
-
-
-def _ofa_test_metrics(log_path):
-    for line in log_path.read_text(encoding="utf-8",
-                                   errors="replace").splitlines():
-        m = OFA_TEST_RE.search(line)
-        if m:
-            return {"auc": float(m.group(4)),
-                    "accuracy": float(m.group(2))}
-    return None
-
-
 def discover_ofa():
-    exps = []
-    if not OFA_BASE.is_dir():
-        return exps
-    for d in sorted(OFA_BASE.iterdir()):
-        if not d.is_dir():
-            continue
-        seed = _ofa_seed(d)
-        if seed not in SEEDS:
-            continue
-        log = d / "output.log"
-        if not log.exists():
-            continue
-        met = _ofa_test_metrics(log)
-        if met is None:
-            continue
-        m_same = OFA_SAME_RE.match(d.name)
-        if m_same:
-            dom = m_same.group(1)
-            if dom not in DOMAINS:
-                continue
-            exps.append({
-                "model": "OFA", "seed": seed, "source": dom, "target": dom,
-                "mode": "同域", "metrics": met, "src": log,
-            })
-            continue
-        m_zs = OFA_ZS_RE.match(d.name)
-        if m_zs:
-            src, tgt = m_zs.groups()
-            if src in DOMAINS and tgt in DOMAINS:
-                exps.append({
-                    "model": "OFA", "seed": seed, "source": src,
-                    "target": tgt, "mode": "零样本", "metrics": met,
-                    "src": log,
-                })
-    return exps
+    return discover_from_metrics_jsons("OFA", "OFA")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -502,12 +412,13 @@ def build_html():
         c = cells.setdefault(key, {"mode": e["mode"], "seeds": []})
         c["seeds"].append((e["seed"], e["metrics"], e["src"]))
 
-    pairs = []
-    for s in DOMAINS:
-        pairs.append((s, s))       # 同域在前
-        pairs += [(s, t) for t in DOMAINS if t != s]
+    same_pairs = [(s, s) for s in DOMAINS]
+    cross_pairs = [(s, t) for s in DOMAINS for t in DOMAINS if t != s]
+    # 每格三项指标: Balanced Acc / AUC-ROC / AUC-PR
+    METRIC_COLS = [("bal_acc", "BalAcc"), ("auc", "AUC-ROC"),
+                   ("auc_pr", "AUC-PR")]
 
-    def _merged_table():
+    def _metrics_table(title, pairs, cells):
         rows = []
         for model in MODELS:
             row = {}
@@ -515,12 +426,12 @@ def build_html():
                 row[p] = cells.get((model, p[0], p[1]))
             rows.append((model, row))
 
-        best = {p: {"auc": None, "accuracy": None} for p in pairs}
+        best = {p: {k: None for k, _ in METRIC_COLS} for p in pairs}
         for _, row in rows:
             for p, c in row.items():
                 if not c:
                     continue
-                for key in ("auc", "accuracy"):
+                for key, _ in METRIC_COLS:
                     vals = [m.get(key) for _, m, _ in c["seeds"]]
                     vals = [v for v in vals if v is not None]
                     if vals:
@@ -532,8 +443,8 @@ def build_html():
         thead1 = ['<th rowspan="2" class="left">模型</th>']
         thead2 = []
         for src, tgt in pairs:
-            thead1.append(f'<th colspan="2">{escape(src)} → {escape(tgt)}</th>')
-            thead2.append("<th>AUC</th><th>Acc</th>")
+            thead1.append(f'<th colspan="3">{escape(src)} → {escape(tgt)}</th>')
+            thead2.append("<th>BalAcc</th><th>AUC-ROC</th><th>AUC-PR</th>")
 
         tbody = []
         for model, row in rows:
@@ -542,7 +453,7 @@ def build_html():
             for p in pairs:
                 c = row[p]
                 if c:
-                    for key in ("auc", "accuracy"):
+                    for key, _ in METRIC_COLS:
                         vals = [m.get(key) for _, m, _ in c["seeds"]]
                         vals = [v for v in vals if v is not None]
                         if not vals:
@@ -556,13 +467,16 @@ def build_html():
                             f'<td class="cell" title="{_cell_tooltip(model, p[0], p[1], c, key)}">'
                             f'<span{style}>{_cell_text(vals)}</span></td>')
                 else:
-                    tr.append('<td class="empty" colspan="2">—</td>')
+                    tr.append('<td class="empty" colspan="3">—</td>')
             tbody.append("<tr>" + "".join(tr) + "</tr>")
 
-        return (f'<h2>双域 2×2 合并表</h2>\n'
+        return (f'<h2>{escape(title)}</h2>\n'
                 f'<table>\n  <thead>\n    <tr>{"".join(thead1)}</tr>\n'
                 f'    <tr>{"".join(thead2)}</tr>\n  </thead>\n'
                 f'  <tbody>\n{chr(10).join(tbody)}\n  </tbody>\n</table>')
+
+    tables = (_metrics_table("同域表现 (训练域 → 同域测试)", same_pairs, cells)
+              + "\n" + _metrics_table("跨域零样本泛化", cross_pairs, cells))
 
     def _ablation_table(cells):
         base_same = cells.get(("KnowledgeLLM", "CAUEEG", "CAUEEG"))
@@ -647,11 +561,11 @@ def build_html():
                         f'<td class="cell">{(mean - base_mean[kind]) * 100:+.1f}</td>')
             tbody.append("<tr>" + "".join(tr) + "</tr>")
 
-        return (f'<h2>定稿方法消融表 (CAUEEG 训练域, 3 seeds)</h2>\n'
+        return (f'<h2>主方法消融表 (CAUEEG 训练域, window AUC-ROC, 3 seeds)</h2>\n'
                 f'<table>\n  <thead>\n    <tr>{thead}</tr>\n  </thead>\n'
                 f'  <tbody>\n{chr(10).join(tbody)}\n  </tbody>\n</table>')
 
-    tables = _merged_table() + "\n" + _ablation_table(cells)
+    tables = tables + "\n" + _ablation_table(cells)
 
     n_baseline_cells = 0
     for (model, _, _), c in cells.items():
@@ -665,20 +579,24 @@ def build_html():
                  "<b>3 seeds (42/43/44), 每格 mean ± std</b>); "
                  "<b>EEGNet / EEG-Deformer / LaBraM / NeuroLM / OFA = 10s 段</b>"
                  "(每 60s 窗取首个 10s 段), <b>3 seeds (42/43/44), 每格 mean ± std</b>。")
+    notes.append("· 指标口径: 每格报告 <b>Balanced Acc / AUC-ROC / AUC-PR</b> "
+                 "三项 (百分数刻度, mean ± std, 单位均为百分点)。"
+                 "Balanced Acc = (Sensitivity + Specificity) / 2。")
+    notes.append("· <b>所有数值均可溯源</b>: 悬浮提示列出各 seed 数值与来源文件 "
+                 "(KnowledgeLLM / EEGNet / OFA / EEG-Deformer 为 metrics JSON 或 "
+                 "结果 JSON, NeuroLM 为 test_results.json, LaBraM 为评估日志; "
+                 "各项 AUC/AUC-PR 与对应评估日志逐位一致)。")
     notes.append("· 训练设置: EPOCHS=200 / LR=1e-4 / PATIENCE=20 / val-AUC 选模型; "
                  "各基线优化器/调度按各自仓库默认。")
-    notes.append("· <b>加粗</b> = 该训练域→目标域该指标的最佳 mean; "
-                 "悬浮提示列出各 seed 数值与来源。")
+    notes.append("· <b>加粗</b> = 该训练域→目标域该指标的最佳 mean。")
     notes.append("· <b>TUEP 已从主表移除</b>: 所有方法(含基线)在 TUEP 上同域/跨域"
                  "均接近随机(发作间期 EEG 无判别特征), 作为阴性对照单独讨论。")
     notes.append("· 消融表: 主方法 no_raw (FC+PSD) vs 各消融变体 "
-                 "(CAUEEG 训练域), <b>3 seeds, window AUC mean ± std</b>; "
+                 "(CAUEEG 训练域), 维持 <b>window AUC-ROC</b> 口径 "
+                 "(变体未重测新指标), <b>3 seeds mean ± std</b>; "
                  "<b>Δ = 变体 mean − 主方法 mean</b>; <b>加粗</b> = 该列最佳 "
                  "mean; 悬浮提示列出各 seed 数值与来源。A1/A2a/A3c/A3b/A4/A5 "
                  "基于含 raw 的三模态设置运行 (设置差异后续说明)。")
-    notes.append("· 所有 AUC / Acc 均以百分数刻度显示 "
-                 "(原始 0-1 值 × 100, 不带 % 号); "
-                 "mean ± std 与 Δ 的单位均为百分点。")
 
     note_items = "".join(f"<li>{n}</li>" for n in notes)
 
@@ -736,7 +654,7 @@ def build_html():
 </head>
 <body>
 <h1>LLM4FC 实验结果对比 (六模型, 3-seed)</h1>
-<div class="sub">疾病分类任务 · 双域 2×2 合并表 · 每格 AUC / Acc (3-seed mean ± std) · 生成于 {now}</div>
+<div class="sub">疾病分类任务 · 同域/跨域分表 · 每格 Balanced Acc / AUC-ROC / AUC-PR (3-seed mean ± std) · 生成于 {now}</div>
 {tables}
 <div class="notes"><b>说明</b><ul>{note_items}</ul></div>
 <div class="srcs"><h2>各模型数值来源文件</h2>{src_section}</div>

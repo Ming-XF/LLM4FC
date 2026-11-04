@@ -222,6 +222,13 @@ def main(config):
                 continue  # e.g. 'epoch' is None for test-set evaluation
             print_str += '{}: {:8f} | '.format(k, v)
         logger.info(print_str)
+        # 保存逐样本预测 (供离线补算/复核指标)
+        import numpy as np
+        pred_path = os.path.join(config['pred_dir'], 'best_predictions.npz')
+        np.savez(pred_path,
+                 targets=np.concatenate(per_batch_test['targets'], axis=0),
+                 predictions=np.concatenate(per_batch_test['predictions'], axis=0))
+        logger.info(f"Saved test predictions to {pred_path}")
         return
     
     # Initialize data generators

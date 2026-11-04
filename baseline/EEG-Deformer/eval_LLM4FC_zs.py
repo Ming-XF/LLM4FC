@@ -12,7 +12,8 @@ import sys
 import numpy as np
 import torch
 from torch.utils.data import TensorDataset, DataLoader
-from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.metrics import (roc_auc_score, accuracy_score,
+                             average_precision_score, balanced_accuracy_score)
 
 sys.path.insert(0, osp.dirname(osp.abspath(__file__)))
 from models.model_handler import DLModel
@@ -46,9 +47,12 @@ def main():
     labels = torch.cat(labels).numpy()
 
     auc = roc_auc_score(labels, probs)
+    pr_auc = average_precision_score(labels, probs)
     preds = (probs > 0.5).astype(np.int64)
     acc = accuracy_score(labels, preds)
-    print(f'ZS/TEST RESULT: AUC={auc:.6f} Acc={acc:.6f} N={len(labels)}')
+    bal_acc = balanced_accuracy_score(labels, preds)
+    print(f'ZS/TEST RESULT: AUC={auc:.6f} PR_AUC={pr_auc:.6f} '
+          f'Acc={acc:.6f} BalAcc={bal_acc:.6f} N={len(labels)}')
 
     # 持久化结果（conclusion.py 溯源用）
     import json
@@ -59,10 +63,14 @@ def main():
     tgt = osp.basename(osp.normpath(args.data_dir)).replace('llm4fc_data_10s', '')
     tgt = {'': 'CAUEEG', '_tuab': 'TUAB', '_tuep': 'TUEP'}.get(tgt, tgt)
     rec = {'ckpt': osp.basename(args.ckpt), 'source': src, 'target': tgt,
-           'auc': float(auc), 'accuracy': float(acc), 'n': int(len(labels))}
+           'auc': float(auc), 'pr_auc': float(pr_auc),
+           'accuracy': float(acc), 'balanced_accuracy': float(bal_acc),
+           'n': int(len(labels))}
     fname = osp.join(out, f'{src}__{tgt}.json')
     with open(fname, 'w', encoding='utf-8') as f:
         json.dump(rec, f)
+    np.savez(osp.join(out, f'{src}__{tgt}_preds.npz'),
+             labels=labels, probs=probs)
     print(f'结果已写入 {fname}')
 
 

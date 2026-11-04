@@ -499,6 +499,9 @@ class SupervisedRunner(BaseRunner):
                 prec, rec, _ = sklearn.metrics.precision_recall_curve(targets, probs[:, 1])
                 self.epoch_metrics['AUPRC'] = sklearn.metrics.auc(rec, prec)
 
+                self.epoch_metrics['balanced_accuracy'] = \
+                    sklearn.metrics.balanced_accuracy_score(targets, predictions)
+
         if keep_all:
             return self.epoch_metrics, per_batch
         else:
