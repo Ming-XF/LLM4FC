@@ -239,6 +239,7 @@ LABRAM_TRAIN_DIRS = {
 
 def discover_labram():
     exps = []
+    covered = set()  # (seed, src, tgt) 已由 eval 日志覆盖
     evaldir = LABRAM_BASE / "log_llm4fc"
     if evaldir.is_dir():
         for p in sorted(evaldir.glob("*.log")):
@@ -249,9 +250,6 @@ def discover_labram():
             src = LABRAM_SRC.get(m.group(2))
             tgt = m.group(3)
             if src is None or tgt not in DOMAINS:
-                continue
-            if src == tgt:
-                # 同域统一取训练 log.txt (与 s43/s44 口径一致, 避免双源重复)
                 continue
             auc = pr_auc = bal_acc = acc = None
             for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -268,6 +266,7 @@ def discover_labram():
                         acc = float(d["accuracy"])
             if auc is None:
                 continue
+            # 同域与跨域统一走 best-ckpt 的 --eval 日志 (Global 行)
             exps.append({
                 "model": "LaBraM", "seed": seed, "source": src, "target": tgt,
                 "mode": "同域" if src == tgt else "零样本",
@@ -275,10 +274,13 @@ def discover_labram():
                             "bal_acc": bal_acc, "accuracy": acc},
                 "src": p,
             })
-    # 同域 (训练 log.txt 最后一行)
+            covered.add((seed, src, tgt))
+    # 兜底: 无 eval 日志的同域格回退训练 log.txt 最后一行 (末轮 test)
     for seed, dirs in LABRAM_TRAIN_DIRS.items():
         for dom, dname in dirs.items():
             if dom not in DOMAINS:
+                continue
+            if (seed, dom, dom) in covered:
                 continue
             logf = LABRAM_BASE / dname / "log.txt"
             if not logf.exists():
