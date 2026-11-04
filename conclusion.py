@@ -8,13 +8,16 @@ conclusion.py
 口径:
   - 主表 = 双域 2×2 合并表 (CAUEEG/TUAB 训练域 × 目标域), TUEP 已移出
     主表 (全方法接近随机, 作阴性对照单独讨论)。
-  - KnowledgeLLM: 主方法 (10s 三模态 + 知识银行 + 冻结 6 层 Llama),
-    CAUEEG/TUAB 双训练域, 3 个 seed (42/43/44), 每格报告 mean ± std。
+  - KnowledgeLLM: 主方法 (10s FC+PSD 双模态 [no_raw] + 知识银行 +
+    冻结 6 层 Llama), CAUEEG/TUAB 双训练域, 3 个 seed (42/43/44),
+    每格报告 mean ± std; 日志以 _a3a 标记, 发现时归一化。
   - EEGNet / EEG-Deformer / LaBraM / NeuroLM / OFA: 10s 段输入
     (每 60s 窗取首个 10s 段), 3 个 seed (42/43/44), 每格报告 mean ± std。
-  - 消融表 = 定稿方法 (CAUEEG 训练域) vs 各消融变体, 3 个 seed
+  - 消融表 = 主方法 no_raw (CAUEEG 训练域) vs 各消融变体, 3 个 seed
     (42/43/44), 同域 CAUEEG 与 →TUAB 零样本两格, window AUC
-    mean ± std; Δ = 与定稿方法 mean 之差。变体日志命名约定:
+    mean ± std; Δ = 与主方法 mean 之差。注意: A1/A2a/A3c/A3b/A4/A5
+    消融变体基于含 raw 的三模态设置运行 (设置差异后续说明)。
+    变体日志命名约定:
     训练 train_KnowledgeLLM_s{seed}_caueeg_{variant}_DiseaseCAUEEG.log,
     零样本 test_KnowledgeLLM_s{seed}_{variant}_caueeg_to_tuab_zero-shot_DiseaseTUAB.log;
     新增变体在 ABLATION_VARIANTS 登记 (key, label) 即并入表格。
@@ -53,7 +56,8 @@ KNOWLEDGELLM_ZS_RE = re.compile(
 def discover_knowledgellm():
     exps = []
     for p in sorted(LOG_DIR.glob("train_KnowledgeLLM_s*_Disease*.log")):
-        m = KNOWLEDGELLM_TRAIN_RE.match(p.name)
+        # 主方法 = no_raw (FC+PSD), 其日志以 _a3a 标记, 先归一化再匹配
+        m = KNOWLEDGELLM_TRAIN_RE.match(p.name.replace("_a3a", ""))
         if not m:
             continue
         seed, srctag, dom = m.groups()
@@ -67,7 +71,7 @@ def discover_knowledgellm():
                 "target": dom, "mode": "同域", "metrics": met, "src": p,
             })
     for p in sorted(LOG_DIR.glob("test_KnowledgeLLM_s*_zero-shot_Disease*.log")):
-        m = KNOWLEDGELLM_ZS_RE.match(p.name)
+        m = KNOWLEDGELLM_ZS_RE.match(p.name.replace("_a3a", ""))
         if not m:
             continue
         seed, srctag, tgttag, dom = m.groups()
@@ -96,7 +100,10 @@ def discover_knowledgellm():
 ABLATION_VARIANTS = [
     ("a1", "A1 随机知识银行"),
     ("a2a", "A2a LLM随机+预训练bank"),
-    ("a3a", "A3a 去掉raw (FC+PSD)"),
+    ("a3c", "A3c 去掉fc (raw+PSD)"),
+    ("a3b", "A3b 去掉psd (raw+FC)"),
+    ("a4", "A4 无跨注意力 (静态知识相加)"),
+    ("a5", "A5 无对比损失"),
 ]
 
 ABL_TRAIN_RE = re.compile(
@@ -116,6 +123,8 @@ def discover_ablations():
         seed, variant = m.groups()
         if seed not in SEEDS:
             continue
+        if variant == "a3a":
+            continue  # a3a = no_raw 主方法, 已入主表, 不进消融表
         met = parse_trainer_log(p)
         if met:
             exps.setdefault(variant, {}).setdefault(
@@ -127,6 +136,8 @@ def discover_ablations():
             continue
         seed, variant = m.groups()
         if seed not in SEEDS:
+            continue
+        if variant == "a3a":
             continue
         met = parse_trainer_log(p)
         if met:
@@ -591,7 +602,7 @@ def build_html():
         best = {"same": None, "zs": None}
         for key in keys:
             if key == "":
-                label = "定稿方法 (KnowledgeLLM)"
+                label = "主方法 no_raw (FC+PSD)"
                 color = MODEL_COLORS["KnowledgeLLM"]
                 same_cell, zs_cell = base_same, base_zs
             else:
@@ -649,7 +660,8 @@ def build_html():
 
     notes = []
     notes.append("· 口径: <b>KnowledgeLLM = 主方法</b>"
-                 "(10s 三模态 + 知识银行 + 冻结 6 层 Llama; CAUEEG/TUAB 双训练域, "
+                 "(10s FC+PSD 双模态 [no_raw] + 知识银行 + 冻结 6 层 Llama; "
+                 "CAUEEG/TUAB 双训练域, "
                  "<b>3 seeds (42/43/44), 每格 mean ± std</b>); "
                  "<b>EEGNet / EEG-Deformer / LaBraM / NeuroLM / OFA = 10s 段</b>"
                  "(每 60s 窗取首个 10s 段), <b>3 seeds (42/43/44), 每格 mean ± std</b>。")
@@ -659,10 +671,11 @@ def build_html():
                  "悬浮提示列出各 seed 数值与来源。")
     notes.append("· <b>TUEP 已从主表移除</b>: 所有方法(含基线)在 TUEP 上同域/跨域"
                  "均接近随机(发作间期 EEG 无判别特征), 作为阴性对照单独讨论。")
-    notes.append("· 消融表: 定稿方法 vs 各消融变体 (CAUEEG 训练域), "
-                 "<b>3 seeds, window AUC mean ± std</b>; <b>Δ = 变体 mean "
-                 "− 定稿 mean</b>; <b>加粗</b> = 该列最佳 mean; "
-                 "悬浮提示列出各 seed 数值与来源。")
+    notes.append("· 消融表: 主方法 no_raw (FC+PSD) vs 各消融变体 "
+                 "(CAUEEG 训练域), <b>3 seeds, window AUC mean ± std</b>; "
+                 "<b>Δ = 变体 mean − 主方法 mean</b>; <b>加粗</b> = 该列最佳 "
+                 "mean; 悬浮提示列出各 seed 数值与来源。A1/A2a/A3c/A3b/A4/A5 "
+                 "基于含 raw 的三模态设置运行 (设置差异后续说明)。")
     notes.append("· 所有 AUC / Acc 均以百分数刻度显示 "
                  "(原始 0-1 值 × 100, 不带 % 号); "
                  "mean ± std 与 Δ 的单位均为百分点。")

@@ -1,4 +1,4 @@
-11/04/2026 10:30:54 - INFO - __main__ -   ==================== Explicit args ====================
+11/04/2026 18:48:56 - INFO - __main__ -   ==================== Explicit args ====================
   append: _s44_a1_caueeg_to_tuab
   batch_size: 16
   contrast_lambda: 0.3
@@ -27,7 +27,7 @@
   num_heads: 8
   pretrain_path: ./output_dir/output_dir_knowledge_s44_a1/KnowledgeLLM_DiseaseCAUEEG_train
   [effective] batch_size: 16, learning_rate: 0.0001
-11/04/2026 10:30:54 - INFO - __main__ -   ==================== Full args (resolved) ====================
+11/04/2026 18:48:56 - INFO - __main__ -   ==================== Full args (resolved) ====================
   D: 2
   F1: 8
   abla_channel: -1
@@ -77,6 +77,7 @@
   knowledge_fc_stride: 1
   knowledge_fusion_tokens: 16
   knowledge_llm_layers: 6
+  knowledge_modalities: all
   knowledge_psd_patch: 8
   knowledge_psd_stride: 4
   knowledge_raw_patch: 200
@@ -124,12 +125,12 @@
   wandb_entity: cwg
   warmup_steps: 400
   weight_decay: 0.0001
-11/04/2026 10:30:54 - INFO - utils.trainer -     43 keys not in checkpoint (kept from init)
-11/04/2026 10:30:54 - INFO - utils.trainer -   Model loaded from ./output_dir/output_dir_knowledge_s44_a1/KnowledgeLLM_DiseaseCAUEEG_train/KnowledgeLLM-0.bin (53/53 keys)
-11/04/2026 10:30:54 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
-11/04/2026 10:30:56 - INFO - utils.trainer -   Loss: 1.03207
-11/04/2026 10:30:56 - INFO - utils.trainer -   AUC: 0.69658
-11/04/2026 10:30:56 - INFO - utils.trainer -   Accuracy: 0.59600
-11/04/2026 10:30:56 - INFO - utils.trainer -   Precision: 0.57821
-11/04/2026 10:30:56 - INFO - utils.trainer -   Specificity: 0.23350
-11/04/2026 10:30:56 - INFO - utils.trainer -   Sensitivity: 0.90989
+11/04/2026 18:48:56 - INFO - utils.trainer -     43 keys not in checkpoint (kept from init)
+11/04/2026 18:48:56 - INFO - utils.trainer -   Model loaded from ./output_dir/output_dir_knowledge_s44_a1/KnowledgeLLM_DiseaseCAUEEG_train/KnowledgeLLM-0.bin (53/53 keys)
+11/04/2026 18:48:56 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
+11/04/2026 18:48:59 - INFO - utils.trainer -   Loss: 1.03207
+11/04/2026 18:48:59 - INFO - utils.trainer -   AUC: 0.69658
+11/04/2026 18:48:59 - INFO - utils.trainer -   Accuracy: 0.59600
+11/04/2026 18:48:59 - INFO - utils.trainer -   Precision: 0.57821
+11/04/2026 18:48:59 - INFO - utils.trainer -   Specificity: 0.23350
+11/04/2026 18:48:59 - INFO - utils.trainer -   Sensitivity: 0.90989

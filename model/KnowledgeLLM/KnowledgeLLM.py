@@ -190,7 +190,7 @@ class KnowledgeLLMConfig(BaseConfig):
                  contrast_lambda=0.1, contrast_temperature=0.1,
                  knowledge_bank_path="", knowledge_top_k=8,
                  knowledge_top_m=32, knowledge_temperature=1.0,
-                 llm_layers=6, modalities="all",
+                 llm_layers=6, modalities="all", use_cross_attention=True,
                  task_type="classification", output_dim=2,
                  llm_type="llama", llm_path="./model/deepseek-r1-distill-llama-8B",
                  llm_init="pretrained"):
@@ -221,6 +221,7 @@ class KnowledgeLLMConfig(BaseConfig):
         if modalities not in _MODALITY_SETS:
             raise ValueError(f"Unknown modality set: {modalities}")
         self.modalities = _MODALITY_SETS[modalities]
+        self.use_cross_attention = use_cross_attention
         self.task_type = task_type
         self.output_dim = output_dim
         self.llm_type = llm_type
@@ -270,6 +271,12 @@ class Model(nn.Module):
                 config.d_model, config.n_heads, self.d_llm, config.dropout)
             for _ in ASPECTS
         ])
+        if not config.use_cross_attention:
+            # A4 消融: 去掉跨注意力, EEG query 直接投影到 LLM 维度并加上
+            # 静态知识均值向量 (source.mean), 保留 token 数与顺序。
+            self.no_cross_projections = nn.ModuleList([
+                nn.Linear(config.d_model, self.d_llm) for _ in ASPECTS
+            ])
         # 推理用融合 token 快照：训练保存 checkpoint 前由 capture_knowledge_state
         # 写入；加载后 on_state_loaded 置位，前向直接使用该缓冲作为
         # source/value，不依赖重新提取的知识银行 token 集合。
@@ -455,7 +462,13 @@ class Model(nn.Module):
             else:
                 source = self.mapper_dropout(
                     self.knowledge_mappers[i](self.word_embeddings))
-            tokens.append(self.reprogrammers[i](query, source, source))
+            if self.config.use_cross_attention:
+                tokens.append(self.reprogrammers[i](query, source, source))
+            else:
+                # 静态知识相加: 知识仍在, 但不再随 EEG query 动态检索
+                tokens.append(
+                    self.no_cross_projections[i](query)
+                    + source.mean(dim=0).view(1, 1, -1))
         return tokens
 
     def _labels_for_loss(self, labels):

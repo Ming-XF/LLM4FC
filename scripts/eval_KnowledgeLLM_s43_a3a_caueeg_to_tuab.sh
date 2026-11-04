@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# A3a ablation zero-shot evaluation: CAUEEG (trained) -> TUAB.
+# A3a (main method: no_raw) zero-shot evaluation: CAUEEG (trained) -> TUAB.
 # Must pass the same --knowledge_modalities as training.
 # Run: sh scripts/eval_KnowledgeLLM_s43_a3a_caueeg_to_tuab.sh
 #

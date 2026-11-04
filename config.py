@@ -78,6 +78,7 @@ def init_model_config(args, data_config: DataConfig):
             knowledge_temperature=args.knowledge_temperature,
             llm_layers=args.knowledge_llm_layers,
             modalities=args.knowledge_modalities,
+            use_cross_attention=args.knowledge_cross_attention,
             llm_type=args.llm_type,
             llm_path=args.llm_path,
             llm_init=args.llm_init,
@@ -252,6 +253,12 @@ def init_config():
                              type=float, help="KnowledgeLLM supervised InfoNCE temperature")
     model_group.add_argument("--knowledge_llm_layers", default=6, type=int,
                              help="Number of Llama layers retained by KnowledgeLLM")
+    model_group.add_argument(
+        "--knowledge_cross_attention",
+        action=argparse.BooleanOptionalAction, default=True,
+        help="KnowledgeLLM reprogramming cross-attention "
+             "(A4 ablation; --no-knowledge_cross_attention = static "
+             "knowledge addition, default on)")
     model_group.add_argument(
         "--knowledge_modalities", default="all", type=str,
         choices=["all", "no_raw", "no_fc", "no_psd"],
