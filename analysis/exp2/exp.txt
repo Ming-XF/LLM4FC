@@ -1,0 +1,28 @@
+实验二：融合 token 语义解码
+============================================================================
+
+【实验目的】
+回答：被重编程注意力选中的融合 token 在语义上是什么？
+
+【方法】
+- 直接从 ckpt（s42_a3a val-best）读取训练时的 token_ids (171) 与
+  mapping.weight (16x171)，用 Llama tokenizer 将每个融合 token 解码为
+  top-8 贡献银行词（按 |权重| 排序，含符号）——绕开启动时银行重抽取的
+  token 数不一致问题；
+- 与实验一的平均注意力交叉引用（融合 token 按注意力降序排列）。
+
+【核心发现】
+1. 高注意力融合 token 解码为通用功能词/标点：FC 最忙的 #4/5/6 是
+   "network/across/based/white"、"features/These/changes/distributed"、
+   "both/change/different"；PSD 最忙的 #0/1/2 是 "the/of/;/,"、
+   ".Ċ/A/T/and/with"、"over/The/which/all"——没有领域语义。
+2. 领域词集中在低注意力 token：FC 侧 brain/sites/nodes/organization (#8)、
+   communities/Graph/phase/frequency (#9)、regions/networks/functional/
+   modules (#10) 等，注意力约为最高 token 的一半；PSD 侧最低注意力的
+   #10 (0.0380) 解码为 amounts/wave/synchron/powers——频域术语同样被冷落。
+
+【技术备注】
+- "Ġ" 为 Llama 词首空格符号；"âĢĶ" 是知识语料本身含有的 mojibake 符号；
+- 产物：results/fusion_decoding_fc.txt、results/fusion_decoding_psd.txt、
+  results/mapping_weights.npz；
+- 复跑：sh analysis/exp2/run_decode.sh（纯 CPU，约 1 分钟）。
