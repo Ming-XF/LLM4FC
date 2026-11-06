@@ -1,0 +1,41 @@
+实验三：知识 token 语义分析（试验一）
+====================================
+
+【实验目的】
+回答：进 LLM 的"知识 token"（每样本 22 个 = FC 1 + PSD 21 的 reprogramming
+输出向量）在语言空间里对应什么 —— "LLM 实际读到的文本是什么"。
+
+【方法】
+- case：CAUEEG/TUAB test 各取 2 正 + 2 负 = 8 个样本（按遇到顺序）；
+- 知识 token 取法与评估路径完全一致：model._encode_modalities +
+  model._knowledge_tokens（use_captured_fusion 快照，eval 模式），
+  PSD 去 OFA replicate 尾部 pad（同 exp1 口径）；
+- 语义表示：与 LLM 输入词表嵌入（embed_tokens，与 mapper/LLM 输入同一
+  空间）的余弦相似度 top-5 词，排除特殊 token；
+- 产物：results/knowledge_token_semantics.txt（每样本每位置 top-5 词 +
+  相似度）、results/knowledge_token_semantics.png（8 样本 × 22 位置网格，
+  每格 top-1 词、底色 = 相似度）、results/knowledge_tokens.npz。
+
+【运行】sh analysis/exp3/run_interpret.sh（单卡，推理无反向）
+
+【核心发现】(2026-11-06, s42 a3a ckpt, 8 样本)
+1. 知识 token 的语义是清晰的领域词: FC token = network/networks/regions/
+   structure/changes (sim 0.35-0.41); PSD token = frequency/frequencies/
+   levels/distribution (sim 最高 0.50+) 与 The/the/these/and/with 交替。
+   与 exp2 融合 token 解码 (功能词主导) 对比: 语义在管线终点 (LLM 输入)
+   才清晰起来 —— 分析中间件 (融合 token) 会看走眼, 试验一验证了
+   "以 LLM 输入为分析对象" 的正确性。
+2. 内容级跨域一致: 22 位置中 19 个 (86%) 的 top-1 词 CAUEEG/TUAB 相同
+   (FC 恒定 network/regions, PSD#1 恒定 frequency 且全样本相似度最高
+   0.40-0.53) —— 与 exp1 注意力级 r=0.998 互证, 升级为 "LLM 读到的文本
+   内容跨域稳定", 呼应零样本泛化。
+3. 结构: PSD#1 似"主题位" (恒为 frequency), 后续位置频域词族与限定词族
+   交替 —— 序列有可读结构。
+4. 类别差异: 正/负类 top 词未见明显差异 (负结果)。
+
+【技术备注】
+- 运行时 load_model 跳过 6 个 key (knowledge_mappers.*: ckpt 171 token vs
+  init 重抽取 172, CPU/GPU 数值边界差异, 与 exp2 银行复现诊断同源);
+  不影响结果: 知识 token 走 captured fusion 快照路径, 不经过 mapper。
+- 相似度参考系: LLM 输入词表嵌入 (embed_tokens), 与 mapper/LLM 输入
+  同一空间; 排除特殊 token。

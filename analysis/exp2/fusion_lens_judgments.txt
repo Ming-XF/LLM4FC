@@ -1,0 +1,80 @@
+【内容性质判定 · 初拟 (2026-11-06, 依据 = 上方归属词表, 待人工复核)】
+
+===== FC =====
+  #5 (0.1146) 混合: 通用形容词 (large/based/white/specific) + network/task
+  #6 (0.1136) 混合: 学术通用 (features/distributed/parameters/graph) + 连接词
+  #4 (0.1115) 功能词: different/both/during/within/How/change
+  #2 (0.1038) 功能词: which/also/when/time/It/In
+  #7 (0.0809) 领域: 脑区/结构 (region/areas/structure/systems/states)
+  #3 (0.0759) 功能词: To/For/This/We/An/between
+  #8 (0.0485) 领域: 网络组织 (configuration/organization/nodes/brain/effective)
+  #0 (0.0482) 标点/功能: , . ( the and in of ;
+  #9 (0.0462) 领域: 图论/频段 (phase/frequency/communities/Graph/dynamic)
+  #1 (0.0458) 功能词: at/on/with/as/that/The
+  #10 (0.0431) 领域: 功能网络 (structures/networks/regions/functional/modules/synchron)
+  #11 (0.0349) 领域: 结构指标 (structural/metrics/traits/fract/hem)
+  #13 (0.0344) 领域: 振荡/网络 (oscill/circuits/frequencies/coordination/amplitude)
+  #14 (0.0332) 领域: 脑活动 (propagation/spectral/cerebral/synchronization/entropy/brain)
+  #12 (0.0331) 领域: 神经动力学 (neural/spatial/dynamics/Brain)
+  #15 (0.0323) 领域: EEG/振荡器 (oscillator/electrode/rhythms/hemisphere/neuronal/EEG)
+
+===== PSD =====
+  #2 (0.1161) 功能词: The/all/which/their/over/from/In/but
+  #1 (0.1124) 功能词: and/with/that/as/or/A/for
+  #0 (0.1121) 标点: , : . Ċ the ; in of /
+  #4 (0.1023) 功能词: each/different/between/those/For/But
+  #3 (0.0766) 功能词: This/these/We/It/when/through
+  #6 (0.0727) 功能词: Some/often/certain/among/across/known/age
+  #5 (0.0610) 混合: 量化词 (total/specific/amount/power) + 功能词
+  #7 (0.0393) 领域: 活动状态 (levels/groups/pattern/activity/sleep)
+  #13 (0.0390) 领域: 频段 (frequencies/bandwidth/domains/bins)
+  #9 (0.0389) 领域: 频域量化 (frequency/ratio/percentage/phase/spect)
+  #14 (0.0388) 领域: 频带/振幅 (ratios/distributions/amplitude/suppression/bands)
+  #8 (0.0383) 领域: 频带功率 (distribution/band/Power/brain)
+  #11 (0.0383) 领域: 频谱 (density/spectrum/freq/bands/electrical)
+  #15 (0.0382) 领域: EEG 频域 (spectra/spectral/coherence/electrode/EEG/Theta)
+  #12 (0.0381) 混合: intervals/ranges/zones/proportion (空间分区, 半领域)
+  #10 (0.0380) 领域: 通道/波 (patterns/channels/dimensions/regions/powers/wave)
+
+【总判定】两模态一致: 高注意力融合 token = 功能/标点词型, 低注意力融合 token =
+领域词型 — 模型主要注意力放在"结构词"原型上, 领域词原型被冷落 (但非零)。
+与余弦热图 (本实验部分 B)、exp3 LLM 输入解码 (终点呈领域语义) 的三角对照
+见后续步骤。
+
+【类型汇总表 · 初拟, 待复核】(按注意力降序)
+
+FC (16): 功能 5 / 混合 2 / 领域 9
+  #5  (0.1146) 混合   large/based/white + network/task
+  #6  (0.1136) 混合   features/distributed/parameters/graph
+  #4  (0.1115) 功能   different/both/during/within
+  #2  (0.1038) 功能   which/also/when/time
+  #7  (0.0809) 领域   region/areas/structure/systems
+  #3  (0.0759) 功能   To/For/This/We/An
+  #8  (0.0485) 领域   configuration/organization/nodes/brain
+  #0  (0.0482) 功能·标点 , . ( the and of ;
+  #9  (0.0462) 领域   phase/frequency/communities/Graph
+  #1  (0.0458) 功能   at/on/with/as/that
+  #10 (0.0431) 领域   structures/networks/regions/functional/modules
+  #11 (0.0349) 领域   structural/metrics/traits/fract/hem
+  #13 (0.0344) 领域   oscill/circuits/frequencies/coordination
+  #14 (0.0332) 领域   propagation/spectral/cerebral/entropy/brain
+  #12 (0.0331) 领域   neural/spatial/dynamics/Brain
+  #15 (0.0323) 领域   oscillator/electrode/rhythms/neuronal/EEG
+
+PSD (16): 功能 6 / 混合 2 / 领域 8
+  #2  (0.1161) 功能     The/all/which/their/over
+  #1  (0.1124) 功能     and/with/that/as/or
+  #0  (0.1121) 功能·标点 , : . the ; in of
+  #4  (0.1023) 功能     each/different/between/those
+  #3  (0.0766) 功能     This/these/We/It/when
+  #6  (0.0727) 功能     Some/often/certain/among/age
+  #5  (0.0610) 混合     total/specific/amount/power
+  #7  (0.0393) 领域     levels/pattern/activity/sleep
+  #13 (0.0390) 领域     frequencies/bandwidth/domains/bins
+  #9  (0.0389) 领域     frequency/ratio/percentage/phase
+  #14 (0.0388) 领域     ratios/amplitude/suppression/bands
+  #8  (0.0383) 领域     distribution/band/Power/brain
+  #11 (0.0383) 领域     density/spectrum/freq/bands
+  #15 (0.0382) 领域     spectra/coherence/electrode/EEG/Theta
+  #12 (0.0381) 混合     intervals/ranges/zones/proportion
+  #10 (0.0380) 领域     patterns/channels/dimensions/wave

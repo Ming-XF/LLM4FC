@@ -3,7 +3,9 @@
 """
 conclusion.py
 =============
-汇总六模型实验结果, 渲染 HTML 对比表格 (默认 conclusion.html)。
+汇总六模型实验结果, 渲染 HTML 对比表格 (默认 conclusion.html),
+并在表格下方附四个超参数 (LLM 层数 / top_k / top_m / 融合 token 数)
+的敏感性曲线 (内联 SVG, 同域 CAUEEG test AUC-ROC, 3 seeds mean ± std)。
 
 口径:
   - 主表拆为两张: 同域表 (训练域 → 同域测试) 与跨域零样本表
@@ -36,6 +38,7 @@ conclusion.py
 
 import argparse
 import json
+import math
 import re
 import sys
 from datetime import datetime
@@ -117,6 +120,7 @@ ABL_TRAIN_RE = re.compile(
     r"train_KnowledgeLLM_s(\d+)_caueeg_([a-z0-9]+)_DiseaseCAUEEG\.log")
 ABL_ZS_RE = re.compile(
     r"test_KnowledgeLLM_s(\d+)_([a-z0-9]+)_caueeg_to_tuab_zero-shot_DiseaseTUAB\.log")
+SENS_VARIANT_RE = re.compile(r"^(llm|topk|topm|fusion)\d+$")
 
 
 def discover_ablations():
@@ -132,6 +136,8 @@ def discover_ablations():
             continue
         if variant == "a3a":
             continue  # a3a = no_raw 主方法, 已入主表, 不进消融表
+        if SENS_VARIANT_RE.match(variant):
+            continue  # 敏感性扫描日志, 归入敏感性曲线节, 不进消融表
         met = parse_trainer_log(p)
         if met:
             exps.setdefault(variant, {}).setdefault(
@@ -145,6 +151,8 @@ def discover_ablations():
         if seed not in SEEDS:
             continue
         if variant == "a3a":
+            continue
+        if SENS_VARIANT_RE.match(variant):
             continue
         met = parse_trainer_log(p)
         if met:
@@ -359,6 +367,174 @@ def discover_ofa():
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# 解析: 超参数敏感性分析 (KnowledgeLLM, CAUEEG 同域 test)
+#   扫描格: metrics_KnowledgeLLM_s{seed}_caueeg_{param}{value}_DiseaseCAUEEG.json
+#   锚点格 (tag=None): metrics_KnowledgeLLM_s{seed}_a3a_caueeg_test_DiseaseCAUEEG.json
+#   (a3a 主方法同时取四超参默认值: llm=6 / topk=8 / topm=32 / fusion=16)
+# ─────────────────────────────────────────────────────────────────────────
+
+HYPER_SWEEPS = [
+    # (key, 面板标题, [(x 标签, 扫描 tag or None=锚点), ...])
+    ("llm", "LLM 层数 (knowledge_llm_layers)",
+     [("2", "llm2"), ("4", "llm4"), ("6", None), ("8", "llm8"), ("10", "llm10")]),
+    ("topk", "top_k",
+     [("2", "topk2"), ("4", "topk4"), ("8", None), ("16", "topk16"),
+      ("32", "topk32")]),
+    ("topm", "top_m",
+     [("8", "topm8"), ("16", "topm16"), ("32", None), ("64", "topm64"),
+      ("128", "topm128")]),
+    ("fusion", "融合 token 数 (knowledge_fusion_tokens)",
+     [("4", "fusion4"), ("8", "fusion8"), ("16", None), ("32", "fusion32"),
+      ("64", "fusion64")]),
+]
+
+
+def discover_sensitivity():
+    """{key: [(label, is_anchor, {seed: (metrics, src)})]}"""
+    result = {}
+    for key, _title, values in HYPER_SWEEPS:
+        points = []
+        for label, tag in values:
+            per_seed = {}
+            for seed in SEEDS:
+                if tag is None:
+                    p = (LOG_DIR / f"metrics_KnowledgeLLM_s{seed}_a3a_"
+                         f"caueeg_test_DiseaseCAUEEG.json")
+                else:
+                    p = (LOG_DIR / f"metrics_KnowledgeLLM_s{seed}_caueeg_"
+                         f"{tag}_DiseaseCAUEEG.json")
+                if p.exists():
+                    per_seed[seed] = (_json_metrics(json.loads(
+                        p.read_text(encoding="utf-8"))), p)
+            if per_seed:
+                points.append((label, tag is None, per_seed))
+        result[key] = points
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 渲染: 超参数敏感性曲线 (内联 SVG, 2×2 面板)
+# ─────────────────────────────────────────────────────────────────────────
+
+SENS_ANCHOR_COLOR = "#7c3aed"   # 主方法默认值 (锚点)
+SENS_POINT_COLOR = "#64748b"    # 扫描值
+SENS_GRID_COLOR = "#e5e7eb"
+
+
+def _rel_path(src):
+    p = Path(str(src))
+    if p.is_absolute():
+        try:
+            return str(p.relative_to(REPO))
+        except ValueError:
+            pass
+    return str(src)
+
+
+def _svg_sensitivity_panel(points):
+    """points: [(label, is_anchor, {seed: (metrics, src)})]; y 轴独立缩放"""
+    W, H = 430, 268
+    ML, MR, MT, MB = 46, 12, 28, 36
+    iw, ih = W - ML - MR, H - MT - MB
+    n = len(points)
+    xs = ([ML + iw * (i / (n - 1)) for i in range(n)] if n > 1
+          else [ML + iw / 2])
+
+    lo = hi = None
+    for _label, _is_anchor, per_seed in points:
+        for m, _src in per_seed.values():
+            v = m["auc"]
+            lo = v if lo is None else min(lo, v)
+            hi = v if hi is None else max(hi, v)
+    ymin = math.floor((lo - 0.005) / 0.02) * 0.02
+    ymax = math.ceil((hi + 0.005) / 0.02) * 0.02
+    span = max(ymax - ymin, 1e-6)
+    # 刻度步长自适应: 目标 ~5-6 条网格线
+    step = min([0.01, 0.02, 0.025, 0.05, 0.1],
+               key=lambda s: abs(span / s - 5))
+
+    def y(v):
+        return MT + ih * (1 - (v - ymin) / span)
+
+    parts = []
+    # y 轴网格 + 刻度
+    t = ymin
+    while t <= ymax + 1e-9:
+        ty = y(t)
+        parts.append(f'<line x1="{ML}" y1="{ty:.1f}" x2="{W - MR}" '
+                     f'y2="{ty:.1f}" stroke="{SENS_GRID_COLOR}"/>')
+        parts.append(f'<text x="{ML - 6}" y="{ty + 4:.1f}" '
+                     f'text-anchor="end" font-size="10" fill="#777">'
+                     f'{t * 100:.0f}</text>')
+        t += step
+
+    means, stds = [], []
+    for label, is_anchor, per_seed in points:
+        vals = [m["auc"] for m, _ in per_seed.values()]
+        mean = sum(vals) / len(vals)
+        means.append(mean)
+        if len(vals) > 1:
+            var = sum((v - mean) ** 2 for v in vals) / (len(vals) - 1)
+            stds.append(var ** 0.5)
+        else:
+            stds.append(0.0)
+
+    poly = " ".join(f"{x:.1f},{y(m):.1f}" for x, m in zip(xs, means))
+    parts.append(f'<polyline points="{poly}" fill="none" '
+                 f'stroke="{SENS_POINT_COLOR}" stroke-width="1.6"/>')
+
+    for i, (label, is_anchor, per_seed) in enumerate(points):
+        x, m, s = xs[i], means[i], stds[i]
+        color = SENS_ANCHOR_COLOR if is_anchor else SENS_POINT_COLOR
+        r = 5 if is_anchor else 3.5
+        y_top = y(max(m - s, ymin))
+        y_bot = y(min(m + s, ymax))
+        tip = [f"数值 = {label}" + (" (主方法默认值)" if is_anchor else "")]
+        tip.append(f"mean ± std: {m * 100:.2f} ± {s * 100:.2f}")
+        for seed in sorted(per_seed):
+            met, src = per_seed[seed]
+            tip.append(f"seed {seed}: AUC={met['auc'] * 100:.2f}"
+                       f"  ({_rel_path(src)})")
+        parts.append(
+            f'<g><title>{escape(chr(10).join(tip))}</title>'
+            f'<line x1="{x:.1f}" y1="{y_top:.1f}" x2="{x:.1f}" '
+            f'y2="{y_bot:.1f}" stroke="{color}" stroke-width="1.2"/>'
+            f'<circle cx="{x:.1f}" cy="{y(m):.1f}" r="{r}" fill="{color}" '
+            f'stroke="#fff" stroke-width="1.5"/></g>')
+        xl = f"{label}·默认" if is_anchor else label
+        parts.append(
+            f'<text x="{x:.1f}" y="{H - MB + 15:.1f}" text-anchor="middle" '
+            f'font-size="10" {"font-weight=\"700\"" if is_anchor else ""} '
+            f'fill="{color}">{escape(xl)}</text>')
+
+    return (f'<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">'
+            + "".join(parts) + "</svg>")
+
+
+def _sensitivity_section():
+    sweeps = discover_sensitivity()
+    if not sweeps:
+        return ""
+    panels = []
+    for key, title, _values in HYPER_SWEEPS:
+        points = sweeps.get(key)
+        if not points:
+            continue
+        svg = _svg_sensitivity_panel(points)
+        panels.append(f'<div class="sens-panel">{svg}'
+                      f'<div class="sens-cap">{escape(title)}</div></div>')
+
+    legend = ('<div class="sens-legend">'
+              f'<span class="sw">●</span> 扫描值 (3 seeds mean ± std)'
+              f'&nbsp;&nbsp; <span class="an">●</span> 主方法默认值 (锚点)'
+              f'&nbsp;&nbsp; 各面板 y 轴独立缩放'
+              '</div>')
+    return ('<h2>超参数敏感性分析 (KnowledgeLLM · CAUEEG 同域 test AUC-ROC)'
+            '</h2>\n' + legend + '\n<div class="sens-grid">'
+            + "".join(panels) + "</div>")
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # 聚合 + 渲染
 # ─────────────────────────────────────────────────────────────────────────
 
@@ -568,6 +744,7 @@ def build_html():
                 f'  <tbody>\n{chr(10).join(tbody)}\n  </tbody>\n</table>')
 
     tables = tables + "\n" + _ablation_table(cells)
+    tables = tables + "\n" + _sensitivity_section()
 
     n_baseline_cells = 0
     for (model, _, _), c in cells.items():
@@ -599,6 +776,11 @@ def build_html():
                  "<b>Δ = 变体 mean − 主方法 mean</b>; <b>加粗</b> = 该列最佳 "
                  "mean; 悬浮提示列出各 seed 数值与来源。A1/A2a/A3c/A3b/A4/A5 "
                  "基于含 raw 的三模态设置运行 (设置差异后续说明)。")
+    notes.append("· 敏感性曲线: 四超参 (LLM 层数 / top_k / top_m / 融合 token 数) "
+                 "各自 5 格 (含主方法默认值锚点), <b>CAUEEG 同域 test "
+                 "AUC-ROC</b>, <b>3 seeds mean ± std</b>; 折线连接均值, "
+                 "误差棒为 ±1 std, 紫色点 = 主方法默认值, 悬浮提示列出逐 seed "
+                 "数值与来源文件。")
 
     note_items = "".join(f"<li>{n}</li>" for n in notes)
 
@@ -647,6 +829,13 @@ def build_html():
   td.cell span.best {{ font-weight: 700; color: #b91c1c; }}
   td.empty {{ color: #bbb; }}
   .notes {{ font-size: 12px; color: #666; margin-top: 14px; line-height: 1.7; max-width: 980px; }}
+  .sens-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 940px; }}
+  .sens-panel {{ background: #fff; border: 1px solid #e3e6eb; padding: 6px 8px 2px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }}
+  .sens-panel svg {{ display: block; width: 100%; height: auto; }}
+  .sens-cap {{ font-size: 12px; font-weight: 600; color: #333; margin: 2px 4px 4px; }}
+  .sens-legend {{ font-size: 12px; color: #555; margin: 4px 0 8px; }}
+  .sens-legend .sw {{ color: #64748b; }}
+  .sens-legend .an {{ color: #7c3aed; }}
   .notes li {{ margin: 2px 0; }}
   .srcs {{ font-size: 12px; color: #555; margin-top: 18px; max-width: 980px; }}
   .srcs h3 {{ font-size: 13px; margin: 10px 0 4px; color: #333; }}
@@ -684,6 +873,10 @@ def main():
     abl = discover_ablations()
     print(f"消融变体 {len(abl)} 个: "
           + ", ".join(sorted(abl)) if abl else "(无)")
+    sens = discover_sensitivity()
+    print("敏感性曲线: " + ", ".join(
+        f"{k}×{len(v)}格" for k, v in sens.items()) if sens else
+        "敏感性曲线: (无数据)")
 
 
 if __name__ == "__main__":

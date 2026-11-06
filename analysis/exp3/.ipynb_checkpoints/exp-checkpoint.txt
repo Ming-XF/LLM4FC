@@ -1,0 +1,19 @@
+实验三：知识 token 语义分析（试验一）
+====================================
+
+【实验目的】
+回答：进 LLM 的"知识 token"（每样本 22 个 = FC 1 + PSD 21 的 reprogramming
+输出向量）在语言空间里对应什么 —— "LLM 实际读到的文本是什么"。
+
+【方法】
+- case：CAUEEG/TUAB test 各取 2 正 + 2 负 = 8 个样本（按遇到顺序）；
+- 知识 token 取法与评估路径完全一致：model._encode_modalities +
+  model._knowledge_tokens（use_captured_fusion 快照，eval 模式），
+  PSD 去 OFA replicate 尾部 pad（同 exp1 口径）；
+- 语义表示：与 LLM 输入词表嵌入（embed_tokens，与 mapper/LLM 输入同一
+  空间）的余弦相似度 top-5 词，排除特殊 token；
+- 产物：results/knowledge_token_semantics.txt（每样本每位置 top-5 词 +
+  相似度）、results/knowledge_token_semantics.png（8 样本 × 22 位置网格，
+  每格 top-1 词、底色 = 相似度）、results/knowledge_tokens.npz。
+
+【运行】sh analysis/exp3/run_interpret.sh（单卡，推理无反向）

@@ -1,9 +1,15 @@
-实验二：融合 token 语义解码
-============================================================================
+实验二：融合 token 与知识集内容分析（三个部分）
+====================================================
 
 【实验目的】
-回答：被重编程注意力选中的融合 token 在语义上是什么？
+知识集（171 词/模态）太细碎、无统一分类标准，故以模型学出的 16 个融合
+token 为透镜刻画其内容：融合 token 由什么词组成（A）、与知识集的相似度
+（B）、汇聚了知识集中的哪些词、这些词是什么性质（C），并回答"领域知识
+是否被使用"（叠加 exp1 注意力）。
 
+────────────────────────────────────────────────────────
+部分 A：融合 token 语义解码（mapping 权重 top-8）
+────────────────────────────────────────────────────────
 【方法】
 - 直接从 ckpt（s42_a3a val-best）读取训练时的 token_ids (171) 与
   mapping.weight (16x171)，用 Llama tokenizer 将每个融合 token 解码为
@@ -20,9 +26,56 @@
    communities/Graph/phase/frequency (#9)、regions/networks/functional/
    modules (#10) 等，注意力约为最高 token 的一半；PSD 侧最低注意力的
    #10 (0.0380) 解码为 amounts/wave/synchron/powers——频域术语同样被冷落。
+产物：results/fusion_decoding_{fc,psd}.txt、results/mapping_weights.npz。
+复跑：sh analysis/exp2/run_decode.sh（纯 CPU，约 1 分钟）。
+
+────────────────────────────────────────────────────────
+部分 B：知识银行复现 + 余弦热图
+────────────────────────────────────────────────────────
+【方法】
+- 银行复现（extract_bank_reproduce.py）：与训练启动路径逐式一致地在全量
+  8B bf16 上重跑知识银行抽取（top_k=8/top_m=32/temp=1.0），验证后保存；
+- 诊断结论：重抽取完全自洽（两次逐位相同），与 ckpt 重叠 98-99%（fc
+  168/171、psd 169/171、raw 204/207）——差异为训练时 topk 边界数值噪声，
+  ckpt 的 token_ids 才是 mapper 实际消费的精确知识集，以其为权威保存
+  （results/knowledge_bank_s42.npz，可被 --knowledge_bank_path 复用）；
+- 余弦热图（cosine_heatmap.py）：16 融合 token × 171 银行词余弦相似度
+  （融合向量 = ckpt 快照；银行词嵌入 = LLM 输入词嵌入），全 171 列，
+  行按注意力降序。
+
+【核心发现】
+1. 余弦 ≈ mapping 权重的几何平滑，两种解码互相印证：每行的最近邻银行词
+   正是该行 mapping top 词（t5 → large/based/network；psd t0 → 标点；
+   低注意力行 → 领域词）；
+2. 整体余弦低（mean ~0.15, max ~0.6）：融合向量是 171 词的弥散混合，
+   离任何单个词都远——"弥散组合而非检索命名概念"的量化证据；
+3. 热图直观显示不同融合 token 汇聚不同知识词（16 个可解释单元）。
+产物：results/knowledge_bank_s42.npz、results/cosine_fc_psd.npz、
+  results/cosine_{fc,psd}.png。
+复跑：sh analysis/exp2/run_extract.sh（需单卡 ≥20GB）→
+  sh analysis/exp2/run_cosine.sh（纯 CPU）。
+
+────────────────────────────────────────────────────────
+部分 C：融合 token 透镜——知识集归属与判定（fusion_lens_profile.py）
+────────────────────────────────────────────────────────
+【方法】
+- 基于部分 B 的余弦矩阵：每个银行词按 argmax 归属到某融合 token；
+- 每融合 token 输出：注意力（exp1）+ 归属词全表（按余弦降序）+ 归属词数；
+- 内容性质判定由人读词表给出（sidecar: fusion_lens_judgments.txt，
+  脚本重跑不覆盖人工内容）。
+
+【核心发现（初拟，待人工复核）】
+1. 类型汇总：FC 16 个 = 功能 5 / 混合 2 / 领域 9；PSD 16 个 = 功能 6 /
+   混合 2 / 领域 8；
+2. 两模态一致：高注意力融合 token = 功能/标点词型，低注意力融合 token =
+   领域词型——模型主要注意力放在"结构词"原型上，领域词原型被冷落（但非
+   零）；
+3. 与 exp3 LLM 输入解码（终点呈领域语义）的三角对照：语义在管线终点
+   （LLM 输入）才清晰，中间件（融合 token）层呈"功能词主导"。
+产物：results/fusion_lens_profile.txt（机算表 + 人工判定合并）、
+  results/fusion_lens_profile.png。
+复跑：sh analysis/exp2/run_profile.sh（纯 CPU）。
 
 【技术备注】
 - "Ġ" 为 Llama 词首空格符号；"âĢĶ" 是知识语料本身含有的 mojibake 符号；
-- 产物：results/fusion_decoding_fc.txt、results/fusion_decoding_psd.txt、
-  results/mapping_weights.npz；
-- 复跑：sh analysis/exp2/run_decode.sh（纯 CPU，约 1 分钟）。
+- 所有部分共用：s42 a3a ckpt、exp1 注意力、LLM 输入词嵌入（shard 1）。

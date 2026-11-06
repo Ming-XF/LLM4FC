@@ -10,7 +10,7 @@
 - 同域 (CAUEEG test) 与跨域 (TUAB test) 各 16 正 + 16 负样本，报告：
   每个融合 token 的平均注意力、参与率 (effective token 数)、top-3、跨域相关性；
 - 产物：analysis/results/attn_fc_psd.npz + fc_attention.png +
-  psd_attention_{caueeg,tuab}.png + stats.json。
+  psd_attention.png (patch 维平均柱状图) + stats.json。
 
 运行：sh analysis/exp1/run_interpret.sh
 """
@@ -243,27 +243,29 @@ def make_figures(results, stats):
                 bbox_inches='tight')
     plt.close(fig)
 
-    # ── PSD: patch token x 16 融合 token 热力图 (每域一张) ──
-    for d in results:
-        mat = results[d]['psd'].mean(axis=(0, 1))          # (L, 16)
-        fig, ax = plt.subplots(figsize=(7, 3.6))
-        im = ax.imshow(mat, aspect='auto', cmap='viridis')
-        for i in range(mat.shape[0]):
-            for j in range(mat.shape[1]):
-                v = mat[i, j]
-                ax.text(j, i, f'{v:.2f}', ha='center', va='center',
-                        fontsize=7,
-                        color='white' if v > np.percentile(mat, 60) else '0.2')
-        ax.set_xticks(np.arange(16))
-        ax.set_xlabel('PSD 融合 token 索引 (16)')
-        ax.set_yticks(np.arange(mat.shape[0]))
-        ax.set_ylabel('PSD patch token')
-        ax.set_title(f'PSD 重编程注意力 — {DOMAIN_LABEL[d]}')
-        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-        fig.tight_layout()
-        fig.savefig(os.path.join(OUT_DIR, f'psd_attention_{d}.png'), dpi=200,
-                    bbox_inches='tight')
-        plt.close(fig)
+    # ── PSD: patch 维平均后 -> 16 融合 token 柱状图 (两域并列, 与 FC 同款) ──
+    psd_r = stats['cross_domain_corr']['psd']
+    PSD_LABEL = {'caueeg': 'CAUEEG (same-domain)',
+                 'tuab': 'TUAB (cross-domain)'}
+    psd = {d: results[d]['psd'].mean(axis=(0, 1, 2)) for d in results}   # (16,)
+    psd_std = {d: results[d]['psd'].mean(axis=2).reshape(-1, 16).std(axis=0)
+               for d in results}
+    x = np.arange(16)
+    fig, ax = plt.subplots(figsize=(9, 3.2))
+    for k, d in enumerate(results):
+        ax.bar(x + (k - 0.5) * 0.38, psd[d], width=0.38,
+               yerr=psd_std[d], capsize=2, color=COLOR[d],
+               label=PSD_LABEL[d])
+    ax.set_xticks(x)
+    ax.set_xlabel('PSD fusion token index (16)')
+    ax.set_ylabel('Mean cross-attention')
+    ax.set_title(f'PSD reprogramming attention (averaged over patch tokens, '
+                 f'r = {psd_r:.3f})')
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT_DIR, 'psd_attention.png'), dpi=200,
+                bbox_inches='tight')
+    plt.close(fig)
 
     print(f"图片已写入 {OUT_DIR}")
 
