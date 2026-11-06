@@ -1,0 +1,730 @@
+11/05/2026 22:41:34 - INFO - __main__ -   ########## Repeat:0 ##########
+11/05/2026 22:41:34 - INFO - __main__ -   ==================== Explicit args ====================
+  append: _s44_caueeg_topm16
+  contrast_lambda: 0.3
+  d_model: 128
+  dataset: DiseaseCAUEEG
+  deepspeed: True
+  deepspeed_config: deepspeed/train_patch.json
+  do_evaluate: True
+  do_test: True
+  do_train: True
+  dropout: 0.1
+  early_stop_metric: AUC
+  early_stop_patience: 20
+  few_shot: 0
+  knowledge_bank: 
+  knowledge_contrast_temperature: 0.2
+  knowledge_fc_patch: 1
+  knowledge_fc_stride: 1
+  knowledge_fusion_tokens: 16
+  knowledge_llm_layers: 6
+  knowledge_modalities: no_raw
+  knowledge_psd_patch: 8
+  knowledge_psd_stride: 4
+  knowledge_raw_patch: 200
+  knowledge_raw_stride: 200
+  knowledge_temperature: 1.0
+  knowledge_top_k: 8
+  knowledge_top_m: 16
+  llm_init: pretrained
+  llm_path: ./model/deepseek-r1-distill-llama-8B
+  llm_type: llama
+  local_rank: 0
+  model: KnowledgeLLM
+  model_dir: output_dir/output_dir_sens_topm/M16_s44
+  num_epochs: 200
+  num_heads: 8
+  num_repeat: 1
+  save_steps: 25
+  schedule: cos
+  seed: 44
+  warmup_steps: 400
+  [effective] batch_size: 32, learning_rate: 0.0001
+11/05/2026 22:41:34 - INFO - __main__ -   ==================== Full args (resolved) ====================
+  D: 2
+  F1: 8
+  abla_channel: -1
+  abla_vae: n
+  activation: gelu
+  alpha: 1.0
+  append: _s44_caueeg_topm16
+  batch_size: 32
+  beta: 1.0
+  beta1: 0.9
+  beta2: 0.98
+  contrast_lambda: 0.3
+  d_ff: 128
+  d_model: 128
+  data_processors: 0
+  dataset: DiseaseCAUEEG
+  deepspeed: True
+  deepspeed_config: deepspeed/train_patch.json
+  device: cuda
+  distill: False
+  do_evaluate: True
+  do_parallel: False
+  do_test: True
+  do_train: True
+  drop_last: False
+  dropout: 0.1
+  early_stop_metric: AUC
+  early_stop_patience: 20
+  eps: 1e-08
+  epsilon: 1e-09
+  except_rule: None
+  few_shot: 0
+  few_shot_seed: 42
+  freeze_head_bias: True
+  frequency: 500
+  initializer: None
+  k: 5
+  knowledge_anchor_candidates: 1000
+  knowledge_anchor_fusion: 0.1
+  knowledge_anchors: 10
+  knowledge_aspect_mix: 0.6
+  knowledge_bank: 
+  knowledge_contrast_temperature: 0.2
+  knowledge_cross_attention: True
+  knowledge_description_candidates: 1000
+  knowledge_description_prototypes: 100
+  knowledge_fc_patch: 1
+  knowledge_fc_stride: 1
+  knowledge_fusion_tokens: 16
+  knowledge_llm_layers: 6
+  knowledge_modalities: no_raw
+  knowledge_psd_patch: 8
+  knowledge_psd_stride: 4
+  knowledge_raw_patch: 200
+  knowledge_raw_stride: 200
+  knowledge_similarity: centered_cosine
+  knowledge_temperature: 1.0
+  knowledge_top_k: 8
+  knowledge_top_m: 16
+  learning_rate: 0.0001
+  llm_init: pretrained
+  llm_path: ./model/deepseek-r1-distill-llama-8B
+  llm_type: llama
+  local_rank: 0
+  log_dir: ./log_dir
+  match_rule: None
+  max_learning_rate: 0.001
+  max_steps: -1
+  model: KnowledgeLLM
+  model_dir: output_dir/output_dir_sens_topm/M16_s44
+  no_weight_decay: False
+  num_epochs: 200
+  num_heads: 8
+  num_kernels: 5
+  num_prototypes: 500
+  num_repeat: 1
+  num_windows: 10
+  num_workers: 5
+  optimizer: Adam
+  p1: 4
+  p2: 8
+  pretrain_path: 
+  project: 
+  save_steps: 25
+  schedule: cos
+  seed: 44
+  sparsity: 0.7
+  standard_split: False
+  target_learning_rate: 1e-05
+  train_set: 0.6
+  use_patch_embeds: True
+  use_semantic_prototypes: True
+  use_task_prompt: False
+  val_set: 0.2
+  visualize: False
+  wandb_entity: cwg
+  warmup_steps: 400
+  weight_decay: 0.0001
+11/05/2026 22:41:34 - INFO - utils.trainer -   ***** Running training *****
+11/05/2026 22:41:34 - INFO - utils.trainer -     Num examples = 56
+11/05/2026 22:41:34 - INFO - utils.trainer -     Num Epochs = 200
+11/05/2026 22:41:34 - INFO - utils.trainer -     Total train batch size = 32
+11/05/2026 22:41:34 - INFO - utils.trainer -     warmup steps = 400
+11/05/2026 22:41:34 - INFO - utils.trainer -     Total optimization steps = 11200
+11/05/2026 22:41:34 - INFO - utils.trainer -     Save steps = 25
+11/05/2026 22:41:50 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:41:52 - INFO - utils.trainer -   Loss: 0.83229
+11/05/2026 22:41:52 - INFO - utils.trainer -   AUC: 0.73006
+11/05/2026 22:41:52 - INFO - utils.trainer -   AUC_PR: 0.73390
+11/05/2026 22:41:52 - INFO - utils.trainer -   Accuracy: 0.45553
+11/05/2026 22:41:52 - INFO - utils.trainer -   Precision: 0.00000
+11/05/2026 22:41:52 - INFO - utils.trainer -   Specificity: 1.00000
+11/05/2026 22:41:52 - INFO - utils.trainer -   Sensitivity: 0.00000
+11/05/2026 22:41:52 - INFO - utils.trainer -   BalancedAccuracy: 0.50000
+11/05/2026 22:41:52 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:41:52 - INFO - utils.trainer -   Best model saved (val_AUC=0.7301)
+11/05/2026 22:41:52 - INFO - utils.trainer -   Epoch: 1, Loss: 0.90839, Val loss: 0.83229, Val AUC: 0.7301, Best val AUC: 0.7301, No improve: 0/20, Time: 16.2s
+11/05/2026 22:42:07 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:42:10 - INFO - utils.trainer -   Loss: 0.77519
+11/05/2026 22:42:10 - INFO - utils.trainer -   AUC: 0.70185
+11/05/2026 22:42:10 - INFO - utils.trainer -   AUC_PR: 0.67455
+11/05/2026 22:42:10 - INFO - utils.trainer -   Accuracy: 0.67925
+11/05/2026 22:42:10 - INFO - utils.trainer -   Precision: 0.67220
+11/05/2026 22:42:10 - INFO - utils.trainer -   Specificity: 0.53254
+11/05/2026 22:42:10 - INFO - utils.trainer -   Sensitivity: 0.80198
+11/05/2026 22:42:10 - INFO - utils.trainer -   BalancedAccuracy: 0.66726
+11/05/2026 22:42:10 - INFO - utils.trainer -   Epoch: 2, Loss: 0.88787, Val loss: 0.77519, Val AUC: 0.7019, Best val AUC: 0.7301, No improve: 1/20, Time: 15.4s
+11/05/2026 22:42:25 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:42:27 - INFO - utils.trainer -   Loss: 0.74421
+11/05/2026 22:42:27 - INFO - utils.trainer -   AUC: 0.75613
+11/05/2026 22:42:27 - INFO - utils.trainer -   AUC_PR: 0.72628
+11/05/2026 22:42:27 - INFO - utils.trainer -   Accuracy: 0.63881
+11/05/2026 22:42:27 - INFO - utils.trainer -   Precision: 0.61296
+11/05/2026 22:42:27 - INFO - utils.trainer -   Specificity: 0.31065
+11/05/2026 22:42:27 - INFO - utils.trainer -   Sensitivity: 0.91337
+11/05/2026 22:42:27 - INFO - utils.trainer -   BalancedAccuracy: 0.61201
+11/05/2026 22:42:27 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:42:27 - INFO - utils.trainer -   Best model saved (val_AUC=0.7561)
+11/05/2026 22:42:27 - INFO - utils.trainer -   Epoch: 3, Loss: 0.83817, Val loss: 0.74421, Val AUC: 0.7561, Best val AUC: 0.7561, No improve: 0/20, Time: 15.4s
+11/05/2026 22:42:43 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:42:45 - INFO - utils.trainer -   Loss: 0.68431
+11/05/2026 22:42:45 - INFO - utils.trainer -   AUC: 0.82025
+11/05/2026 22:42:45 - INFO - utils.trainer -   AUC_PR: 0.85920
+11/05/2026 22:42:45 - INFO - utils.trainer -   Accuracy: 0.72507
+11/05/2026 22:42:45 - INFO - utils.trainer -   Precision: 0.87037
+11/05/2026 22:42:45 - INFO - utils.trainer -   Specificity: 0.89645
+11/05/2026 22:42:45 - INFO - utils.trainer -   Sensitivity: 0.58168
+11/05/2026 22:42:45 - INFO - utils.trainer -   BalancedAccuracy: 0.73907
+11/05/2026 22:42:45 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:42:45 - INFO - utils.trainer -   Best model saved (val_AUC=0.8203)
+11/05/2026 22:42:45 - INFO - utils.trainer -   Epoch: 4, Loss: 0.80660, Val loss: 0.68431, Val AUC: 0.8203, Best val AUC: 0.8203, No improve: 0/20, Time: 15.3s
+11/05/2026 22:43:00 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:43:02 - INFO - utils.trainer -   Loss: 0.66750
+11/05/2026 22:43:02 - INFO - utils.trainer -   AUC: 0.82454
+11/05/2026 22:43:02 - INFO - utils.trainer -   AUC_PR: 0.86649
+11/05/2026 22:43:02 - INFO - utils.trainer -   Accuracy: 0.72911
+11/05/2026 22:43:02 - INFO - utils.trainer -   Precision: 0.87732
+11/05/2026 22:43:02 - INFO - utils.trainer -   Specificity: 0.90237
+11/05/2026 22:43:02 - INFO - utils.trainer -   Sensitivity: 0.58416
+11/05/2026 22:43:02 - INFO - utils.trainer -   BalancedAccuracy: 0.74326
+11/05/2026 22:43:03 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:43:03 - INFO - utils.trainer -   Best model saved (val_AUC=0.8245)
+11/05/2026 22:43:03 - INFO - utils.trainer -   Epoch: 5, Loss: 0.74530, Val loss: 0.66750, Val AUC: 0.8245, Best val AUC: 0.8245, No improve: 0/20, Time: 15.3s
+11/05/2026 22:43:18 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:43:20 - INFO - utils.trainer -   Loss: 0.62755
+11/05/2026 22:43:20 - INFO - utils.trainer -   AUC: 0.82653
+11/05/2026 22:43:20 - INFO - utils.trainer -   AUC_PR: 0.86729
+11/05/2026 22:43:20 - INFO - utils.trainer -   Accuracy: 0.74124
+11/05/2026 22:43:20 - INFO - utils.trainer -   Precision: 0.79121
+11/05/2026 22:43:20 - INFO - utils.trainer -   Specificity: 0.77515
+11/05/2026 22:43:20 - INFO - utils.trainer -   Sensitivity: 0.71287
+11/05/2026 22:43:20 - INFO - utils.trainer -   BalancedAccuracy: 0.74401
+11/05/2026 22:43:20 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:43:20 - INFO - utils.trainer -   Best model saved (val_AUC=0.8265)
+11/05/2026 22:43:20 - INFO - utils.trainer -   Epoch: 6, Loss: 0.72068, Val loss: 0.62755, Val AUC: 0.8265, Best val AUC: 0.8265, No improve: 0/20, Time: 15.2s
+11/05/2026 22:43:36 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:43:38 - INFO - utils.trainer -   Loss: 0.65063
+11/05/2026 22:43:38 - INFO - utils.trainer -   AUC: 0.82709
+11/05/2026 22:43:38 - INFO - utils.trainer -   AUC_PR: 0.86997
+11/05/2026 22:43:38 - INFO - utils.trainer -   Accuracy: 0.72372
+11/05/2026 22:43:38 - INFO - utils.trainer -   Precision: 0.86447
+11/05/2026 22:43:38 - INFO - utils.trainer -   Specificity: 0.89053
+11/05/2026 22:43:38 - INFO - utils.trainer -   Sensitivity: 0.58416
+11/05/2026 22:43:38 - INFO - utils.trainer -   BalancedAccuracy: 0.73735
+11/05/2026 22:43:38 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:43:38 - INFO - utils.trainer -   Best model saved (val_AUC=0.8271)
+11/05/2026 22:43:38 - INFO - utils.trainer -   Epoch: 7, Loss: 0.71483, Val loss: 0.65063, Val AUC: 0.8271, Best val AUC: 0.8271, No improve: 0/20, Time: 15.4s
+11/05/2026 22:43:53 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:43:55 - INFO - utils.trainer -   Loss: 0.62284
+11/05/2026 22:43:55 - INFO - utils.trainer -   AUC: 0.82906
+11/05/2026 22:43:55 - INFO - utils.trainer -   AUC_PR: 0.87207
+11/05/2026 22:43:55 - INFO - utils.trainer -   Accuracy: 0.75337
+11/05/2026 22:43:55 - INFO - utils.trainer -   Precision: 0.86230
+11/05/2026 22:43:55 - INFO - utils.trainer -   Specificity: 0.87574
+11/05/2026 22:43:55 - INFO - utils.trainer -   Sensitivity: 0.65099
+11/05/2026 22:43:55 - INFO - utils.trainer -   BalancedAccuracy: 0.76336
+11/05/2026 22:43:56 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:43:56 - INFO - utils.trainer -   Best model saved (val_AUC=0.8291)
+11/05/2026 22:43:56 - INFO - utils.trainer -   Epoch: 8, Loss: 0.71716, Val loss: 0.62284, Val AUC: 0.8291, Best val AUC: 0.8291, No improve: 0/20, Time: 15.2s
+11/05/2026 22:44:11 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:44:13 - INFO - utils.trainer -   Loss: 0.64976
+11/05/2026 22:44:13 - INFO - utils.trainer -   AUC: 0.83084
+11/05/2026 22:44:13 - INFO - utils.trainer -   AUC_PR: 0.87000
+11/05/2026 22:44:13 - INFO - utils.trainer -   Accuracy: 0.71563
+11/05/2026 22:44:13 - INFO - utils.trainer -   Precision: 0.89069
+11/05/2026 22:44:13 - INFO - utils.trainer -   Specificity: 0.92012
+11/05/2026 22:44:13 - INFO - utils.trainer -   Sensitivity: 0.54455
+11/05/2026 22:44:13 - INFO - utils.trainer -   BalancedAccuracy: 0.73234
+11/05/2026 22:44:13 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:44:13 - INFO - utils.trainer -   Best model saved (val_AUC=0.8308)
+11/05/2026 22:44:13 - INFO - utils.trainer -   Epoch: 9, Loss: 0.68923, Val loss: 0.64976, Val AUC: 0.8308, Best val AUC: 0.8308, No improve: 0/20, Time: 15.2s
+11/05/2026 22:44:29 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:44:31 - INFO - utils.trainer -   Loss: 0.66715
+11/05/2026 22:44:31 - INFO - utils.trainer -   AUC: 0.83670
+11/05/2026 22:44:31 - INFO - utils.trainer -   AUC_PR: 0.87693
+11/05/2026 22:44:31 - INFO - utils.trainer -   Accuracy: 0.71563
+11/05/2026 22:44:31 - INFO - utils.trainer -   Precision: 0.92140
+11/05/2026 22:44:31 - INFO - utils.trainer -   Specificity: 0.94675
+11/05/2026 22:44:31 - INFO - utils.trainer -   Sensitivity: 0.52228
+11/05/2026 22:44:31 - INFO - utils.trainer -   BalancedAccuracy: 0.73451
+11/05/2026 22:44:31 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:44:31 - INFO - utils.trainer -   Best model saved (val_AUC=0.8367)
+11/05/2026 22:44:31 - INFO - utils.trainer -   Epoch: 10, Loss: 0.68597, Val loss: 0.66715, Val AUC: 0.8367, Best val AUC: 0.8367, No improve: 0/20, Time: 15.4s
+11/05/2026 22:44:46 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:44:48 - INFO - utils.trainer -   Loss: 0.64932
+11/05/2026 22:44:48 - INFO - utils.trainer -   AUC: 0.83368
+11/05/2026 22:44:48 - INFO - utils.trainer -   AUC_PR: 0.87363
+11/05/2026 22:44:48 - INFO - utils.trainer -   Accuracy: 0.73450
+11/05/2026 22:44:48 - INFO - utils.trainer -   Precision: 0.89961
+11/05/2026 22:44:48 - INFO - utils.trainer -   Specificity: 0.92308
+11/05/2026 22:44:48 - INFO - utils.trainer -   Sensitivity: 0.57673
+11/05/2026 22:44:48 - INFO - utils.trainer -   BalancedAccuracy: 0.74990
+11/05/2026 22:44:48 - INFO - utils.trainer -   Epoch: 11, Loss: 0.67122, Val loss: 0.64932, Val AUC: 0.8337, Best val AUC: 0.8367, No improve: 1/20, Time: 14.9s
+11/05/2026 22:45:03 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:45:05 - INFO - utils.trainer -   Loss: 0.70996
+11/05/2026 22:45:05 - INFO - utils.trainer -   AUC: 0.83690
+11/05/2026 22:45:05 - INFO - utils.trainer -   AUC_PR: 0.86874
+11/05/2026 22:45:05 - INFO - utils.trainer -   Accuracy: 0.70620
+11/05/2026 22:45:05 - INFO - utils.trainer -   Precision: 0.92273
+11/05/2026 22:45:05 - INFO - utils.trainer -   Specificity: 0.94970
+11/05/2026 22:45:05 - INFO - utils.trainer -   Sensitivity: 0.50248
+11/05/2026 22:45:05 - INFO - utils.trainer -   BalancedAccuracy: 0.72609
+11/05/2026 22:45:05 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:45:05 - INFO - utils.trainer -   Best model saved (val_AUC=0.8369)
+11/05/2026 22:45:05 - INFO - utils.trainer -   Epoch: 12, Loss: 0.68648, Val loss: 0.70996, Val AUC: 0.8369, Best val AUC: 0.8369, No improve: 0/20, Time: 15.1s
+11/05/2026 22:45:21 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:45:23 - INFO - utils.trainer -   Loss: 0.67552
+11/05/2026 22:45:23 - INFO - utils.trainer -   AUC: 0.84298
+11/05/2026 22:45:23 - INFO - utils.trainer -   AUC_PR: 0.88018
+11/05/2026 22:45:23 - INFO - utils.trainer -   Accuracy: 0.71024
+11/05/2026 22:45:23 - INFO - utils.trainer -   Precision: 0.90213
+11/05/2026 22:45:23 - INFO - utils.trainer -   Specificity: 0.93195
+11/05/2026 22:45:23 - INFO - utils.trainer -   Sensitivity: 0.52475
+11/05/2026 22:45:23 - INFO - utils.trainer -   BalancedAccuracy: 0.72835
+11/05/2026 22:45:23 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:45:23 - INFO - utils.trainer -   Best model saved (val_AUC=0.8430)
+11/05/2026 22:45:23 - INFO - utils.trainer -   Epoch: 13, Loss: 0.65131, Val loss: 0.67552, Val AUC: 0.8430, Best val AUC: 0.8430, No improve: 0/20, Time: 15.6s
+11/05/2026 22:45:39 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:45:41 - INFO - utils.trainer -   Loss: 0.60478
+11/05/2026 22:45:41 - INFO - utils.trainer -   AUC: 0.84129
+11/05/2026 22:45:41 - INFO - utils.trainer -   AUC_PR: 0.87195
+11/05/2026 22:45:41 - INFO - utils.trainer -   Accuracy: 0.75202
+11/05/2026 22:45:41 - INFO - utils.trainer -   Precision: 0.75000
+11/05/2026 22:45:41 - INFO - utils.trainer -   Specificity: 0.67456
+11/05/2026 22:45:41 - INFO - utils.trainer -   Sensitivity: 0.81683
+11/05/2026 22:45:41 - INFO - utils.trainer -   BalancedAccuracy: 0.74569
+11/05/2026 22:45:41 - INFO - utils.trainer -   Epoch: 14, Loss: 0.62658, Val loss: 0.60478, Val AUC: 0.8413, Best val AUC: 0.8430, No improve: 1/20, Time: 15.4s
+11/05/2026 22:45:56 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:45:58 - INFO - utils.trainer -   Loss: 0.60401
+11/05/2026 22:45:58 - INFO - utils.trainer -   AUC: 0.84081
+11/05/2026 22:45:58 - INFO - utils.trainer -   AUC_PR: 0.87128
+11/05/2026 22:45:58 - INFO - utils.trainer -   Accuracy: 0.76550
+11/05/2026 22:45:58 - INFO - utils.trainer -   Precision: 0.84848
+11/05/2026 22:45:58 - INFO - utils.trainer -   Specificity: 0.85207
+11/05/2026 22:45:58 - INFO - utils.trainer -   Sensitivity: 0.69307
+11/05/2026 22:45:58 - INFO - utils.trainer -   BalancedAccuracy: 0.77257
+11/05/2026 22:45:58 - INFO - utils.trainer -   Epoch: 15, Loss: 0.62194, Val loss: 0.60401, Val AUC: 0.8408, Best val AUC: 0.8430, No improve: 2/20, Time: 15.4s
+11/05/2026 22:46:14 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:46:15 - INFO - utils.trainer -   Loss: 0.70715
+11/05/2026 22:46:15 - INFO - utils.trainer -   AUC: 0.83443
+11/05/2026 22:46:15 - INFO - utils.trainer -   AUC_PR: 0.86130
+11/05/2026 22:46:15 - INFO - utils.trainer -   Accuracy: 0.70620
+11/05/2026 22:46:15 - INFO - utils.trainer -   Precision: 0.89407
+11/05/2026 22:46:15 - INFO - utils.trainer -   Specificity: 0.92604
+11/05/2026 22:46:15 - INFO - utils.trainer -   Sensitivity: 0.52228
+11/05/2026 22:46:15 - INFO - utils.trainer -   BalancedAccuracy: 0.72416
+11/05/2026 22:46:15 - INFO - utils.trainer -   Epoch: 16, Loss: 0.65169, Val loss: 0.70715, Val AUC: 0.8344, Best val AUC: 0.8430, No improve: 3/20, Time: 15.6s
+11/05/2026 22:46:32 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:46:33 - INFO - utils.trainer -   Loss: 0.71420
+11/05/2026 22:46:33 - INFO - utils.trainer -   AUC: 0.83815
+11/05/2026 22:46:33 - INFO - utils.trainer -   AUC_PR: 0.87188
+11/05/2026 22:46:33 - INFO - utils.trainer -   Accuracy: 0.69946
+11/05/2026 22:46:33 - INFO - utils.trainer -   Precision: 0.90222
+11/05/2026 22:46:33 - INFO - utils.trainer -   Specificity: 0.93491
+11/05/2026 22:46:33 - INFO - utils.trainer -   Sensitivity: 0.50248
+11/05/2026 22:46:33 - INFO - utils.trainer -   BalancedAccuracy: 0.71869
+11/05/2026 22:46:34 - INFO - utils.trainer -   Epoch: 17, Loss: 0.62580, Val loss: 0.71420, Val AUC: 0.8381, Best val AUC: 0.8430, No improve: 4/20, Time: 16.2s
+11/05/2026 22:46:49 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:46:51 - INFO - utils.trainer -   Loss: 0.61461
+11/05/2026 22:46:51 - INFO - utils.trainer -   AUC: 0.84176
+11/05/2026 22:46:51 - INFO - utils.trainer -   AUC_PR: 0.86574
+11/05/2026 22:46:51 - INFO - utils.trainer -   Accuracy: 0.76685
+11/05/2026 22:46:51 - INFO - utils.trainer -   Precision: 0.86207
+11/05/2026 22:46:51 - INFO - utils.trainer -   Specificity: 0.86982
+11/05/2026 22:46:51 - INFO - utils.trainer -   Sensitivity: 0.68069
+11/05/2026 22:46:51 - INFO - utils.trainer -   BalancedAccuracy: 0.77526
+11/05/2026 22:46:51 - INFO - utils.trainer -   Epoch: 18, Loss: 0.63681, Val loss: 0.61461, Val AUC: 0.8418, Best val AUC: 0.8430, No improve: 5/20, Time: 15.8s
+11/05/2026 22:47:07 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:47:09 - INFO - utils.trainer -   Loss: 0.59837
+11/05/2026 22:47:09 - INFO - utils.trainer -   AUC: 0.83677
+11/05/2026 22:47:09 - INFO - utils.trainer -   AUC_PR: 0.86631
+11/05/2026 22:47:09 - INFO - utils.trainer -   Accuracy: 0.77089
+11/05/2026 22:47:09 - INFO - utils.trainer -   Precision: 0.80789
+11/05/2026 22:47:09 - INFO - utils.trainer -   Specificity: 0.78402
+11/05/2026 22:47:09 - INFO - utils.trainer -   Sensitivity: 0.75990
+11/05/2026 22:47:09 - INFO - utils.trainer -   BalancedAccuracy: 0.77196
+11/05/2026 22:47:09 - INFO - utils.trainer -   Epoch: 19, Loss: 0.60433, Val loss: 0.59837, Val AUC: 0.8368, Best val AUC: 0.8430, No improve: 6/20, Time: 15.7s
+11/05/2026 22:47:25 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:47:28 - INFO - utils.trainer -   Loss: 0.59720
+11/05/2026 22:47:28 - INFO - utils.trainer -   AUC: 0.84267
+11/05/2026 22:47:28 - INFO - utils.trainer -   AUC_PR: 0.87339
+11/05/2026 22:47:28 - INFO - utils.trainer -   Accuracy: 0.77089
+11/05/2026 22:47:28 - INFO - utils.trainer -   Precision: 0.82682
+11/05/2026 22:47:28 - INFO - utils.trainer -   Specificity: 0.81657
+11/05/2026 22:47:28 - INFO - utils.trainer -   Sensitivity: 0.73267
+11/05/2026 22:47:28 - INFO - utils.trainer -   BalancedAccuracy: 0.77462
+11/05/2026 22:47:28 - INFO - utils.trainer -   Epoch: 20, Loss: 0.60493, Val loss: 0.59720, Val AUC: 0.8427, Best val AUC: 0.8430, No improve: 7/20, Time: 16.0s
+11/05/2026 22:47:43 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:47:46 - INFO - utils.trainer -   Loss: 0.59861
+11/05/2026 22:47:46 - INFO - utils.trainer -   AUC: 0.84480
+11/05/2026 22:47:46 - INFO - utils.trainer -   AUC_PR: 0.87192
+11/05/2026 22:47:46 - INFO - utils.trainer -   Accuracy: 0.76954
+11/05/2026 22:47:46 - INFO - utils.trainer -   Precision: 0.84570
+11/05/2026 22:47:46 - INFO - utils.trainer -   Specificity: 0.84615
+11/05/2026 22:47:46 - INFO - utils.trainer -   Sensitivity: 0.70545
+11/05/2026 22:47:46 - INFO - utils.trainer -   BalancedAccuracy: 0.77580
+11/05/2026 22:47:46 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:47:46 - INFO - utils.trainer -   Best model saved (val_AUC=0.8448)
+11/05/2026 22:47:46 - INFO - utils.trainer -   Epoch: 21, Loss: 0.61120, Val loss: 0.59861, Val AUC: 0.8448, Best val AUC: 0.8448, No improve: 0/20, Time: 15.9s
+11/05/2026 22:48:01 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:48:03 - INFO - utils.trainer -   Loss: 0.60073
+11/05/2026 22:48:03 - INFO - utils.trainer -   AUC: 0.84528
+11/05/2026 22:48:03 - INFO - utils.trainer -   AUC_PR: 0.86487
+11/05/2026 22:48:03 - INFO - utils.trainer -   Accuracy: 0.77224
+11/05/2026 22:48:03 - INFO - utils.trainer -   Precision: 0.83668
+11/05/2026 22:48:03 - INFO - utils.trainer -   Specificity: 0.83136
+11/05/2026 22:48:03 - INFO - utils.trainer -   Sensitivity: 0.72277
+11/05/2026 22:48:03 - INFO - utils.trainer -   BalancedAccuracy: 0.77707
+11/05/2026 22:48:04 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:48:04 - INFO - utils.trainer -   Best model saved (val_AUC=0.8453)
+11/05/2026 22:48:04 - INFO - utils.trainer -   Epoch: 22, Loss: 0.61081, Val loss: 0.60073, Val AUC: 0.8453, Best val AUC: 0.8453, No improve: 0/20, Time: 15.7s
+11/05/2026 22:48:19 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:48:21 - INFO - utils.trainer -   Loss: 0.58958
+11/05/2026 22:48:21 - INFO - utils.trainer -   AUC: 0.84965
+11/05/2026 22:48:21 - INFO - utils.trainer -   AUC_PR: 0.87445
+11/05/2026 22:48:21 - INFO - utils.trainer -   Accuracy: 0.77628
+11/05/2026 22:48:21 - INFO - utils.trainer -   Precision: 0.84593
+11/05/2026 22:48:21 - INFO - utils.trainer -   Specificity: 0.84320
+11/05/2026 22:48:21 - INFO - utils.trainer -   Sensitivity: 0.72030
+11/05/2026 22:48:21 - INFO - utils.trainer -   BalancedAccuracy: 0.78175
+11/05/2026 22:48:21 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:48:21 - INFO - utils.trainer -   Best model saved (val_AUC=0.8496)
+11/05/2026 22:48:21 - INFO - utils.trainer -   Epoch: 23, Loss: 0.58749, Val loss: 0.58958, Val AUC: 0.8496, Best val AUC: 0.8496, No improve: 0/20, Time: 15.5s
+11/05/2026 22:48:37 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:48:39 - INFO - utils.trainer -   Loss: 0.59959
+11/05/2026 22:48:39 - INFO - utils.trainer -   AUC: 0.84127
+11/05/2026 22:48:39 - INFO - utils.trainer -   AUC_PR: 0.87103
+11/05/2026 22:48:39 - INFO - utils.trainer -   Accuracy: 0.76954
+11/05/2026 22:48:39 - INFO - utils.trainer -   Precision: 0.80902
+11/05/2026 22:48:39 - INFO - utils.trainer -   Specificity: 0.78698
+11/05/2026 22:48:39 - INFO - utils.trainer -   Sensitivity: 0.75495
+11/05/2026 22:48:39 - INFO - utils.trainer -   BalancedAccuracy: 0.77097
+11/05/2026 22:48:39 - INFO - utils.trainer -   Epoch: 24, Loss: 0.58882, Val loss: 0.59959, Val AUC: 0.8413, Best val AUC: 0.8496, No improve: 1/20, Time: 15.9s
+11/05/2026 22:48:55 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:48:57 - INFO - utils.trainer -   Loss: 0.65071
+11/05/2026 22:48:57 - INFO - utils.trainer -   AUC: 0.84687
+11/05/2026 22:48:57 - INFO - utils.trainer -   AUC_PR: 0.87633
+11/05/2026 22:48:57 - INFO - utils.trainer -   Accuracy: 0.74394
+11/05/2026 22:48:57 - INFO - utils.trainer -   Precision: 0.87676
+11/05/2026 22:48:57 - INFO - utils.trainer -   Specificity: 0.89645
+11/05/2026 22:48:57 - INFO - utils.trainer -   Sensitivity: 0.61634
+11/05/2026 22:48:57 - INFO - utils.trainer -   BalancedAccuracy: 0.75639
+11/05/2026 22:48:57 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train/checkpoint-epoch-25
+11/05/2026 22:48:57 - INFO - utils.trainer -   Checkpoint saved at epoch 25
+11/05/2026 22:48:57 - INFO - utils.trainer -   Epoch: 25, Loss: 0.58431, Val loss: 0.65071, Val AUC: 0.8469, Best val AUC: 0.8496, No improve: 2/20, Time: 15.7s
+11/05/2026 22:49:13 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:49:15 - INFO - utils.trainer -   Loss: 0.64856
+11/05/2026 22:49:15 - INFO - utils.trainer -   AUC: 0.84704
+11/05/2026 22:49:15 - INFO - utils.trainer -   AUC_PR: 0.87426
+11/05/2026 22:49:15 - INFO - utils.trainer -   Accuracy: 0.74798
+11/05/2026 22:49:15 - INFO - utils.trainer -   Precision: 0.87031
+11/05/2026 22:49:15 - INFO - utils.trainer -   Specificity: 0.88757
+11/05/2026 22:49:15 - INFO - utils.trainer -   Sensitivity: 0.63119
+11/05/2026 22:49:15 - INFO - utils.trainer -   BalancedAccuracy: 0.75938
+11/05/2026 22:49:15 - INFO - utils.trainer -   Epoch: 26, Loss: 0.57060, Val loss: 0.64856, Val AUC: 0.8470, Best val AUC: 0.8496, No improve: 3/20, Time: 15.9s
+11/05/2026 22:49:31 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:49:33 - INFO - utils.trainer -   Loss: 0.59034
+11/05/2026 22:49:33 - INFO - utils.trainer -   AUC: 0.84888
+11/05/2026 22:49:33 - INFO - utils.trainer -   AUC_PR: 0.86795
+11/05/2026 22:49:33 - INFO - utils.trainer -   Accuracy: 0.77358
+11/05/2026 22:49:33 - INFO - utils.trainer -   Precision: 0.82240
+11/05/2026 22:49:33 - INFO - utils.trainer -   Specificity: 0.80769
+11/05/2026 22:49:33 - INFO - utils.trainer -   Sensitivity: 0.74505
+11/05/2026 22:49:33 - INFO - utils.trainer -   BalancedAccuracy: 0.77637
+11/05/2026 22:49:33 - INFO - utils.trainer -   Epoch: 27, Loss: 0.56400, Val loss: 0.59034, Val AUC: 0.8489, Best val AUC: 0.8496, No improve: 4/20, Time: 15.7s
+11/05/2026 22:49:49 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:49:51 - INFO - utils.trainer -   Loss: 0.61775
+11/05/2026 22:49:51 - INFO - utils.trainer -   AUC: 0.84090
+11/05/2026 22:49:51 - INFO - utils.trainer -   AUC_PR: 0.86969
+11/05/2026 22:49:51 - INFO - utils.trainer -   Accuracy: 0.76954
+11/05/2026 22:49:51 - INFO - utils.trainer -   Precision: 0.84164
+11/05/2026 22:49:51 - INFO - utils.trainer -   Specificity: 0.84024
+11/05/2026 22:49:51 - INFO - utils.trainer -   Sensitivity: 0.71040
+11/05/2026 22:49:51 - INFO - utils.trainer -   BalancedAccuracy: 0.77532
+11/05/2026 22:49:51 - INFO - utils.trainer -   Epoch: 28, Loss: 0.56720, Val loss: 0.61775, Val AUC: 0.8409, Best val AUC: 0.8496, No improve: 5/20, Time: 15.8s
+11/05/2026 22:50:07 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:50:09 - INFO - utils.trainer -   Loss: 0.65967
+11/05/2026 22:50:09 - INFO - utils.trainer -   AUC: 0.83812
+11/05/2026 22:50:09 - INFO - utils.trainer -   AUC_PR: 0.86924
+11/05/2026 22:50:09 - INFO - utils.trainer -   Accuracy: 0.74259
+11/05/2026 22:50:09 - INFO - utils.trainer -   Precision: 0.86102
+11/05/2026 22:50:09 - INFO - utils.trainer -   Specificity: 0.87870
+11/05/2026 22:50:09 - INFO - utils.trainer -   Sensitivity: 0.62871
+11/05/2026 22:50:09 - INFO - utils.trainer -   BalancedAccuracy: 0.75371
+11/05/2026 22:50:09 - INFO - utils.trainer -   Epoch: 29, Loss: 0.56348, Val loss: 0.65967, Val AUC: 0.8381, Best val AUC: 0.8496, No improve: 6/20, Time: 15.8s
+11/05/2026 22:50:25 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:50:27 - INFO - utils.trainer -   Loss: 0.60637
+11/05/2026 22:50:27 - INFO - utils.trainer -   AUC: 0.84515
+11/05/2026 22:50:27 - INFO - utils.trainer -   AUC_PR: 0.86978
+11/05/2026 22:50:27 - INFO - utils.trainer -   Accuracy: 0.76550
+11/05/2026 22:50:27 - INFO - utils.trainer -   Precision: 0.83824
+11/05/2026 22:50:27 - INFO - utils.trainer -   Specificity: 0.83728
+11/05/2026 22:50:27 - INFO - utils.trainer -   Sensitivity: 0.70545
+11/05/2026 22:50:27 - INFO - utils.trainer -   BalancedAccuracy: 0.77136
+11/05/2026 22:50:27 - INFO - utils.trainer -   Epoch: 30, Loss: 0.56751, Val loss: 0.60637, Val AUC: 0.8452, Best val AUC: 0.8496, No improve: 7/20, Time: 15.7s
+11/05/2026 22:50:43 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:50:45 - INFO - utils.trainer -   Loss: 0.64149
+11/05/2026 22:50:45 - INFO - utils.trainer -   AUC: 0.83704
+11/05/2026 22:50:45 - INFO - utils.trainer -   AUC_PR: 0.86339
+11/05/2026 22:50:45 - INFO - utils.trainer -   Accuracy: 0.73450
+11/05/2026 22:50:45 - INFO - utils.trainer -   Precision: 0.84158
+11/05/2026 22:50:45 - INFO - utils.trainer -   Specificity: 0.85799
+11/05/2026 22:50:45 - INFO - utils.trainer -   Sensitivity: 0.63119
+11/05/2026 22:50:45 - INFO - utils.trainer -   BalancedAccuracy: 0.74459
+11/05/2026 22:50:45 - INFO - utils.trainer -   Epoch: 31, Loss: 0.55439, Val loss: 0.64149, Val AUC: 0.8370, Best val AUC: 0.8496, No improve: 8/20, Time: 15.9s
+11/05/2026 22:51:01 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:51:03 - INFO - utils.trainer -   Loss: 0.63765
+11/05/2026 22:51:03 - INFO - utils.trainer -   AUC: 0.85351
+11/05/2026 22:51:03 - INFO - utils.trainer -   AUC_PR: 0.88052
+11/05/2026 22:51:03 - INFO - utils.trainer -   Accuracy: 0.76146
+11/05/2026 22:51:03 - INFO - utils.trainer -   Precision: 0.88215
+11/05/2026 22:51:03 - INFO - utils.trainer -   Specificity: 0.89645
+11/05/2026 22:51:03 - INFO - utils.trainer -   Sensitivity: 0.64851
+11/05/2026 22:51:03 - INFO - utils.trainer -   BalancedAccuracy: 0.77248
+11/05/2026 22:51:03 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train
+11/05/2026 22:51:03 - INFO - utils.trainer -   Best model saved (val_AUC=0.8535)
+11/05/2026 22:51:03 - INFO - utils.trainer -   Epoch: 32, Loss: 0.52991, Val loss: 0.63765, Val AUC: 0.8535, Best val AUC: 0.8535, No improve: 0/20, Time: 15.7s
+11/05/2026 22:51:19 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:51:21 - INFO - utils.trainer -   Loss: 0.61347
+11/05/2026 22:51:21 - INFO - utils.trainer -   AUC: 0.84928
+11/05/2026 22:51:21 - INFO - utils.trainer -   AUC_PR: 0.87327
+11/05/2026 22:51:21 - INFO - utils.trainer -   Accuracy: 0.76550
+11/05/2026 22:51:21 - INFO - utils.trainer -   Precision: 0.84226
+11/05/2026 22:51:21 - INFO - utils.trainer -   Specificity: 0.84320
+11/05/2026 22:51:21 - INFO - utils.trainer -   Sensitivity: 0.70050
+11/05/2026 22:51:21 - INFO - utils.trainer -   BalancedAccuracy: 0.77185
+11/05/2026 22:51:21 - INFO - utils.trainer -   Epoch: 33, Loss: 0.55685, Val loss: 0.61347, Val AUC: 0.8493, Best val AUC: 0.8535, No improve: 1/20, Time: 15.8s
+11/05/2026 22:51:36 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:51:38 - INFO - utils.trainer -   Loss: 0.67084
+11/05/2026 22:51:38 - INFO - utils.trainer -   AUC: 0.84040
+11/05/2026 22:51:38 - INFO - utils.trainer -   AUC_PR: 0.86569
+11/05/2026 22:51:38 - INFO - utils.trainer -   Accuracy: 0.73315
+11/05/2026 22:51:38 - INFO - utils.trainer -   Precision: 0.84797
+11/05/2026 22:51:38 - INFO - utils.trainer -   Specificity: 0.86686
+11/05/2026 22:51:38 - INFO - utils.trainer -   Sensitivity: 0.62129
+11/05/2026 22:51:38 - INFO - utils.trainer -   BalancedAccuracy: 0.74408
+11/05/2026 22:51:38 - INFO - utils.trainer -   Epoch: 34, Loss: 0.54049, Val loss: 0.67084, Val AUC: 0.8404, Best val AUC: 0.8535, No improve: 2/20, Time: 15.6s
+11/05/2026 22:51:54 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:51:56 - INFO - utils.trainer -   Loss: 0.64860
+11/05/2026 22:51:56 - INFO - utils.trainer -   AUC: 0.84680
+11/05/2026 22:51:56 - INFO - utils.trainer -   AUC_PR: 0.87059
+11/05/2026 22:51:56 - INFO - utils.trainer -   Accuracy: 0.75337
+11/05/2026 22:51:56 - INFO - utils.trainer -   Precision: 0.85993
+11/05/2026 22:51:56 - INFO - utils.trainer -   Specificity: 0.87278
+11/05/2026 22:51:56 - INFO - utils.trainer -   Sensitivity: 0.65347
+11/05/2026 22:51:56 - INFO - utils.trainer -   BalancedAccuracy: 0.76312
+11/05/2026 22:51:56 - INFO - utils.trainer -   Epoch: 35, Loss: 0.56774, Val loss: 0.64860, Val AUC: 0.8468, Best val AUC: 0.8535, No improve: 3/20, Time: 15.7s
+11/05/2026 22:52:12 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:52:14 - INFO - utils.trainer -   Loss: 0.61049
+11/05/2026 22:52:14 - INFO - utils.trainer -   AUC: 0.84199
+11/05/2026 22:52:14 - INFO - utils.trainer -   AUC_PR: 0.86942
+11/05/2026 22:52:14 - INFO - utils.trainer -   Accuracy: 0.77089
+11/05/2026 22:52:14 - INFO - utils.trainer -   Precision: 0.81967
+11/05/2026 22:52:14 - INFO - utils.trainer -   Specificity: 0.80473
+11/05/2026 22:52:14 - INFO - utils.trainer -   Sensitivity: 0.74257
+11/05/2026 22:52:14 - INFO - utils.trainer -   BalancedAccuracy: 0.77365
+11/05/2026 22:52:14 - INFO - utils.trainer -   Epoch: 36, Loss: 0.54419, Val loss: 0.61049, Val AUC: 0.8420, Best val AUC: 0.8535, No improve: 4/20, Time: 15.8s
+11/05/2026 22:52:30 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:52:32 - INFO - utils.trainer -   Loss: 0.68847
+11/05/2026 22:52:32 - INFO - utils.trainer -   AUC: 0.84908
+11/05/2026 22:52:32 - INFO - utils.trainer -   AUC_PR: 0.87426
+11/05/2026 22:52:32 - INFO - utils.trainer -   Accuracy: 0.73989
+11/05/2026 22:52:32 - INFO - utils.trainer -   Precision: 0.87814
+11/05/2026 22:52:32 - INFO - utils.trainer -   Specificity: 0.89941
+11/05/2026 22:52:32 - INFO - utils.trainer -   Sensitivity: 0.60644
+11/05/2026 22:52:32 - INFO - utils.trainer -   BalancedAccuracy: 0.75292
+11/05/2026 22:52:32 - INFO - utils.trainer -   Epoch: 37, Loss: 0.53497, Val loss: 0.68847, Val AUC: 0.8491, Best val AUC: 0.8535, No improve: 5/20, Time: 15.8s
+11/05/2026 22:52:48 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:52:50 - INFO - utils.trainer -   Loss: 0.64218
+11/05/2026 22:52:50 - INFO - utils.trainer -   AUC: 0.84319
+11/05/2026 22:52:50 - INFO - utils.trainer -   AUC_PR: 0.86871
+11/05/2026 22:52:50 - INFO - utils.trainer -   Accuracy: 0.75202
+11/05/2026 22:52:50 - INFO - utils.trainer -   Precision: 0.85484
+11/05/2026 22:52:50 - INFO - utils.trainer -   Specificity: 0.86686
+11/05/2026 22:52:50 - INFO - utils.trainer -   Sensitivity: 0.65594
+11/05/2026 22:52:50 - INFO - utils.trainer -   BalancedAccuracy: 0.76140
+11/05/2026 22:52:50 - INFO - utils.trainer -   Epoch: 38, Loss: 0.53514, Val loss: 0.64218, Val AUC: 0.8432, Best val AUC: 0.8535, No improve: 6/20, Time: 16.0s
+11/05/2026 22:53:06 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:53:08 - INFO - utils.trainer -   Loss: 0.64790
+11/05/2026 22:53:08 - INFO - utils.trainer -   AUC: 0.84755
+11/05/2026 22:53:08 - INFO - utils.trainer -   AUC_PR: 0.87374
+11/05/2026 22:53:08 - INFO - utils.trainer -   Accuracy: 0.74528
+11/05/2026 22:53:08 - INFO - utils.trainer -   Precision: 0.85016
+11/05/2026 22:53:08 - INFO - utils.trainer -   Specificity: 0.86391
+11/05/2026 22:53:08 - INFO - utils.trainer -   Sensitivity: 0.64604
+11/05/2026 22:53:08 - INFO - utils.trainer -   BalancedAccuracy: 0.75497
+11/05/2026 22:53:08 - INFO - utils.trainer -   Epoch: 39, Loss: 0.52347, Val loss: 0.64790, Val AUC: 0.8476, Best val AUC: 0.8535, No improve: 7/20, Time: 15.7s
+11/05/2026 22:53:24 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:53:26 - INFO - utils.trainer -   Loss: 0.65902
+11/05/2026 22:53:26 - INFO - utils.trainer -   AUC: 0.84966
+11/05/2026 22:53:26 - INFO - utils.trainer -   AUC_PR: 0.87261
+11/05/2026 22:53:26 - INFO - utils.trainer -   Accuracy: 0.76415
+11/05/2026 22:53:26 - INFO - utils.trainer -   Precision: 0.87055
+11/05/2026 22:53:26 - INFO - utils.trainer -   Specificity: 0.88166
+11/05/2026 22:53:26 - INFO - utils.trainer -   Sensitivity: 0.66584
+11/05/2026 22:53:26 - INFO - utils.trainer -   BalancedAccuracy: 0.77375
+11/05/2026 22:53:26 - INFO - utils.trainer -   Epoch: 40, Loss: 0.52795, Val loss: 0.65902, Val AUC: 0.8497, Best val AUC: 0.8535, No improve: 8/20, Time: 15.7s
+11/05/2026 22:53:42 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:53:44 - INFO - utils.trainer -   Loss: 0.63100
+11/05/2026 22:53:44 - INFO - utils.trainer -   AUC: 0.84734
+11/05/2026 22:53:44 - INFO - utils.trainer -   AUC_PR: 0.87011
+11/05/2026 22:53:44 - INFO - utils.trainer -   Accuracy: 0.76280
+11/05/2026 22:53:44 - INFO - utils.trainer -   Precision: 0.84337
+11/05/2026 22:53:44 - INFO - utils.trainer -   Specificity: 0.84615
+11/05/2026 22:53:44 - INFO - utils.trainer -   Sensitivity: 0.69307
+11/05/2026 22:53:44 - INFO - utils.trainer -   BalancedAccuracy: 0.76961
+11/05/2026 22:53:44 - INFO - utils.trainer -   Epoch: 41, Loss: 0.50645, Val loss: 0.63100, Val AUC: 0.8473, Best val AUC: 0.8535, No improve: 9/20, Time: 15.8s
+11/05/2026 22:53:57 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:53:58 - INFO - utils.trainer -   Loss: 0.64720
+11/05/2026 22:53:58 - INFO - utils.trainer -   AUC: 0.84012
+11/05/2026 22:53:58 - INFO - utils.trainer -   AUC_PR: 0.86525
+11/05/2026 22:53:58 - INFO - utils.trainer -   Accuracy: 0.75202
+11/05/2026 22:53:58 - INFO - utils.trainer -   Precision: 0.84375
+11/05/2026 22:53:58 - INFO - utils.trainer -   Specificity: 0.85207
+11/05/2026 22:53:58 - INFO - utils.trainer -   Sensitivity: 0.66832
+11/05/2026 22:53:58 - INFO - utils.trainer -   BalancedAccuracy: 0.76019
+11/05/2026 22:53:58 - INFO - utils.trainer -   Epoch: 42, Loss: 0.49528, Val loss: 0.64720, Val AUC: 0.8401, Best val AUC: 0.8535, No improve: 10/20, Time: 12.6s
+11/05/2026 22:54:09 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:54:11 - INFO - utils.trainer -   Loss: 0.61008
+11/05/2026 22:54:11 - INFO - utils.trainer -   AUC: 0.84213
+11/05/2026 22:54:11 - INFO - utils.trainer -   AUC_PR: 0.86614
+11/05/2026 22:54:11 - INFO - utils.trainer -   Accuracy: 0.76415
+11/05/2026 22:54:11 - INFO - utils.trainer -   Precision: 0.80052
+11/05/2026 22:54:11 - INFO - utils.trainer -   Specificity: 0.77515
+11/05/2026 22:54:11 - INFO - utils.trainer -   Sensitivity: 0.75495
+11/05/2026 22:54:11 - INFO - utils.trainer -   BalancedAccuracy: 0.76505
+11/05/2026 22:54:11 - INFO - utils.trainer -   Epoch: 43, Loss: 0.50728, Val loss: 0.61008, Val AUC: 0.8421, Best val AUC: 0.8535, No improve: 11/20, Time: 11.0s
+11/05/2026 22:54:22 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:54:24 - INFO - utils.trainer -   Loss: 0.63180
+11/05/2026 22:54:24 - INFO - utils.trainer -   AUC: 0.84674
+11/05/2026 22:54:24 - INFO - utils.trainer -   AUC_PR: 0.87028
+11/05/2026 22:54:24 - INFO - utils.trainer -   Accuracy: 0.76954
+11/05/2026 22:54:24 - INFO - utils.trainer -   Precision: 0.83965
+11/05/2026 22:54:24 - INFO - utils.trainer -   Specificity: 0.83728
+11/05/2026 22:54:24 - INFO - utils.trainer -   Sensitivity: 0.71287
+11/05/2026 22:54:24 - INFO - utils.trainer -   BalancedAccuracy: 0.77507
+11/05/2026 22:54:24 - INFO - utils.trainer -   Epoch: 44, Loss: 0.51070, Val loss: 0.63180, Val AUC: 0.8467, Best val AUC: 0.8535, No improve: 12/20, Time: 11.2s
+11/05/2026 22:54:35 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:54:37 - INFO - utils.trainer -   Loss: 0.63520
+11/05/2026 22:54:37 - INFO - utils.trainer -   AUC: 0.84512
+11/05/2026 22:54:37 - INFO - utils.trainer -   AUC_PR: 0.86772
+11/05/2026 22:54:37 - INFO - utils.trainer -   Accuracy: 0.76280
+11/05/2026 22:54:37 - INFO - utils.trainer -   Precision: 0.84132
+11/05/2026 22:54:37 - INFO - utils.trainer -   Specificity: 0.84320
+11/05/2026 22:54:37 - INFO - utils.trainer -   Sensitivity: 0.69554
+11/05/2026 22:54:37 - INFO - utils.trainer -   BalancedAccuracy: 0.76937
+11/05/2026 22:54:37 - INFO - utils.trainer -   Epoch: 45, Loss: 0.51946, Val loss: 0.63520, Val AUC: 0.8451, Best val AUC: 0.8535, No improve: 13/20, Time: 11.4s
+11/05/2026 22:54:48 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:54:50 - INFO - utils.trainer -   Loss: 0.62172
+11/05/2026 22:54:50 - INFO - utils.trainer -   AUC: 0.84872
+11/05/2026 22:54:50 - INFO - utils.trainer -   AUC_PR: 0.86998
+11/05/2026 22:54:50 - INFO - utils.trainer -   Accuracy: 0.76685
+11/05/2026 22:54:50 - INFO - utils.trainer -   Precision: 0.83095
+11/05/2026 22:54:50 - INFO - utils.trainer -   Specificity: 0.82544
+11/05/2026 22:54:50 - INFO - utils.trainer -   Sensitivity: 0.71782
+11/05/2026 22:54:50 - INFO - utils.trainer -   BalancedAccuracy: 0.77163
+11/05/2026 22:54:50 - INFO - utils.trainer -   Epoch: 46, Loss: 0.52147, Val loss: 0.62172, Val AUC: 0.8487, Best val AUC: 0.8535, No improve: 14/20, Time: 11.4s
+11/05/2026 22:55:01 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:55:02 - INFO - utils.trainer -   Loss: 0.64294
+11/05/2026 22:55:02 - INFO - utils.trainer -   AUC: 0.84599
+11/05/2026 22:55:02 - INFO - utils.trainer -   AUC_PR: 0.86884
+11/05/2026 22:55:02 - INFO - utils.trainer -   Accuracy: 0.76550
+11/05/2026 22:55:02 - INFO - utils.trainer -   Precision: 0.83824
+11/05/2026 22:55:02 - INFO - utils.trainer -   Specificity: 0.83728
+11/05/2026 22:55:02 - INFO - utils.trainer -   Sensitivity: 0.70545
+11/05/2026 22:55:02 - INFO - utils.trainer -   BalancedAccuracy: 0.77136
+11/05/2026 22:55:02 - INFO - utils.trainer -   Epoch: 47, Loss: 0.50594, Val loss: 0.64294, Val AUC: 0.8460, Best val AUC: 0.8535, No improve: 15/20, Time: 11.1s
+11/05/2026 22:55:14 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:55:15 - INFO - utils.trainer -   Loss: 0.62764
+11/05/2026 22:55:15 - INFO - utils.trainer -   AUC: 0.85206
+11/05/2026 22:55:15 - INFO - utils.trainer -   AUC_PR: 0.87786
+11/05/2026 22:55:15 - INFO - utils.trainer -   Accuracy: 0.76819
+11/05/2026 22:55:15 - INFO - utils.trainer -   Precision: 0.83721
+11/05/2026 22:55:15 - INFO - utils.trainer -   Specificity: 0.83432
+11/05/2026 22:55:15 - INFO - utils.trainer -   Sensitivity: 0.71287
+11/05/2026 22:55:15 - INFO - utils.trainer -   BalancedAccuracy: 0.77360
+11/05/2026 22:55:15 - INFO - utils.trainer -   Epoch: 48, Loss: 0.49859, Val loss: 0.62764, Val AUC: 0.8521, Best val AUC: 0.8535, No improve: 16/20, Time: 11.4s
+11/05/2026 22:55:26 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:55:27 - INFO - utils.trainer -   Loss: 0.62713
+11/05/2026 22:55:27 - INFO - utils.trainer -   AUC: 0.84545
+11/05/2026 22:55:27 - INFO - utils.trainer -   AUC_PR: 0.87043
+11/05/2026 22:55:27 - INFO - utils.trainer -   Accuracy: 0.77089
+11/05/2026 22:55:27 - INFO - utils.trainer -   Precision: 0.83621
+11/05/2026 22:55:27 - INFO - utils.trainer -   Specificity: 0.83136
+11/05/2026 22:55:27 - INFO - utils.trainer -   Sensitivity: 0.72030
+11/05/2026 22:55:27 - INFO - utils.trainer -   BalancedAccuracy: 0.77583
+11/05/2026 22:55:27 - INFO - utils.trainer -   Epoch: 49, Loss: 0.48709, Val loss: 0.62713, Val AUC: 0.8455, Best val AUC: 0.8535, No improve: 17/20, Time: 10.5s
+11/05/2026 22:55:39 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:55:40 - INFO - utils.trainer -   Loss: 0.65257
+11/05/2026 22:55:40 - INFO - utils.trainer -   AUC: 0.84283
+11/05/2026 22:55:40 - INFO - utils.trainer -   AUC_PR: 0.86950
+11/05/2026 22:55:40 - INFO - utils.trainer -   Accuracy: 0.76550
+11/05/2026 22:55:40 - INFO - utils.trainer -   Precision: 0.84639
+11/05/2026 22:55:40 - INFO - utils.trainer -   Specificity: 0.84911
+11/05/2026 22:55:40 - INFO - utils.trainer -   Sensitivity: 0.69554
+11/05/2026 22:55:40 - INFO - utils.trainer -   BalancedAccuracy: 0.77233
+11/05/2026 22:55:40 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train/checkpoint-epoch-50
+11/05/2026 22:55:40 - INFO - utils.trainer -   Checkpoint saved at epoch 50
+11/05/2026 22:55:40 - INFO - utils.trainer -   Epoch: 50, Loss: 0.50045, Val loss: 0.65257, Val AUC: 0.8428, Best val AUC: 0.8535, No improve: 18/20, Time: 11.4s
+11/05/2026 22:55:52 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:55:54 - INFO - utils.trainer -   Loss: 0.62672
+11/05/2026 22:55:54 - INFO - utils.trainer -   AUC: 0.84983
+11/05/2026 22:55:54 - INFO - utils.trainer -   AUC_PR: 0.87608
+11/05/2026 22:55:54 - INFO - utils.trainer -   Accuracy: 0.77224
+11/05/2026 22:55:54 - INFO - utils.trainer -   Precision: 0.84457
+11/05/2026 22:55:54 - INFO - utils.trainer -   Specificity: 0.84320
+11/05/2026 22:55:54 - INFO - utils.trainer -   Sensitivity: 0.71287
+11/05/2026 22:55:54 - INFO - utils.trainer -   BalancedAccuracy: 0.77803
+11/05/2026 22:55:54 - INFO - utils.trainer -   Epoch: 51, Loss: 0.51577, Val loss: 0.62672, Val AUC: 0.8498, Best val AUC: 0.8535, No improve: 19/20, Time: 11.4s
+11/05/2026 22:56:05 - INFO - utils.trainer -   ***** Running evaluation on val dataset *****
+11/05/2026 22:56:06 - INFO - utils.trainer -   Loss: 0.63076
+11/05/2026 22:56:06 - INFO - utils.trainer -   AUC: 0.85170
+11/05/2026 22:56:06 - INFO - utils.trainer -   AUC_PR: 0.87679
+11/05/2026 22:56:06 - INFO - utils.trainer -   Accuracy: 0.78032
+11/05/2026 22:56:06 - INFO - utils.trainer -   Precision: 0.83754
+11/05/2026 22:56:06 - INFO - utils.trainer -   Specificity: 0.82840
+11/05/2026 22:56:06 - INFO - utils.trainer -   Sensitivity: 0.74010
+11/05/2026 22:56:06 - INFO - utils.trainer -   BalancedAccuracy: 0.78425
+11/05/2026 22:56:06 - INFO - utils.trainer -   Epoch: 52, Loss: 0.48190, Val loss: 0.63076, Val AUC: 0.8517, Best val AUC: 0.8535, No improve: 20/20, Time: 11.3s
+11/05/2026 22:56:06 - INFO - utils.trainer -   Early stopping triggered at epoch 52
+11/05/2026 22:56:06 - INFO - utils.trainer -   Early stopping triggered at epoch 52
+11/05/2026 22:56:06 - INFO - utils.trainer -     43 keys not in checkpoint (kept from init)
+11/05/2026 22:56:06 - INFO - utils.trainer -   Model loaded from output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train/KnowledgeLLM-0.bin (53/53 keys)
+11/05/2026 22:56:06 - INFO - utils.trainer -   ***** Running evaluation on test dataset *****
+11/05/2026 22:56:06 - INFO - utils.trainer -     43 keys not in checkpoint (kept from init)
+11/05/2026 22:56:06 - INFO - utils.trainer -   Model loaded from output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train/KnowledgeLLM-0.bin (53/53 keys)
+11/05/2026 22:56:08 - INFO - utils.trainer -   Loss: 0.62639
+11/05/2026 22:56:08 - INFO - utils.trainer -   AUC: 0.81526
+11/05/2026 22:56:08 - INFO - utils.trainer -   AUC_PR: 0.80432
+11/05/2026 22:56:08 - INFO - utils.trainer -   Accuracy: 0.73907
+11/05/2026 22:56:08 - INFO - utils.trainer -   Precision: 0.74460
+11/05/2026 22:56:08 - INFO - utils.trainer -   Specificity: 0.83827
+11/05/2026 22:56:08 - INFO - utils.trainer -   Sensitivity: 0.61062
+11/05/2026 22:56:08 - INFO - utils.trainer -   BalancedAccuracy: 0.72444
+11/05/2026 22:56:08 - INFO - utils.trainer -   Metrics saved to ./log_dir/metrics_KnowledgeLLM_s44_caueeg_topm16_DiseaseCAUEEG.json
+11/05/2026 22:56:08 - INFO - utils.trainer -   === Best epoch test result ===
+11/05/2026 22:56:08 - INFO - utils.trainer -     Loss: 0.62639
+11/05/2026 22:56:08 - INFO - utils.trainer -     AUC: 0.81526
+11/05/2026 22:56:08 - INFO - utils.trainer -     AUC_PR: 0.80432
+11/05/2026 22:56:08 - INFO - utils.trainer -     Accuracy: 0.73907
+11/05/2026 22:56:08 - INFO - utils.trainer -     Precision: 0.74460
+11/05/2026 22:56:08 - INFO - utils.trainer -     Specificity: 0.83827
+11/05/2026 22:56:08 - INFO - utils.trainer -     Sensitivity: 0.61062
+11/05/2026 22:56:08 - INFO - utils.trainer -     BalancedAccuracy: 0.72444
+11/05/2026 22:56:08 - INFO - utils.trainer -   Model saved to output_dir/output_dir_sens_topm/M16_s44/KnowledgeLLM_DiseaseCAUEEG_train/final-epoch-200
+11/05/2026 22:56:08 - INFO - utils.trainer -   Final model saved at epoch 200
